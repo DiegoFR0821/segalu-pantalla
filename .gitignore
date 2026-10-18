@@ -1,0 +1,27 @@
+# ==============================================================================
+# ARCHIVO: .gitignore
+# DIDÁCTICA (Pilar de Confidencialidad):
+# Este archivo le ordena a Git que NUNCA suba a internet (GitHub) el archivo .env
+# donde guardamos nuestras llaves reales de Supabase.
+# ==============================================================================
+
+# Variables de entorno secretas (NUNCA subir a GitHub)
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+
+# Entorno virtual de Python y archivos compilados
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Estado temporal local
+backend/estado_eventos_segalu.json
+
+# Archivos temporales del sistema operativo
+.DS_Store
+Thumbs.db
+

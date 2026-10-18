@@ -1,0 +1,26 @@
+# ==============================================================================
+# PROYECTO: MVP WEB SEGALU (Arquitectura Todo en Uno - FastAPI + Frontend)
+# ARCHIVO: render.yaml (Configuración de despliegue en Render.com)
+# ==============================================================================
+services:
+  - type: web
+    name: segalu-eventos-mvp
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: multimedia_segalu
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite

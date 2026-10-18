@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Segalú Eventos | Proyector en Vivo Pantalla Completa</title>
+    <!-- Favicon oficial transparente de Segalú -->
+    <link rel="icon" type="image/png" href="/static/img/logo_segalu.png" />
+    <link rel="apple-touch-icon" href="/static/img/logo_segalu.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/proyector/proyector.css?v=20261018b" />
+</head>
+<body>
+    <!-- Lienzo de Fuegos Artificiales a 60 FPS para el Podio -->
+    <canvas id="canvas-fuegos-proyector" class="canvas-fuegos-proyector" aria-hidden="true"></canvas>
+
+    <!-- ====================================================================== -->
+    <!-- CONTENEDOR 100% PANTALLA COMPLETA (100vw x 100vh) SIN CABECERA NI QR   -->
+    <!-- ====================================================================== -->
+    <div id="escenario-fullscreen" class="escenario-fullscreen">
+
+        <!-- ================================================================== -->
+        <!-- MODO 1: GALERIA FULLSCREEN (DOBLE CAPA AMBIENT BLUR + MOSAICO 6-8) -->
+        <!-- ================================================================== -->
+        <main id="vista-modo-galeria" class="vista-modo-proyector">
+            <div class="galeria-fullscreen-stage">
+                <!-- CAPA 1 OBLIGATORIA: Fondo Desenfocado (Ambient Blur 100vw x 100vh) -->
+                <div id="galeria-capa-blur-fondo" class="galeria-capa-blur-fondo"></div>
+                <div class="galeria-capa-velo-suave"></div>
+
+                <!-- CAPA 2A: Vista de Foto Individual Nítida (max-height: 92vh, max-width: 90vw) -->
+                <div id="galeria-contenedor-foto-activa" class="galeria-contenedor-foto-activa">
+                    <img
+                        id="galeria-img-nitida"
+                        class="galeria-img-nitida"
+                        src=""
+                        alt="Fotografía aprobada del evento"
+                    />
+                </div>
+
+                <!-- CAPA 2B: Vista Mosaico Elegante de 6 a 8 Fotos Aprobadas -->
+                <div id="galeria-contenedor-mosaico" class="galeria-contenedor-mosaico hidden">
+                    <div id="galeria-grid-mosaico" class="galeria-grid-mosaico"></div>
+                </div>
+
+                <!-- REQUERIMIENTO 5: Cápsula pequeña, translúcida y fija en la esquina inferior izquierda -->
+                <div id="galeria-autor-capsula" class="galeria-autor-capsula">
+                    <div id="galeria-autor-avatar" class="galeria-autor-avatar-mini"></div>
+                    <span class="galeria-autor-texto-compacto">
+                        En vivo por <strong id="galeria-autor-nombre">Invitado</strong>
+                    </span>
+                </div>
+
+                <!-- Estado elegante cuando aún no hay fotos aprobadas -->
+                <div id="galeria-estado-vacio" class="galeria-estado-vacio hidden">
+                    <img src="/static/img/logo_segalu.png" alt="Logo Segalú" class="galeria-vacio-logo" />
+                    <h2 class="galeria-vacio-titulo">¡Comparte tus mejores momentos en la Pantalla Gigante!</h2>
+                    <p class="galeria-vacio-subtitulo">
+                        Escanea el código QR de tu mesa desde tu celular, toca
+                        <strong>"Subir Foto a la Pantalla"</strong> y tus fotos aparecerán aquí en vivo.
+                    </p>
+                </div>
+            </div>
+        </main>
+
+        <!-- ================================================================== -->
+        <!-- MODO 2: LOBBY_KAHOOT (INVITADOS UNIÉNDOSE EN TIEMPO REAL)          -->
+        <!-- ================================================================== -->
+        <section id="vista-modo-lobby-kahoot" class="vista-modo-proyector hidden">
+            <div class="lobby-kahoot-contenedor">
+                <div class="lobby-kahoot-banner">
+                    <div class="lobby-kahoot-insignia">🎮 RONDA DE PREGUNTAS EN VIVO · ESTILO KAHOOT</div>
+                    <h2 class="lobby-kahoot-titulo">¡Prepárate en tu celular! Estamos por comenzar</h2>
+                    <p class="lobby-kahoot-instruccion">
+                        Ingresa desde el QR de tu mesa y toca el botón
+                        <span class="chip-fuego-inline">🔥 ¡Trivia en Vivo Ahora!</span>
+                    </p>
+                </div>
+
+                <div class="lobby-kahoot-barra-contador">
+                    <div class="lobby-contador-jugadores">
+                        <span id="lobby-numero-jugadores" class="lobby-numero-grande">0</span>
+                        <span class="lobby-texto-jugadores">INVITADOS EN LA PISTA</span>
+                    </div>
+                    <div class="lobby-esperando-host">
+                        <span class="punto-pulso-dorado"></span>
+                        Esperando a que el Host lance la primera pregunta...
+                    </div>
+                </div>
+
+                <!-- Cuadrícula animada de avatares compuestos (Personaje + Accesorio) -->
+                <div id="lobby-grid-avatares" class="lobby-grid-avatares"></div>
+            </div>
+        </section>
+
+        <!-- ================================================================== -->
+        <!-- MODO 3 y 4: PREGUNTA_ACTIVA y RESULTADOS_PREGUNTA (KAHOOT)         -->
+        <!-- ================================================================== -->
+        <section id="vista-modo-pregunta-kahoot" class="vista-modo-proyector hidden">
+            <div class="kahoot-stage-layout">
+                <!-- Enunciado gigante superior -->
+                <div class="kahoot-enunciado-caja">
+                    <div class="kahoot-meta-superior">
+                        <span id="kahoot-badge-numero-pregunta" class="kahoot-badge-orden">PREGUNTA 1 DE 10</span>
+                        <span id="kahoot-badge-estado-ronda" class="kahoot-badge-estado">⏱️ RESPONDE AHORA EN TU CELULAR</span>
+                    </div>
+                    <h2 id="kahoot-texto-enunciado" class="kahoot-texto-enunciado">
+                        ¿En qué distrito se encuentran las dos exclusivas sedes de Segalú Eventos?
+                    </h2>
+                </div>
+
+                <!-- Zona central: Reloj circular (Izq) | Centro (Escenario o Gráfico de Barras) | Contador Respuestas (Der) -->
+                <div class="kahoot-zona-central">
+                    <!-- Cronómetro Circular Gigante -->
+                    <div class="kahoot-panel-reloj">
+                        <div id="kahoot-reloj-circulo" class="kahoot-reloj-circulo">
+                            <svg class="kahoot-reloj-svg" viewBox="0 0 140 140">
+                                <circle class="kahoot-reloj-pista" cx="70" cy="70" r="60"></circle>
+                                <circle id="kahoot-reloj-progreso" class="kahoot-reloj-progreso" cx="70" cy="70" r="60"></circle>
+                            </svg>
+                            <div class="kahoot-reloj-interior">
+                                <span id="kahoot-segundos-numero" class="kahoot-segundos-numero">20</span>
+                                <span class="kahoot-segundos-label">SEG</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Centro: Pista activa durante la pregunta / Gráfico de Barras al cerrar la ronda -->
+                    <div class="kahoot-panel-centro">
+                        <!-- Vista central mientras corre el tiempo (PREGUNTA_ACTIVA) -->
+                        <div id="kahoot-centro-esperando" class="kahoot-centro-esperando">
+                            <div class="kahoot-centro-icono-pulso">⚡</div>
+                            <p class="kahoot-centro-titulo">¡Mira tu celular y toca la figura correcta!</p>
+                            <p class="kahoot-centro-sub">Mientras más rápido aciertes, más puntos ganarás (hasta 1,000 pts).</p>
+                        </div>
+
+                        <!-- Vista central cuando termina el tiempo o el Admin revela respuesta (RESULTADOS_PREGUNTA) -->
+                        <div id="kahoot-centro-grafico-barras" class="kahoot-centro-grafico-barras hidden">
+                            <div class="grafico-titulo-barra">
+                                <span>📊 DISTRIBUCIÓN DE RESPUESTAS EN VIVO</span>
+                            </div>
+                            <div class="grafico-columnas-grid">
+                                <!-- Columna A (Rojo ▲) -->
+                                <div id="col-barra-A" class="grafico-columna-item">
+                                    <div class="grafico-columna-top">
+                                        <span id="check-barra-A" class="grafico-check-correcta hidden">✅</span>
+                                        <strong id="votos-barra-A" class="grafico-votos-num">0</strong>
+                                    </div>
+                                    <div class="grafico-pista-vertical">
+                                        <div id="relleno-barra-A" class="grafico-relleno-barra barra-roja" style="height: 8%;"></div>
+                                    </div>
+                                    <div class="grafico-base-figura barra-roja">▲</div>
+                                </div>
+
+                                <!-- Columna B (Azul ◆) -->
+                                <div id="col-barra-B" class="grafico-columna-item">
+                                    <div class="grafico-columna-top">
+                                        <span id="check-barra-B" class="grafico-check-correcta hidden">✅</span>
+                                        <strong id="votos-barra-B" class="grafico-votos-num">0</strong>
+                                    </div>
+                                    <div class="grafico-pista-vertical">
+                                        <div id="relleno-barra-B" class="grafico-relleno-barra barra-azul" style="height: 8%;"></div>
+                                    </div>
+                                    <div class="grafico-base-figura barra-azul">◆</div>
+                                </div>
+
+                                <!-- Columna C (Amarillo ●) -->
+                                <div id="col-barra-C" class="grafico-columna-item">
+                                    <div class="grafico-columna-top">
+                                        <span id="check-barra-C" class="grafico-check-correcta hidden">✅</span>
+                                        <strong id="votos-barra-C" class="grafico-votos-num">0</strong>
+                                    </div>
+                                    <div class="grafico-pista-vertical">
+                                        <div id="relleno-barra-C" class="grafico-relleno-barra barra-amarilla" style="height: 8%;"></div>
+                                    </div>
+                                    <div class="grafico-base-figura barra-amarilla">●</div>
+                                </div>
+
+                                <!-- Columna D (Verde ■) -->
+                                <div id="col-barra-D" class="grafico-columna-item">
+                                    <div class="grafico-columna-top">
+                                        <span id="check-barra-D" class="grafico-check-correcta hidden">✅</span>
+                                        <strong id="votos-barra-D" class="grafico-votos-num">0</strong>
+                                    </div>
+                                    <div class="grafico-pista-vertical">
+                                        <div id="relleno-barra-D" class="grafico-relleno-barra barra-verde" style="height: 8%;"></div>
+                                    </div>
+                                    <div class="grafico-base-figura barra-verde">■</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contador de Respuestas Recibidas (Derecha) -->
+                    <div class="kahoot-panel-respuestas">
+                        <div class="kahoot-caja-respuestas">
+                            <span id="kahoot-numero-respuestas" class="kahoot-respuestas-num">0</span>
+                            <span class="kahoot-respuestas-label">RESPUESTAS</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Las 4 Tarjetas Clásicas de Kahoot en la parte inferior -->
+                <div class="kahoot-grid-4-tarjetas">
+                    <!-- Opción A: Rojo / Triángulo -->
+                    <div id="tarjeta-proyector-A" class="kahoot-tarjeta-proyector kahoot-card-roja">
+                        <span class="kahoot-figura-icono" aria-hidden="true">▲</span>
+                        <span id="texto-opcion-proyector-A" class="kahoot-opcion-texto">Opción A</span>
+                        <span id="indicador-correcta-A" class="kahoot-check-tarjeta hidden">✅</span>
+                    </div>
+
+                    <!-- Opción B: Azul / Rombo -->
+                    <div id="tarjeta-proyector-B" class="kahoot-tarjeta-proyector kahoot-card-azul">
+                        <span class="kahoot-figura-icono" aria-hidden="true">◆</span>
+                        <span id="texto-opcion-proyector-B" class="kahoot-opcion-texto">Opción B</span>
+                        <span id="indicador-correcta-B" class="kahoot-check-tarjeta hidden">✅</span>
+                    </div>
+
+                    <!-- Opción C: Amarillo / Círculo -->
+                    <div id="tarjeta-proyector-C" class="kahoot-tarjeta-proyector kahoot-card-amarilla">
+                        <span class="kahoot-figura-icono" aria-hidden="true">●</span>
+                        <span id="texto-opcion-proyector-C" class="kahoot-opcion-texto">Opción C</span>
+                        <span id="indicador-correcta-C" class="kahoot-check-tarjeta hidden">✅</span>
+                    </div>
+
+                    <!-- Opción D: Verde / Cuadrado -->
+                    <div id="tarjeta-proyector-D" class="kahoot-tarjeta-proyector kahoot-card-verde">
+                        <span class="kahoot-figura-icono" aria-hidden="true">■</span>
+                        <span id="texto-opcion-proyector-D" class="kahoot-opcion-texto">Opción D</span>
+                        <span id="indicador-correcta-D" class="kahoot-check-tarjeta hidden">✅</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================================================================== -->
+        <!-- MODO 5: PODIO DE GALA SECUENCIAL (3° -> 2° -> 1° CON EXPLOSIONES)  -->
+        <!-- ================================================================== -->
+        <section id="vista-modo-podio" class="vista-modo-proyector hidden">
+            <div class="podio-gala-escenario">
+                <!-- Reflectores de gala tipo Kahoot -->
+                <div class="podio-spotlight podio-spotlight-izq"></div>
+                <div class="podio-spotlight podio-spotlight-centro"></div>
+                <div class="podio-spotlight podio-spotlight-der"></div>
+
+                <!-- Cabecera de Felicitación -->
+                <div class="podio-gala-cabecera">
+                    <span class="podio-gala-kicker">🏆 GRAN FINAL DE LA RONDA DE PREGUNTAS · SEGALÚ EVENTOS</span>
+                    <h2 id="podio-gala-titulo-principal" class="podio-gala-titulo">
+                        ¡PODIO OFICIAL DE CAMPEONES!
+                    </h2>
+                    <p id="podio-gala-subtitulo" class="podio-gala-subtitulo">
+                        Revelando a los ganadores de la noche...
+                    </p>
+                </div>
+
+                <!-- Escenario de 3 Tarimas Escalonadas: 2° Izquierda | 1° Centro (Más alta) | 3° Derecha -->
+                <div id="podio-3-tarimas-contenedor" class="podio-3-tarimas-contenedor">
+                    <!-- COLUMNA IZQUIERDA: 2DO PUESTO (Se eleva 2°) -->
+                    <div id="columna-podio-2" class="podio-columna-proyector podio-col-segundo podio-oculto">
+                        <div class="podio-ganador-ficha">
+                            <div id="avatar-podio-2" class="podio-avatar-compuesto avatar-borde-plata"></div>
+                            <div class="podio-nombre-jugador" id="nombre-podio-2">Esperando...</div>
+                        </div>
+                        <div class="podio-pedestal-bloque pedestal-plata">
+                            <div class="podio-medalla-pentagono medalla-plata">
+                                <span>2</span>
+                            </div>
+                            <div class="podio-puesto-label">2° PUESTO</div>
+                            <div class="podio-puntaje-caja">
+                                <strong id="puntos-podio-2">0</strong>
+                                <span>PTS</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLUMNA CENTRAL: 1ER PUESTO CAMPEÓN (Se eleva 3° al final con explosiones) -->
+                    <div id="columna-podio-1" class="podio-columna-proyector podio-col-primero podio-oculto">
+                        <div class="podio-ganador-ficha ficha-campeon-centro">
+                            <div class="podio-corona-campeon" aria-hidden="true">👑</div>
+                            <div id="avatar-podio-1" class="podio-avatar-compuesto avatar-borde-oro"></div>
+                            <div class="podio-nombre-jugador nombre-campeon-oro" id="nombre-podio-1">Campeón</div>
+                            <div class="podio-felicitacion-chip">¡FELICITACIONES CAMPEÓN!</div>
+                        </div>
+                        <div class="podio-pedestal-bloque pedestal-oro">
+                            <div class="podio-medalla-pentagono medalla-oro">
+                                <span>1</span>
+                            </div>
+                            <div class="podio-puesto-label">1° PUESTO</div>
+                            <div class="podio-puntaje-caja puntaje-oro">
+                                <strong id="puntos-podio-1">0</strong>
+                                <span>PTS</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLUMNA DERECHA: 3ER PUESTO (Se eleva 1°) -->
+                    <div id="columna-podio-3" class="podio-columna-proyector podio-col-tercero podio-oculto">
+                        <div class="podio-ganador-ficha">
+                            <div id="avatar-podio-3" class="podio-avatar-compuesto avatar-borde-bronce"></div>
+                            <div class="podio-nombre-jugador" id="nombre-podio-3">Esperando...</div>
+                        </div>
+                        <div class="podio-pedestal-bloque pedestal-bronce">
+                            <div class="podio-medalla-pentagono medalla-bronce">
+                                <span>3</span>
+                            </div>
+                            <div class="podio-puesto-label">3° PUESTO</div>
+                            <div class="podio-puntaje-caja">
+                                <strong id="puntos-podio-3">0</strong>
+                                <span>PTS</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Menciones Honrosas (#4 y #5) discretas en la base del escenario -->
+                <div id="podio-menciones-barra" class="podio-menciones-barra hidden"></div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Librería ligera canvas-confetti + motor propio de fuegos artificiales a 60 FPS -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <script src="/proyector/proyector.js?v=20261018b"></script>
+</body>
+</html>

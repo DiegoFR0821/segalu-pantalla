@@ -1,0 +1,39 @@
+# ==============================================================================
+# PROYECTO: MVP WEB SEGALU
+# ARCHIVO: requirements.txt (Dependencias de Python)
+# ==============================================================================
+# Instalación en terminal: pip install -r requirements.txt
+# ==============================================================================
+
+# Framework web moderno y ultrarrápido para crear nuestra API en Python
+fastapi>=0.110.0
+
+# Servidor ASGI que ejecuta nuestra aplicación FastAPI
+uvicorn[standard]>=0.29.0
+
+# Cliente oficial de Supabase para Python (conecta con PostgreSQL y Storage)
+supabase>=2.4.0
+
+# Lee las variables secretas desde el archivo .env (Pilar de Confidencialidad)
+python-dotenv>=1.0.1
+
+# Validación estricta de datos de entrada (Protección extra de Integridad)
+pydantic>=2.7.0
+
+# [FASE 3] Procesamiento de imágenes: redimensión, compresión (~300 KB),
+# pre-filtro local de seguridad IA y estampado de marca de agua PNG de Segalú
+Pillow>=10.3.0
+
+# [FASE 3] Permite a FastAPI recibir archivos fotográficos y PDFs (FormData / UploadFile)
+python-multipart>=0.0.9
+
+# [FASE 4.5] Lectura y extracción de texto desde documentos PDF para la Trivia
+pypdf>=4.2.0
+
+# [FASE 4.5] SDK oficial de Google Gemini IA (gemini-3.5-flash-lite)
+# para generar 10 preguntas tipo Kahoot con 3 distractores cercanos desde un PDF
+google-generativeai>=0.7.0
+
+# Cliente HTTP asíncrono/síncrono requerido por Supabase y peticiones de red
+httpx>=0.27.0
+

@@ -1,0 +1,2172 @@
+/* ============================================================================
+   PROYECTO: MVP WEB SEGALU
+   ARCHIVO: frontend/invitado/styles.css
+   FASE 2.5 (Refinamiento Visual): Modo Claro "Gala Marfil y Gris Sobrio"
+   ============================================================================ */
+
+/* 1. VARIABLES DE COLOR - PALETA GALA MARFIL Y GRIS SOBRIO */
+:root {
+    /* ---> LÍNEA 10: Variable de fondo del contenedor del Logo PNG (transparent por defecto) <--- */
+    --bg-logo-container: transparent;
+
+    /* Fondos principales Modo Claro */
+    --bg-ivory: #FAF8F4;
+    --bg-card-white: #FFFFFF;
+    --bg-pearl-input: #F4F2EE;
+    --bg-pearl-hover: #EBE7DF;
+
+    /* Bordes y Acentos Dorados / Bronce Sobrio */
+    --border-sand-gold: #E6DEC8;
+    --icon-bronze-gold: #B58E3E;
+    --gold-champagne-start: #DFC075;
+    --gold-champagne-end: #B88E35;
+
+    /* Tipografía */
+    --text-charcoal: #1E1E24;
+    --text-warm-gray: #6E6A64;
+
+    /* Radios y Sombras sutiles */
+    --radius-xl: 24px;
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --shadow-subtle: 0 10px 30px rgba(30, 30, 36, 0.05);
+}
+
+/* 2. RESETEO GENERAL */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bg-ivory);
+    background-image: radial-gradient(circle at 50% 10%, rgba(223, 192, 117, 0.14) 0%, transparent 60%);
+    color: var(--text-charcoal);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 14px 16px 32px;
+}
+
+.app-container {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* 3. SISTEMA DE ÍCONOS SVG MONOCROMÁTICOS DE LÍNEA FINA (#B58E3E) */
+.svg-icon {
+    width: 18px;
+    height: 18px;
+    stroke: var(--icon-bronze-gold);
+    fill: none;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+}
+
+.svg-xs {
+    width: 15px;
+    height: 15px;
+}
+
+.svg-sm {
+    width: 17px;
+    height: 17px;
+}
+
+.svg-md {
+    width: 22px;
+    height: 22px;
+}
+
+.svg-lg {
+    width: 28px;
+    height: 28px;
+}
+
+.icon-dark {
+    stroke: var(--text-charcoal);
+}
+
+/* 4. BARRA SUPERIOR Y CABECERA CON CONTENEDOR DEL LOGO PNG */
+.top-brand-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 2px 8px;
+}
+
+.brand-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sparkle-icon,
+.vip-diamond {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-card-white);
+    border: 1px solid var(--border-sand-gold);
+    box-shadow: 0 2px 8px rgba(181, 142, 62, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.brand-title {
+    display: block;
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--text-charcoal);
+    line-height: 1;
+}
+
+.brand-sub {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    color: var(--icon-bronze-gold);
+    margin-top: 2px;
+}
+
+/* Cabecera central con Logo 100% Transparente (Sin fondo negro detrás) */
+.gala-header {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 8px 2px;
+}
+
+.logo-medallion {
+    width: 108px;
+    height: 108px;
+    background: transparent;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logo-inner-surface {
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-logo-container);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.logo-fallback {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--gold-champagne-start);
+}
+
+.logo-fallback span {
+    font-size: 0.5rem;
+    letter-spacing: 1.5px;
+}
+
+.logo-fallback strong {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.15rem;
+}
+
+.exclusive-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 2.4px;
+    color: var(--icon-bronze-gold);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.welcome-heading {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.7rem;
+    font-weight: 700;
+    line-height: 1.22;
+    color: var(--text-charcoal);
+    margin-bottom: 12px;
+}
+
+.gold-italic {
+    color: var(--icon-bronze-gold);
+    font-style: italic;
+}
+
+.venue-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-card-white);
+    border: 1px solid var(--border-sand-gold);
+    box-shadow: 0 3px 10px rgba(30, 30, 36, 0.04);
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: var(--text-charcoal);
+    text-transform: uppercase;
+}
+
+.venue-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--icon-bronze-gold);
+}
+
+/* 5. ALERTAS FLOTANTES SOBRIAS */
+.alert-box {
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    font-size: 0.86rem;
+    font-weight: 600;
+    text-align: center;
+    animation: gentleFade 0.2s ease-out;
+}
+
+.alert-error {
+    background: #FDF2F2;
+    border: 1px solid #F5C2C2;
+    color: #9B2C2C;
+}
+
+.alert-success {
+    background: #FBF7EC;
+    border: 1px solid var(--border-sand-gold);
+    color: #785A1E;
+}
+
+/* 6. SUPERPOSICIÓN DE CAPAS DEL MUÑEQUITO (PERSONAJE + ACCESORIO EN LA CABEZA) */
+.avatar-stage {
+    position: relative;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 35%, #FFFFFF 0%, var(--bg-pearl-input) 85%);
+    border: 2px solid var(--border-sand-gold);
+    box-shadow: 0 6px 20px rgba(181, 142, 62, 0.14);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+
+.avatar-stage-lg {
+    width: 128px;
+    height: 128px;
+}
+
+.avatar-stage-sm {
+    width: 78px;
+    height: 78px;
+}
+
+.avatar-layer-character {
+    font-size: 3.9rem;
+    line-height: 1;
+    transform: translateY(6px);
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-stage-sm .avatar-layer-character {
+    font-size: 2.35rem;
+    transform: translateY(4px);
+}
+
+.avatar-layer-accessory {
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 2rem;
+    line-height: 1;
+    z-index: 2;
+    filter: drop-shadow(0 2px 4px rgba(30, 30, 36, 0.18));
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-stage-sm .avatar-layer-accessory {
+    top: 2px;
+    font-size: 1.25rem;
+}
+
+.avatar-custom-img {
+    width: 78%;
+    height: 78%;
+    object-fit: contain;
+}
+
+.accessory-custom-img {
+    width: 50px;
+    height: 50px;
+    object-fit: contain;
+}
+
+/* 7. TARJETA PRINCIPAL DE LOGIN / REGISTRO (BLANCO PURO #FFFFFF + BORDES #E6DEC8) */
+.gala-card {
+    background: var(--bg-card-white);
+    border: 1px solid var(--border-sand-gold);
+    border-radius: var(--radius-xl);
+    padding: 22px 20px;
+    box-shadow: var(--shadow-subtle);
+    animation: gentleFade 0.25s ease-out;
+}
+
+.qr-code-bar {
+    margin-bottom: 14px;
+}
+
+.qr-code-bar label {
+    display: block;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--text-charcoal);
+    margin-bottom: 8px;
+}
+
+.qr-input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.qr-input-group input {
+    flex: 1;
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    border-radius: var(--radius-md);
+    color: var(--text-charcoal);
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 0.92rem;
+    letter-spacing: 0.5px;
+    padding: 11px 14px;
+    text-transform: uppercase;
+    outline: none;
+}
+
+.btn-outline-gold {
+    background: #FBF8F1;
+    border: 1px solid #D5C295;
+    color: #6B5019;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 0.86rem;
+    padding: 10px 18px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-outline-gold:active {
+    transform: scale(0.97);
+}
+
+.card-divider {
+    height: 1px;
+    border-top: 1px dashed var(--border-sand-gold);
+    margin: 16px 0;
+}
+
+.welcome-avatar-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.preview-hint {
+    font-size: 0.8rem;
+    color: var(--text-warm-gray);
+    text-align: center;
+    max-width: 260px;
+    line-height: 1.35;
+}
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+.field-label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #7D5D21;
+    margin-bottom: 8px;
+}
+
+.gala-input {
+    width: 100%;
+    padding: 13px 16px;
+    font-size: 0.96rem;
+    font-family: inherit;
+    color: var(--text-charcoal);
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    border-radius: var(--radius-md);
+    outline: none;
+}
+
+.gala-input::placeholder {
+    color: #9E9A93;
+}
+
+.gala-input:focus {
+    border-color: var(--icon-bronze-gold);
+    background: var(--bg-card-white);
+}
+
+.input-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 0.76rem;
+    color: var(--text-warm-gray);
+    line-height: 1.35;
+}
+
+/* Botón Principal con Degradado Dorado Champán (#DFC075 a #B88E35) */
+.btn-gold-primary {
+    width: 100%;
+    padding: 15px 18px;
+    font-size: 0.98rem;
+    font-weight: 700;
+    font-family: inherit;
+    color: var(--text-charcoal);
+    background: linear-gradient(90deg, var(--gold-champagne-start) 0%, var(--gold-champagne-end) 100%);
+    border: 1px solid rgba(184, 142, 53, 0.4);
+    border-radius: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 6px 18px rgba(184, 142, 53, 0.22);
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-gold-primary:active {
+    transform: scale(0.98);
+}
+
+.btn-gold-primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+/* 8. LOBBY DE GALA EN MODO CLARO */
+.lobby-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    animation: gentleFade 0.25s ease-out;
+}
+
+.hero-avatar-card {
+    position: relative;
+    background: var(--bg-card-white);
+    border: 1px solid var(--border-sand-gold);
+    border-radius: var(--radius-xl);
+    padding: 24px 18px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    box-shadow: var(--shadow-subtle);
+}
+
+.btn-edit-avatar {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    color: var(--text-charcoal);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: transform 0.15s ease;
+}
+
+.btn-edit-avatar:active {
+    transform: scale(0.95);
+}
+
+.avatar-medallion-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 12px;
+    cursor: pointer;
+}
+
+.vip-badge-pill {
+    margin-top: -12px;
+    z-index: 3;
+    background: linear-gradient(90deg, var(--gold-champagne-start), var(--gold-champagne-end));
+    color: var(--text-charcoal);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    padding: 4px 14px;
+    border-radius: 999px;
+    box-shadow: 0 3px 8px rgba(181, 142, 62, 0.2);
+}
+
+.guest-locked-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-charcoal);
+    margin-bottom: 2px;
+}
+
+.guest-honor-subtitle {
+    font-size: 0.84rem;
+    color: var(--text-warm-gray);
+    margin-bottom: 14px;
+}
+
+.screen-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-charcoal);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--icon-bronze-gold);
+}
+
+/* 9. BOTONES DE ACTIVIDADES EN VIVO (MODO CLARO SOBRIO) */
+.section-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+}
+
+.section-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 1.4px;
+    color: var(--text-warm-gray);
+}
+
+.section-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--icon-bronze-gold);
+}
+
+.live-actions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.gala-action-btn {
+    width: 100%;
+    background: var(--bg-card-white);
+    border: 1px solid var(--border-sand-gold);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--text-charcoal);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: var(--shadow-subtle);
+    transition: transform 0.15s ease;
+}
+
+.gala-action-btn:active {
+    transform: scale(0.98);
+}
+
+.action-icon-box {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.gold-box {
+    background: linear-gradient(135deg, var(--gold-champagne-start), var(--gold-champagne-end));
+}
+
+.pearl-gold-box {
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+}
+
+.action-content {
+    flex: 1;
+}
+
+.action-content h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-charcoal);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.gold-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--icon-bronze-gold);
+}
+
+.action-content p {
+    font-size: 0.8rem;
+    color: var(--text-warm-gray);
+    line-height: 1.35;
+}
+
+.host-wait-tag {
+    display: inline-block;
+    margin-top: 6px;
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    color: var(--text-warm-gray);
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 6px;
+}
+
+.action-circle-arrow {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    color: var(--icon-bronze-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+/* 10. SECCIÓN PROMOCIONAL SEGALÚ (SOBRIA: BLANCO, GRIS PERLA Y DORADO/CARBÓN) */
+.promo-segalu-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.section-title-gold {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text-charcoal);
+}
+
+.btn-ver-galeria {
+    background: none;
+    border: none;
+    color: var(--icon-bronze-gold);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    cursor: pointer;
+}
+
+.spaces-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.space-card {
+    background: var(--bg-card-white);
+    border: 1px solid var(--border-sand-gold);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: var(--shadow-subtle);
+    transition: transform 0.15s ease;
+}
+
+.space-card:active {
+    transform: scale(0.97);
+}
+
+/* Cabecera visual de las tarjetas en gris perla y champán suave (sin verdes ni morados) */
+.space-visual {
+    height: 86px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px solid var(--border-sand-gold);
+}
+
+.space-bg-colocho {
+    background: linear-gradient(135deg, #F7F3E8 0%, #EDE5D0 100%);
+}
+
+.space-bg-crystal {
+    background: linear-gradient(135deg, #F4F2EE 0%, #E8E2D5 100%);
+}
+
+.space-tag {
+    background: var(--bg-card-white);
+    border: 1px solid var(--border-sand-gold);
+    color: var(--text-charcoal);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.space-info {
+    padding: 10px 12px;
+}
+
+.space-info h4 {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--text-charcoal);
+    margin-bottom: 2px;
+}
+
+.space-info p {
+    font-size: 0.72rem;
+    color: var(--text-warm-gray);
+}
+
+.btn-gallery-banner {
+    width: 100%;
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    border-radius: var(--radius-md);
+    padding: 11px 14px;
+    color: var(--text-charcoal);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.btn-gallery-banner span:last-child {
+    color: var(--icon-bronze-gold);
+}
+
+.btn-gallery-banner:active {
+    transform: scale(0.98);
+}
+
+/* Botón WhatsApp Sobrio: Blanco Puro, Gris Perla y Acentos Dorados/Carbón */
+.btn-whatsapp-cta {
+    width: 100%;
+    text-decoration: none;
+    background: var(--bg-card-white);
+    border: 1.5px solid var(--border-sand-gold);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-charcoal);
+    box-shadow: var(--shadow-subtle);
+    transition: transform 0.15s ease;
+}
+
+.btn-whatsapp-cta:active {
+    transform: scale(0.98);
+}
+
+.wa-icon-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.wa-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.wa-text strong {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.98rem;
+    color: var(--text-charcoal);
+}
+
+.wa-text span {
+    font-size: 0.76rem;
+    font-weight: 500;
+    color: var(--text-warm-gray);
+}
+
+.wa-arrow {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--icon-bronze-gold);
+}
+
+.lobby-footer {
+    text-align: center;
+    padding: 6px 0 2px;
+}
+
+.btn-exit-delete {
+    background: none;
+    border: none;
+    color: var(--text-warm-gray);
+    font-family: inherit;
+    font-size: 0.8rem;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 6px 12px;
+}
+
+/* Leyenda inferior igual a la captura de Stitch */
+.brand-bottom-caption {
+    text-align: center;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--icon-bronze-gold);
+    margin-top: 8px;
+    opacity: 0.85;
+}
+
+/* 11. MODAL INFERIOR (BOTTOM SHEET) ESTILO KAHOOT EN MODO CLARO */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(30, 30, 36, 0.45);
+    z-index: 100;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    animation: gentleFade 0.2s ease-out;
+}
+
+.bottom-sheet {
+    width: 100%;
+    max-width: 440px;
+    max-height: 92vh;
+    overflow-y: auto;
+    background: var(--bg-card-white);
+    border-top: 2px solid var(--border-sand-gold);
+    border-radius: 28px 28px 0 0;
+    padding: 14px 18px 26px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 -12px 36px rgba(30, 30, 36, 0.14);
+}
+
+.sheet-handle {
+    width: 46px;
+    height: 4px;
+    border-radius: 99px;
+    background: var(--border-sand-gold);
+}
+
+.sheet-header {
+    text-align: center;
+}
+
+.vip-sheet-pill {
+    display: inline-block;
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    color: var(--icon-bronze-gold);
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    margin-bottom: 6px;
+}
+
+.sheet-header h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.45rem;
+    color: var(--text-charcoal);
+    margin-bottom: 4px;
+}
+
+.sheet-header p {
+    font-size: 0.78rem;
+    color: var(--text-warm-gray);
+}
+
+.live-preview-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 2px 0;
+}
+
+.projecting-pill {
+    margin-top: -12px;
+    z-index: 3;
+    background: linear-gradient(90deg, var(--gold-champagne-start), var(--gold-champagne-end));
+    color: var(--text-charcoal);
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    padding: 3px 12px;
+    border-radius: 999px;
+}
+
+.preview-combo-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-charcoal);
+    margin-top: 8px;
+}
+
+.preview-combo-sub {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    color: var(--icon-bronze-gold);
+}
+
+/* Conmutador de las 2 pestañas (Personaje | Accesorio) */
+.tabs-switcher {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    border-radius: 999px;
+    padding: 4px;
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-warm-gray);
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    padding: 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.tab-btn.active {
+    background: linear-gradient(90deg, var(--gold-champagne-start), var(--gold-champagne-end));
+    color: var(--text-charcoal);
+    box-shadow: 0 2px 8px rgba(181, 142, 62, 0.2);
+}
+
+.tab-panel {
+    width: 100%;
+}
+
+.panel-meta-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: var(--text-warm-gray);
+    margin-bottom: 8px;
+    padding: 0 4px;
+}
+
+.package-filter-bar {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 6px;
+}
+
+.package-pill-btn {
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    color: var(--text-warm-gray);
+    font-family: inherit;
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.package-pill-btn.active {
+    border-color: var(--icon-bronze-gold);
+    color: var(--text-charcoal);
+    background: #F7EFE0;
+}
+
+.customizer-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.item-option-card {
+    position: relative;
+    background: var(--bg-pearl-input);
+    border: 1.5px solid var(--border-sand-gold);
+    border-radius: var(--radius-md);
+    padding: 12px 6px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-charcoal);
+    font-family: inherit;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.item-option-card:active {
+    transform: scale(0.95);
+}
+
+.item-option-card.selected {
+    border-color: var(--icon-bronze-gold);
+    background: #FBF7EC;
+    box-shadow: 0 4px 12px rgba(181, 142, 62, 0.15);
+}
+
+.item-check-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--icon-bronze-gold);
+    color: #FFFFFF;
+    font-size: 0.7rem;
+    font-weight: 900;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.item-option-card.selected .item-check-badge {
+    display: flex;
+}
+
+.item-option-icon {
+    font-size: 2rem;
+    line-height: 1.1;
+}
+
+.item-option-title {
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--text-charcoal);
+    text-align: center;
+}
+
+.item-option-sub {
+    font-size: 0.65rem;
+    color: var(--text-warm-gray);
+}
+
+.sheet-info-note {
+    width: 100%;
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.75rem;
+    color: var(--text-warm-gray);
+}
+
+.btn-cancel-sheet {
+    background: none;
+    border: none;
+    color: var(--text-warm-gray);
+    font-family: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 4px;
+}
+
+/* 12. MODAL VISOR DE GALERÍA PROMOCIONAL EN MODO CLARO */
+.gallery-modal-card {
+    width: 92%;
+    max-width: 400px;
+    margin: auto;
+    background: var(--bg-card-white);
+    border: 1.5px solid var(--border-sand-gold);
+    border-radius: var(--radius-xl);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 16px 40px rgba(30, 30, 36, 0.16);
+}
+
+.gallery-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.gallery-modal-header h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    color: var(--text-charcoal);
+}
+
+.btn-close-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    color: var(--text-charcoal);
+    cursor: pointer;
+}
+
+.gallery-slide-visual {
+    height: 165px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-sand-gold);
+    background: linear-gradient(135deg, #FBF8F1 0%, #EFE8D8 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.gallery-hero-icon {
+    font-size: 2.8rem;
+}
+
+.gallery-slide-body h4 {
+    font-size: 1.05rem;
+    color: var(--text-charcoal);
+    margin-bottom: 4px;
+}
+
+.gallery-slide-body p {
+    font-size: 0.82rem;
+    color: var(--text-warm-gray);
+    line-height: 1.4;
+}
+
+.gallery-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.gallery-counter {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--icon-bronze-gold);
+}
+
+@keyframes gentleFade {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================================================
+   13. [FASE 3] ESTILOS DEL MODAL DE SUBIDA DE FOTO Y PRE-FILTRO DE IA
+   ============================================================================ */
+.upload-dropzone {
+    width: 100%;
+    min-height: 210px;
+    background: var(--bg-pearl-input);
+    border: 1.5px dashed var(--border-sand-gold);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform 0.15s ease;
+}
+
+.upload-dropzone:active {
+    transform: scale(0.99);
+}
+
+.upload-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+}
+
+.upload-icon-circle {
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: var(--bg-card-white);
+    border: 1px solid var(--border-sand-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+}
+
+.upload-placeholder strong {
+    font-size: 0.92rem;
+    color: var(--text-charcoal);
+}
+
+.upload-placeholder span {
+    font-size: 0.74rem;
+    color: var(--text-warm-gray);
+}
+
+/* Estructura de Doble Capa "Ambient Blur" (Sin bordes negros vacíos) */
+.photo-preview-wrapper {
+    position: relative;
+    width: 100%;
+    height: 270px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-sand-gold);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-pearl-input);
+}
+
+/* Capa 1 (Fondo): La misma foto desenfocada rellenando todo el recuadro */
+.ambient-blur-layer {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: blur(28px);
+    transform: scale(1.12);
+    opacity: 0.92;
+    z-index: 1;
+}
+
+/* Capa 2 (Frente): La foto original completa y nítida (object-fit: contain) */
+.photo-preview-img {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    max-height: 270px;
+    object-fit: contain;
+    display: block;
+}
+
+/* Marca de agua transparente en la esquina superior izquierda (margen ~3%) */
+.watermark-preview-topleft {
+    position: absolute;
+    top: 3%;
+    left: 3%;
+    z-index: 3;
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    background: transparent;
+    pointer-events: none;
+}
+
+.ia-status-box {
+    width: 100%;
+    background: #FBF8F1;
+    border: 1px solid var(--border-sand-gold);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ia-status-box.ia-warning {
+    background: #FDF4F4;
+    border-color: #EBB5B5;
+}
+
+.ia-status-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ia-status-text strong {
+    font-size: 0.82rem;
+    color: var(--text-charcoal);
+}
+
+.ia-status-text span {
+    font-size: 0.72rem;
+    color: var(--text-warm-gray);
+}
+
+/* ============================================================================
+   14. [FASE 4.5] EXPERIENCIA DE TRIVIA ESTILO KAHOOT Y CUADRO CUADRADO DE PODIO
+   ============================================================================ */
+.host-wait-tag.live-now {
+    background: linear-gradient(90deg, #1E8754 0%, #156A40 100%);
+    border-color: #68D391;
+    color: #FFFFFF;
+    box-shadow: 0 4px 12px rgba(30, 135, 84, 0.25);
+    animation: pulseLiveLobby 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes pulseLiveLobby {
+    from {
+        transform: scale(1);
+    }
+    to {
+        transform: scale(1.03);
+    }
+}
+
+.trivia-view-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    animation: gentleFade 0.25s ease-out;
+}
+
+.trivia-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.btn-back-lobby {
+    background: var(--bg-card-white);
+    border: 1px solid var(--border-sand-gold);
+    color: var(--text-charcoal);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 8px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: var(--shadow-subtle);
+}
+
+.trivia-phase-pill {
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    background: #FBF7EC;
+    border: 1px solid var(--border-sand-gold);
+    color: #6B5019;
+}
+
+/* Sub-panel A: Sala de Espera */
+.trivia-waiting-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 26px 18px;
+}
+
+.trivia-wait-heading {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.45rem;
+    color: var(--text-charcoal);
+    margin: 12px 0 6px;
+}
+
+.trivia-wait-text {
+    font-size: 0.84rem;
+    color: var(--text-warm-gray);
+    line-height: 1.45;
+    margin-bottom: 14px;
+}
+
+.trivia-speed-tip {
+    width: 100%;
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.78rem;
+    color: var(--text-charcoal);
+    text-align: left;
+    line-height: 1.35;
+}
+
+/* Sub-panel B: Pregunta en Vivo + Temporizador Fluido + 4 Opciones Oficiales Kahoot */
+.trivia-question-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.trivia-timer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.question-order-badge {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    color: var(--icon-bronze-gold);
+    text-transform: uppercase;
+}
+
+.timer-clock-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #FBF7EC;
+    border: 1.5px solid var(--border-sand-gold);
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    color: var(--text-charcoal);
+}
+
+.timer-clock-pill.timer-urgent {
+    background: #FDF2F2;
+    border-color: #E57373;
+    color: #9B2C2C;
+}
+
+.trivia-progress-track {
+    width: 100%;
+    height: 10px;
+    background: var(--bg-pearl-input);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid var(--border-sand-gold);
+}
+
+.trivia-progress-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, var(--gold-champagne-start), var(--gold-champagne-end));
+    border-radius: 999px;
+    transition: width 0.12s linear, background 0.25s ease;
+}
+
+.trivia-progress-fill.bar-urgent {
+    background: linear-gradient(90deg, #E53E3E, #C53030);
+}
+
+.trivia-statement-box {
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    border-radius: var(--radius-md);
+    padding: 16px 14px;
+    text-align: center;
+}
+
+.trivia-statement-box h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    line-height: 1.32;
+    color: var(--text-charcoal);
+}
+
+/* 4 Alternativas Oficiales Estilo Kahoot (Igual a la Imagen 1 de Referencia):
+   Rojo (#E21B3C) Triángulo ▲ | Azul (#1368CE) Rombo ◆
+   Amarillo (#D89E00) Círculo ● | Verde (#26890C) Cuadrado ■ */
+.kahoot-options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.kahoot-option-btn {
+    position: relative;
+    border: none;
+    border-radius: 12px;
+    padding: 28px 12px 16px;
+    min-height: 120px;
+    color: #FFFFFF;
+    font-family: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 5px 0 rgba(0, 0, 0, 0.22), 0 8px 18px rgba(30, 30, 36, 0.15);
+    transition: transform 0.1s ease, opacity 0.15s ease;
+}
+
+.kahoot-option-btn:active {
+    transform: translateY(3px) scale(0.98);
+}
+
+.kahoot-option-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.kahoot-btn-a {
+    background-color: #E21B3C;
+}
+
+.kahoot-btn-b {
+    background-color: #1368CE;
+}
+
+.kahoot-btn-c {
+    background-color: #D89E00;
+}
+
+.kahoot-btn-d {
+    background-color: #26890C;
+}
+
+/* Ícono geométrico blanco en la esquina superior izquierda de cada tarjeta Kahoot */
+.kahoot-shape-corner {
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    font-size: 1.05rem;
+    line-height: 1;
+    color: #FFFFFF;
+    opacity: 0.96;
+}
+
+.kahoot-opt-text {
+    font-size: 0.92rem;
+    font-weight: 800;
+    line-height: 1.25;
+    color: #FFFFFF;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Sub-panel B.2: [FASE 4.5 - REQUERIMIENTO D] Pantalla Neutral al Enviar Respuesta */
+.trivia-neutral-sent-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 26px 20px;
+    gap: 12px;
+    background: linear-gradient(145deg, #2D1957 0%, #1C0F38 100%);
+    border: 2px solid #D4AF37;
+    color: #FFFFFF;
+}
+
+.neutral-hourglass-circle {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1.5px solid rgba(245, 215, 127, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    animation: gentleHourglass 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes gentleHourglass {
+    from {
+        transform: rotate(-8deg) scale(1);
+    }
+    to {
+        transform: rotate(8deg) scale(1.06);
+    }
+}
+
+.avatar-stage-md {
+    width: 82px;
+    height: 82px;
+}
+
+.avatar-stage-md .avatar-layer-character {
+    font-size: 2.6rem;
+    transform: translateY(5px);
+}
+
+.avatar-stage-md .avatar-layer-accessory {
+    top: 2px;
+    font-size: 1.45rem;
+}
+
+.neutral-sent-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.22rem;
+    line-height: 1.35;
+    color: #FFF9E6;
+}
+
+.neutral-sent-sub {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.82);
+}
+
+.neutral-countdown-pill {
+    margin-top: 4px;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(245, 215, 127, 0.5);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 0.84rem;
+    color: #F5D77F;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Sub-panel C: Pantalla de Resultado Único y Definitivo (Verde ✅ / Roja ❌) */
+.kahoot-result-card {
+    border-radius: var(--radius-xl);
+    padding: 24px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    color: #FFFFFF;
+    box-shadow: 0 14px 34px rgba(30, 30, 36, 0.18);
+    animation: gentleFade 0.22s ease-out;
+}
+
+.kahoot-result-card.result-correct {
+    background: linear-gradient(145deg, #1E8754 0%, #13653F 100%);
+    border: 2px solid #68D391;
+}
+
+.kahoot-result-card.result-wrong {
+    background: linear-gradient(145deg, #C83737 0%, #962222 100%);
+    border: 2px solid #FC8181;
+}
+
+.kahoot-giant-icon {
+    font-size: 3.9rem;
+    line-height: 1;
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.22));
+}
+
+.kahoot-result-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.55rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+}
+
+.kahoot-points-pill {
+    background: rgba(0, 0, 0, 0.24);
+    border: 1.5px solid rgba(255, 255, 255, 0.45);
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.kahoot-stats-strip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
+
+.kahoot-stat-chip {
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.36);
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.result-avatar-wrap {
+    margin: 4px 0;
+}
+
+.avatar-celebrating {
+    animation: kahootCelebrate 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes kahootCelebrate {
+    from {
+        transform: translateY(0) scale(1);
+    }
+    to {
+        transform: translateY(-8px) scale(1.06);
+    }
+}
+
+.kahoot-result-msg {
+    font-size: 0.86rem;
+    line-height: 1.4;
+    opacity: 0.95;
+    max-width: 310px;
+}
+
+.kahoot-official-answer {
+    width: 100%;
+    margin-top: 4px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+/* Sub-panel D: [FASE 4.5 - REQUERIMIENTO E] Cuadro CUADRADO Centrado de Podio en el Celular
+   (Idéntico a la imagen de referencia móvil de Kahoot: medalla pentagonal, puesto, avatar y puntaje) */
+.trivia-mobile-podium-outer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 0;
+}
+
+.kahoot-mobile-podium-square {
+    position: relative;
+    width: 100%;
+    max-width: 350px;
+    min-height: 350px;
+    aspect-ratio: 1 / 1;
+    margin: 0 auto;
+    border-radius: 26px;
+    padding: 0 22px 24px;
+    background: radial-gradient(circle at 50% 20%, #4C249E 0%, #2C1460 65%, #1B0B3E 100%);
+    border: 2.5px solid #D4AF37;
+    color: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    text-align: center;
+    box-shadow: 0 18px 40px rgba(27, 11, 62, 0.32);
+    overflow: hidden;
+}
+
+/* Cinta vertical estilo medalla Olímpica/Kahoot */
+.mobile-medal-ribbon {
+    width: 34px;
+    height: 36px;
+    background: linear-gradient(90deg, #1368CE 0%, #2B82EB 50%, #1368CE 100%);
+    border-left: 3px solid #F5D77F;
+    border-right: 3px solid #F5D77F;
+    margin-bottom: -10px;
+    z-index: 1;
+}
+
+/* Medalla Pentagonal Centrada del Puesto (#1, #2, #3, #4...) */
+.kahoot-mobile-pentagon-medal {
+    position: relative;
+    z-index: 2;
+    width: 78px;
+    height: 78px;
+    clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.1rem;
+    font-weight: 900;
+    color: #1E1E24;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+.kahoot-mobile-pentagon-medal.medal-gold {
+    background: linear-gradient(135deg, #FFF3B0 0%, #FFD700 45%, #D49B00 100%);
+}
+
+.kahoot-mobile-pentagon-medal.medal-silver {
+    background: linear-gradient(135deg, #FFFFFF 0%, #D9E2EC 50%, #9FB3C8 100%);
+}
+
+.kahoot-mobile-pentagon-medal.medal-bronze {
+    background: linear-gradient(135deg, #FFE0B5 0%, #E6A15C 50%, #B86B28 100%);
+}
+
+.kahoot-mobile-pentagon-medal.medal-purple {
+    background: linear-gradient(135deg, #F5D77F 0%, #D4AF37 100%);
+}
+
+.mobile-podium-rank-tag {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #F5D77F;
+    margin-top: 4px;
+}
+
+.mobile-podium-congrats {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.45rem;
+    line-height: 1.2;
+    color: #FFFFFF;
+}
+
+.mobile-podium-final-score {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.36);
+    border: 1.5px solid rgba(245, 215, 127, 0.55);
+    border-radius: 14px;
+    padding: 10px 16px;
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: #FFF9DB;
+    letter-spacing: 0.5px;
+}
+
+/* Barra Inferior del Jugador (Muñequito + Nombre Bloqueado + Puntaje Acumulado) */
+.trivia-player-bar {
+    background: var(--bg-card-white);
+    border: 1.5px solid var(--border-sand-gold);
+    border-radius: 18px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    box-shadow: var(--shadow-subtle);
+}
+
+.player-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.avatar-stage-xs {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+}
+
+.avatar-stage-xs .avatar-layer-character {
+    font-size: 1.55rem;
+    transform: translateY(3px);
+}
+
+.avatar-stage-xs .avatar-layer-accessory {
+    top: 1px;
+    font-size: 0.85rem;
+}
+
+.player-bar-meta {
+    display: flex;
+    flex-direction: column;
+}
+
+.player-bar-meta strong {
+    font-size: 0.92rem;
+    color: var(--text-charcoal);
+}
+
+.player-bar-meta span {
+    font-size: 0.72rem;
+    color: var(--text-warm-gray);
+}
+
+.player-score-badge {
+    background: linear-gradient(135deg, var(--gold-champagne-start), var(--gold-champagne-end));
+    border-radius: 12px;
+    padding: 6px 12px;
+    text-align: right;
+    color: var(--text-charcoal);
+}
+
+.score-label {
+    display: block;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.player-score-badge strong {
+    font-size: 0.95rem;
+    font-weight: 800;
+}
+
+/* ============================================================================
+   16. GALERÍA DE 4 FOTOS POR SEDE (16:10) + SECCIÓN "NUESTRAS SEDES Y CÓMO LLEGAR"
+   ============================================================================ */
+.space-visual {
+    position: relative;
+    height: auto !important;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+}
+
+.space-cover-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+}
+
+.space-visual .space-fallback-icon,
+.space-visual .space-tag {
+    position: relative;
+    z-index: 2;
+}
+
+/* Pestañas Sede 1 / Sede 2 dentro del Modal de Galería */
+.gallery-sede-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.btn-sede-tab {
+    background: var(--bg-pearl-input);
+    border: 1.5px solid var(--border-sand-gold);
+    color: var(--text-charcoal);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 8px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-sede-tab.active {
+    background: linear-gradient(135deg, var(--gold-champagne-start), var(--gold-champagne-end));
+    border-color: var(--icon-bronze-gold);
+    font-weight: 800;
+}
+
+.gallery-slide-visual {
+    position: relative;
+    height: auto !important;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    padding: 0;
+}
+
+.gallery-slide-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 2;
+}
+
+.gallery-floating-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 3;
+}
+
+/* Tarjetas de Ubicación "📍 Nuestras Sedes y Cómo Llegar" */
+.sedes-ubicacion-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.sedes-ubicacion-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.sede-ubicacion-card,
+.gallery-modal-location-box {
+    background: var(--bg-card-white);
+    border: 1px solid var(--border-sand-gold);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    box-shadow: var(--shadow-subtle);
+}
+
+.gallery-modal-location-box {
+    background: var(--bg-pearl-input);
+    padding: 10px 12px;
+}
+
+.sede-loc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.sede-loc-header h4 {
+    font-size: 0.88rem;
+    font-weight: 800;
+    color: var(--text-charcoal);
+}
+
+.sede-loc-badge {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: var(--icon-bronze-gold);
+    background: var(--bg-pearl-input);
+    border: 1px solid var(--border-sand-gold);
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.sede-loc-address,
+.gallery-loc-address {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 0.77rem;
+    color: var(--text-warm-gray);
+    line-height: 1.35;
+}
+
+.sede-loc-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+@media (max-width: 370px) {
+    .sede-loc-actions {
+        grid-template-columns: 1fr;
+    }
+}
+
+.btn-sede-maps,
+.btn-sede-share-wa {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 8px 10px;
+    border-radius: 9px;
+    font-size: 0.73rem;
+    font-weight: 800;
+    text-decoration: none;
+    text-align: center;
+    transition: transform 0.15s ease;
+}
+
+.btn-sede-maps:active,
+.btn-sede-share-wa:active {
+    transform: scale(0.97);
+}
+
+.btn-sede-maps {
+    background: linear-gradient(135deg, var(--gold-champagne-start), var(--gold-champagne-end));
+    border: 1px solid rgba(181, 142, 62, 0.45);
+    color: var(--text-charcoal);
+}
+
+.btn-sede-share-wa {
+    background: var(--bg-card-white);
+    border: 1px solid var(--border-sand-gold);
+    color: var(--text-charcoal);
+}
+
+
+

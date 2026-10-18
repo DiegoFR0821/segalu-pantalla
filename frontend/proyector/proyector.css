@@ -1,0 +1,1307 @@
+/* ========================================================================== */
+/* PROYECTO: MVP WEB SEGALU (Eventos & Experiencias)                          */
+/* ARCHIVO: frontend/proyector/proyector.css                                  */
+/* FASE 5: Proyector 100% Pantalla Completa (100vw x 100vh) sin bordes,       */
+/*         Doble Capa Ambient Blur, Mosaico 6-8 Fotos, Trivia Kahoot en       */
+/*         Atmósfera Negro/Plomo y Podio Secuencial 3° -> 2° -> 1°            */
+/* ========================================================================== */
+
+:root {
+    /* ====================================================================== */
+    /* 1. VARIABLES DE FOTOS Y GALERÍA (AJUSTA AQUÍ CUANDO QUIERAS)           */
+    /* ====================================================================== */
+    --foto-max-height: 92vh;          /* Alto máximo de la foto nítida central */
+    --foto-max-width: 90vw;           /* Ancho máximo de la foto nítida central */
+    --foto-border-radius: 22px;       /* Redondeo de esquinas de las fotos     */
+    --blur-intensidad: 38px;          /* Intensidad del desenfoque de fondo    */
+    --transicion-duracion: 0.8s;      /* Duración de la transición entre fotos */
+
+    /* ====================================================================== */
+    /* 2. VARIABLES DE ATMÓSFERA DE JUEGO KAHOOT (FONDO NEGRO Y DIVS PLOMO)   */
+    /* ====================================================================== */
+    --trivia-bg-negro: #0B0C10;       /* Negro profundo principal de Trivia    */
+    --trivia-bg-radial: #151822;      /* Degradado radial suave de Trivia      */
+    --trivia-div-plomo: #1E222D;      /* Gris Pizarra / Plomo de contenedores  */
+    --trivia-borde-sutil: rgba(255, 255, 255, 0.12); /* Borde sutil sobre plomo */
+
+    /* Paleta de Gala Segalú y Colores Oficiales Kahoot */
+    --marfil-fondo: #FAF8F4;
+    --blanco-puro: #FFFFFF;
+    --borde-arena: #E6DEC8;
+    --dorado-segalu: #C5A03F;
+    --dorado-brillante: #E5C158;
+    --dorado-profundo: #8A6D1B;
+    --carbon-oscuro: #1E1E24;
+    --gris-medio: #5E5D59;
+
+    --kahoot-rojo: #E21B3C;
+    --kahoot-rojo-sombra: #A81029;
+    --kahoot-azul: #1368CE;
+    --kahoot-azul-sombra: #0C4891;
+    --kahoot-amarillo: #D89E00;
+    --kahoot-amarillo-sombra: #9E7200;
+    --kahoot-verde: #26890C;
+    --kahoot-verde-sombra: #195E07;
+
+    --fuente-titulos: "Cormorant Garamond", Georgia, serif;
+    --fuente-ui: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* ========================================================================== */
+/* 1. PANTALLA 100% COMPLETA (100vw x 100vh) SIN MÁRGENES NI BORDES           */
+/* ========================================================================== */
+html,
+body {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden !important;
+    background: var(--trivia-bg-negro);
+    font-family: var(--fuente-ui);
+    color: var(--blanco-puro);
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.canvas-fuegos-proyector {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 9999;
+}
+
+.escenario-fullscreen {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.vista-modo-proyector {
+    position: absolute;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    animation: entradaSuaveModo 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes entradaSuaveModo {
+    from {
+        opacity: 0;
+        transform: scale(0.992);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ========================================================================== */
+/* 2. MODO GALERIA FULLSCREEN (100vw x 100vh) + AMBIENT BLUR + MOSAICO 6-8    */
+/* ========================================================================== */
+.galeria-fullscreen-stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0B0C10;
+}
+
+/* CAPA 1 OBLIGATORIA: Fondo Desenfocado ocupando el 100% hasta los 4 bordes */
+.galeria-capa-blur-fondo {
+    position: absolute;
+    inset: -60px;
+    width: calc(100vw + 120px);
+    height: calc(100vh + 120px);
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    filter: blur(var(--blur-intensidad)) saturate(1.22) brightness(0.78);
+    transform: scale(1.14);
+    transition: background-image var(--transicion-duracion) ease-in-out;
+    z-index: 1;
+}
+
+.galeria-capa-velo-suave {
+    position: absolute;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(
+        circle at center,
+        rgba(10, 10, 15, 0.05) 0%,
+        rgba(10, 10, 15, 0.38) 100%
+    );
+    z-index: 2;
+}
+
+/* CAPA 2A: Foto Individual Nítida Centrada (max-height: 92vh; max-width: 90vw) */
+.galeria-contenedor-foto-activa {
+    position: relative;
+    z-index: 4;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.galeria-img-nitida {
+    max-height: var(--foto-max-height);
+    max-width: var(--foto-max-width);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: var(--foto-border-radius);
+    box-shadow: 0 28px 72px rgba(0, 0, 0, 0.52);
+    opacity: 1;
+    transform: scale(1);
+    transition:
+        opacity var(--transicion-duracion) cubic-bezier(0.22, 1, 0.36, 1),
+        transform var(--transicion-duracion) cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+}
+
+.galeria-img-nitida.transicion-foto {
+    opacity: 0;
+    transform: scale(0.965);
+}
+
+/* CAPA 2B: Vista Mosaico de 6 a 8 Fotos Aprobadas sobre el Fondo Desenfocado */
+.galeria-contenedor-mosaico {
+    position: relative;
+    z-index: 4;
+    width: 100vw;
+    height: 100vh;
+    padding: 3.5vh 4vw;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: entradaMosaicoFluida var(--transicion-duracion) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes entradaMosaicoFluida {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.galeria-grid-mosaico {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.galeria-grid-mosaico.mosaico-6-items {
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+}
+
+.mosaico-item-card {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--foto-border-radius);
+    overflow: hidden;
+    background: rgba(20, 20, 28, 0.45);
+    border: 1.5px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+    animation: aparicionTarjetaMosaico 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes aparicionTarjetaMosaico {
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.mosaico-item-blur {
+    position: absolute;
+    inset: -16px;
+    background-size: cover;
+    background-position: center;
+    filter: blur(18px) brightness(0.75);
+    transform: scale(1.1);
+}
+
+.mosaico-item-img {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.mosaico-item-autor {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: rgba(15, 15, 20, 0.52);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #FFFFFF;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+/* ========================================================================== */
+/* 3. ETIQUETA "En vivo por [Nombre]" PEQUEÑA Y TRANSLÚCIDA                   */
+/*    EN LA ESQUINA INFERIOR IZQUIERDA DE LA PANTALLA                         */
+/* ========================================================================== */
+.galeria-autor-capsula {
+    position: fixed;
+    bottom: 24px;
+    left: 28px;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 16px 7px 9px;
+    border-radius: 999px;
+    background: rgba(15, 15, 20, 0.42);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    pointer-events: none;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.galeria-autor-avatar-mini {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(245, 215, 127, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.galeria-autor-avatar-mini svg {
+    width: 28px;
+    height: 28px;
+}
+
+.galeria-autor-texto-compacto {
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: 0.01em;
+}
+
+.galeria-autor-texto-compacto strong {
+    font-weight: 800;
+    color: #FFFFFF;
+}
+
+/* Estado vacío elegante cuando aún no hay fotos aprobadas */
+.galeria-estado-vacio {
+    position: relative;
+    z-index: 5;
+    max-width: 820px;
+    padding: 48px 56px;
+    border-radius: 28px;
+    background: var(--trivia-div-plomo);
+    border: 1.5px solid rgba(229, 193, 88, 0.35);
+    text-align: center;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.galeria-vacio-logo {
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
+    margin-bottom: 14px;
+}
+
+.galeria-vacio-titulo {
+    font-family: var(--fuente-titulos);
+    font-size: 2.75rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 12px;
+}
+
+.galeria-vacio-subtitulo {
+    font-size: 1.25rem;
+    line-height: 1.55;
+    color: #CBD5E1;
+}
+
+/* ========================================================================== */
+/* 4. MODO LOBBY_KAHOOT (ATMÓSFERA DE JUEGO: FONDO NEGRO Y DIVS PLOMO)        */
+/* ========================================================================== */
+.lobby-kahoot-contenedor {
+    width: 100vw;
+    height: 100vh;
+    padding: 36px 48px;
+    background: radial-gradient(
+        circle at 50% 20%,
+        var(--trivia-bg-radial) 0%,
+        var(--trivia-bg-negro) 100%
+    );
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    color: #FFFFFF;
+}
+
+.lobby-kahoot-banner {
+    text-align: center;
+    padding: 22px 32px;
+    border-radius: 24px;
+    background: var(--trivia-div-plomo);
+    border: 1.5px solid rgba(229, 193, 88, 0.32);
+    color: #FFFFFF;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
+}
+
+.lobby-kahoot-insignia {
+    display: inline-block;
+    padding: 5px 16px;
+    border-radius: 999px;
+    background: rgba(229, 193, 88, 0.16);
+    border: 1px solid #E5C158;
+    color: #F5D77F;
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+}
+
+.lobby-kahoot-titulo {
+    font-family: var(--fuente-titulos);
+    font-size: 2.85rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    margin-bottom: 6px;
+}
+
+.lobby-kahoot-instruccion {
+    font-size: 1.2rem;
+    color: #CBD5E1;
+}
+
+.chip-fuego-inline {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #D4AF37, #F5D77F);
+    color: #11131A;
+    font-weight: 800;
+}
+
+.lobby-kahoot-barra-contador {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    border-radius: 18px;
+    background: var(--trivia-div-plomo);
+    border: 1.5px solid var(--trivia-borde-sutil);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.lobby-contador-jugadores {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.lobby-numero-grande {
+    font-size: 2.3rem;
+    font-weight: 900;
+    color: #F5D77F;
+    background: rgba(11, 12, 16, 0.68);
+    padding: 4px 18px;
+    border-radius: 14px;
+    border: 1.5px solid rgba(229, 193, 88, 0.45);
+}
+
+.lobby-texto-jugadores {
+    font-size: 1.08rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: #FFFFFF;
+}
+
+.lobby-esperando-host {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.12rem;
+    font-weight: 700;
+    color: #CBD5E1;
+}
+
+.punto-pulso-dorado {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #E5C158;
+    box-shadow: 0 0 0 0 rgba(229, 193, 88, 0.7);
+    animation: pulsoDoradoVivo 1.6s infinite;
+}
+
+@keyframes pulsoDoradoVivo {
+    0% {
+        box-shadow: 0 0 0 0 rgba(229, 193, 88, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 12px rgba(229, 193, 88, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(229, 193, 88, 0);
+    }
+}
+
+.lobby-grid-avatares {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-auto-rows: 112px;
+    gap: 16px;
+    overflow: hidden;
+    align-content: start;
+    padding: 4px;
+}
+
+.lobby-jugador-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border-radius: 20px;
+    background: var(--trivia-div-plomo);
+    border: 1.5px solid var(--trivia-borde-sutil);
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.38);
+    animation: saltoEntradaJugador 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes saltoEntradaJugador {
+    from {
+        opacity: 0;
+        transform: scale(0.75) translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.lobby-jugador-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: rgba(11, 12, 16, 0.65);
+    border: 2px solid #E5C158;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    animation: flotarAvatarSuave 2.8s ease-in-out infinite;
+}
+
+.lobby-jugador-avatar svg {
+    width: 60px;
+    height: 60px;
+}
+
+@keyframes flotarAvatarSuave {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-4px);
+    }
+}
+
+.lobby-jugador-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.lobby-jugador-nombre {
+    font-size: 1.18rem;
+    font-weight: 800;
+    color: #FFFFFF;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lobby-jugador-pts {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #F5D77F;
+}
+
+/* ========================================================================== */
+/* 5. MODOS PREGUNTA_ACTIVA Y RESULTADOS_PREGUNTA EN ATMÓSFERA NEGRO Y PLOMO  */
+/* ========================================================================== */
+.kahoot-stage-layout {
+    width: 100vw;
+    height: 100vh;
+    padding: 32px 44px;
+    background: radial-gradient(
+        circle at 50% 22%,
+        var(--trivia-bg-radial) 0%,
+        var(--trivia-bg-negro) 100%
+    );
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 20px;
+    color: #FFFFFF;
+}
+
+/* Contenedor superior del enunciado en tono Plomo / Gris Pizarra (#1E222D) */
+.kahoot-enunciado-caja {
+    padding: 22px 36px;
+    border-radius: 26px;
+    background: var(--trivia-div-plomo);
+    border: 1.5px solid rgba(229, 193, 88, 0.32);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.48);
+    text-align: center;
+}
+
+.kahoot-meta-superior {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 10px;
+}
+
+.kahoot-badge-orden {
+    padding: 5px 16px;
+    border-radius: 999px;
+    background: rgba(11, 12, 16, 0.72);
+    border: 1px solid rgba(245, 215, 127, 0.45);
+    color: #F5D77F;
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+}
+
+.kahoot-badge-estado {
+    padding: 5px 16px;
+    border-radius: 999px;
+    background: rgba(229, 193, 88, 0.16);
+    border: 1px solid rgba(229, 193, 88, 0.42);
+    color: #FFF3C4;
+    font-size: 0.92rem;
+    font-weight: 800;
+}
+
+.kahoot-texto-enunciado {
+    font-size: clamp(1.75rem, 2.5vw, 2.55rem);
+    font-weight: 800;
+    line-height: 1.22;
+    color: #FFFFFF;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.kahoot-zona-central {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 220px 1fr 220px;
+    align-items: center;
+    gap: 24px;
+}
+
+.kahoot-panel-reloj,
+.kahoot-panel-respuestas {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Círculo del temporizador en Plomo oscuro (#1E222D) con números blancos */
+.kahoot-reloj-circulo {
+    position: relative;
+    width: 176px;
+    height: 176px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--trivia-div-plomo);
+    border: 1.5px solid var(--trivia-borde-sutil);
+    border-radius: 50%;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.5);
+}
+
+.kahoot-reloj-svg {
+    width: 176px;
+    height: 176px;
+    transform: rotate(-90deg);
+}
+
+.kahoot-reloj-pista {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.12);
+    stroke-width: 11;
+}
+
+.kahoot-reloj-progreso {
+    fill: none;
+    stroke: #F5D77F;
+    stroke-width: 11;
+    stroke-linecap: round;
+    stroke-dasharray: 377;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.45s linear, stroke 0.3s ease;
+}
+
+.kahoot-reloj-circulo.urgente .kahoot-reloj-progreso {
+    stroke: var(--kahoot-rojo);
+}
+
+.kahoot-reloj-interior {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.kahoot-segundos-numero {
+    font-size: 3.4rem;
+    font-weight: 900;
+    line-height: 1;
+    color: #FFFFFF;
+}
+
+.kahoot-segundos-label {
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: #CBD5E1;
+}
+
+/* Cuadro central ("DISTRIBUCIÓN DE RESPUESTAS EN VIVO") en Plomo oscuro (#1E222D) */
+.kahoot-panel-centro {
+    height: 100%;
+    min-height: 0;
+    border-radius: 26px;
+    background: var(--trivia-div-plomo);
+    border: 1.5px solid var(--trivia-borde-sutil);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 32px;
+}
+
+.kahoot-centro-esperando {
+    text-align: center;
+    max-width: 780px;
+}
+
+.kahoot-centro-icono-pulso {
+    font-size: 3.6rem;
+    margin-bottom: 10px;
+    animation: latidoKahoot 1.2s ease-in-out infinite;
+}
+
+@keyframes latidoKahoot {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.14);
+    }
+}
+
+.kahoot-centro-titulo {
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: #FFFFFF;
+    margin-bottom: 6px;
+}
+
+.kahoot-centro-sub {
+    font-size: 1.18rem;
+    color: #CBD5E1;
+    font-weight: 600;
+}
+
+.kahoot-centro-grafico-barras {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.grafico-titulo-barra {
+    text-align: center;
+    font-size: 0.96rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    color: #F5D77F;
+}
+
+.grafico-columnas-grid {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 28px;
+    padding: 6px 48px 4px;
+    align-items: end;
+}
+
+.grafico-columna-item {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.grafico-columna-item.columna-atenuada {
+    opacity: 0.45;
+}
+
+.grafico-columna-item.columna-ganadora {
+    transform: translateY(-4px);
+}
+
+.grafico-columna-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.65rem;
+    font-weight: 900;
+    color: #FFFFFF;
+}
+
+.grafico-check-correcta {
+    font-size: 1.5rem;
+}
+
+/* Carriles vacíos de las barras con contraste oscuro limpio sobre el fondo plomo */
+.grafico-pista-vertical {
+    width: 100%;
+    max-width: 128px;
+    height: 185px;
+    border-radius: 16px 16px 8px 8px;
+    background: rgba(11, 12, 16, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+}
+
+.grafico-relleno-barra {
+    width: 100%;
+    min-height: 14px;
+    border-radius: 14px 14px 0 0;
+    transition: height 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.grafico-base-figura {
+    width: 100%;
+    max-width: 128px;
+    height: 38px;
+    border-radius: 10px;
+    color: #FFFFFF;
+    font-size: 1.35rem;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.barra-roja { background: var(--kahoot-rojo); }
+.barra-azul { background: var(--kahoot-azul); }
+.barra-amarilla { background: var(--kahoot-amarillo); }
+.barra-verde { background: var(--kahoot-verde); }
+
+/* Contador de respuestas en Plomo oscuro (#1E222D) con borde dorado */
+.kahoot-caja-respuestas {
+    width: 184px;
+    height: 176px;
+    border-radius: 28px;
+    background: var(--trivia-div-plomo);
+    border: 1.5px solid rgba(229, 193, 88, 0.42);
+    color: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.5);
+}
+
+.kahoot-respuestas-num {
+    font-size: 3.5rem;
+    font-weight: 900;
+    line-height: 1;
+    color: #F5D77F;
+}
+
+.kahoot-respuestas-label {
+    margin-top: 6px;
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: #FFFFFF;
+}
+
+/* Las 4 Tarjetas Vibrantes de Kahoot */
+.kahoot-grid-4-tarjetas {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 136px);
+    gap: 16px;
+}
+
+.kahoot-tarjeta-proyector {
+    position: relative;
+    border-radius: 22px;
+    padding: 18px 26px;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    color: #FFFFFF;
+    transition: opacity 0.38s ease, transform 0.38s ease, filter 0.38s ease, box-shadow 0.38s ease;
+}
+
+.kahoot-card-roja {
+    background: var(--kahoot-rojo);
+    box-shadow: 0 8px 0 var(--kahoot-rojo-sombra);
+}
+
+.kahoot-card-azul {
+    background: var(--kahoot-azul);
+    box-shadow: 0 8px 0 var(--kahoot-azul-sombra);
+}
+
+.kahoot-card-amarilla {
+    background: var(--kahoot-amarillo);
+    box-shadow: 0 8px 0 var(--kahoot-amarillo-sombra);
+}
+
+.kahoot-card-verde {
+    background: var(--kahoot-verde);
+    box-shadow: 0 8px 0 var(--kahoot-verde-sombra);
+}
+
+.kahoot-figura-icono {
+    width: 68px;
+    height: 68px;
+    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2rem;
+    flex-shrink: 0;
+}
+
+.kahoot-opcion-texto {
+    flex: 1;
+    font-size: clamp(1.3rem, 1.8vw, 1.7rem);
+    font-weight: 800;
+    line-height: 1.2;
+    color: #FFFFFF;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.28);
+}
+
+.kahoot-check-tarjeta {
+    font-size: 2.5rem;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+
+.kahoot-tarjeta-proyector.opcion-correcta-iluminada {
+    transform: scale(1.02);
+    outline: 5px solid #FFF7D1;
+    box-shadow: 0 0 38px rgba(245, 215, 127, 0.85), 0 10px 0 rgba(0, 0, 0, 0.38);
+    z-index: 4;
+}
+
+.kahoot-tarjeta-proyector.opcion-incorrecta-atenuada {
+    opacity: 0.24;
+    filter: grayscale(40%) brightness(0.75);
+    transform: scale(0.985);
+}
+
+/* ========================================================================== */
+/* 6. MODO PODIO DE GALA SECUENCIAL (3° -> 2° -> 1°) EN FONDO NEGRO PROFUNDO  */
+/* ========================================================================== */
+.podio-gala-escenario {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background:
+        radial-gradient(circle at 50% 15%, rgba(245, 215, 127, 0.26), transparent 52%),
+        radial-gradient(circle at 50% 35%, var(--trivia-bg-radial) 0%, var(--trivia-bg-negro) 100%);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 36px 56px 0;
+    color: #FFFFFF;
+}
+
+.podio-spotlight {
+    position: absolute;
+    top: -120px;
+    width: 380px;
+    height: 1050px;
+    background: linear-gradient(180deg, rgba(245, 215, 127, 0.22) 0%, rgba(245, 215, 127, 0) 85%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.podio-spotlight-izq {
+    left: 18%;
+    transform: rotate(-16deg);
+}
+
+.podio-spotlight-centro {
+    left: calc(50% - 190px);
+    background: linear-gradient(180deg, rgba(255, 230, 150, 0.3) 0%, rgba(255, 230, 150, 0) 90%);
+}
+
+.podio-spotlight-der {
+    right: 18%;
+    transform: rotate(16deg);
+}
+
+.podio-gala-cabecera {
+    position: relative;
+    z-index: 5;
+    text-align: center;
+}
+
+.podio-gala-kicker {
+    display: inline-block;
+    padding: 6px 20px;
+    border-radius: 999px;
+    background: rgba(229, 193, 88, 0.18);
+    border: 1px solid #E5C158;
+    color: #F5D77F;
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+}
+
+.podio-gala-titulo {
+    font-family: var(--fuente-titulos);
+    font-size: clamp(2.4rem, 3.6vw, 3.5rem);
+    font-weight: 700;
+    color: #FFF8E1;
+    text-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+.podio-gala-subtitulo {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #E5C158;
+    margin-top: 4px;
+}
+
+.podio-3-tarimas-contenedor {
+    position: relative;
+    z-index: 5;
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1.18fr 1fr;
+    align-items: end;
+    gap: 36px;
+    max-width: 1380px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.podio-columna-proyector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    transform-origin: bottom center;
+    will-change: transform, opacity;
+}
+
+.podio-columna-proyector.podio-oculto {
+    opacity: 0;
+    transform: translateY(140px) scale(0.88);
+    pointer-events: none;
+}
+
+.podio-columna-proyector.podio-revelado {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition:
+        opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.85s cubic-bezier(0.22, 1.28, 0.36, 1);
+}
+
+.podio-ganador-ficha {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    text-align: center;
+}
+
+.podio-corona-campeon {
+    font-size: 3rem;
+    line-height: 1;
+    margin-bottom: -6px;
+    filter: drop-shadow(0 6px 14px rgba(245, 215, 127, 0.65));
+    animation: flotarCorona 2s ease-in-out infinite;
+}
+
+@keyframes flotarCorona {
+    0%, 100% {
+        transform: translateY(0) rotate(-4deg);
+    }
+    50% {
+        transform: translateY(-7px) rotate(4deg);
+    }
+}
+
+.podio-avatar-compuesto {
+    width: 118px;
+    height: 118px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #FFFFFF, #F3EAD2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
+}
+
+.podio-avatar-compuesto svg {
+    width: 96px;
+    height: 96px;
+}
+
+.ficha-campeon-centro .podio-avatar-compuesto {
+    width: 142px;
+    height: 142px;
+}
+
+.ficha-campeon-centro .podio-avatar-compuesto svg {
+    width: 116px;
+    height: 116px;
+}
+
+.avatar-borde-oro {
+    border: 5px solid #F5D77F;
+    box-shadow: 0 0 36px rgba(245, 215, 127, 0.65);
+}
+
+.avatar-borde-plata {
+    border: 4px solid #E2E8F0;
+    box-shadow: 0 0 26px rgba(226, 232, 240, 0.45);
+}
+
+.avatar-borde-bronce {
+    border: 4px solid #E6A87C;
+    box-shadow: 0 0 26px rgba(230, 168, 124, 0.45);
+}
+
+.podio-nombre-jugador {
+    font-size: 1.55rem;
+    font-weight: 800;
+    color: #FFFFFF;
+    padding: 5px 20px;
+    border-radius: 999px;
+    background: var(--trivia-div-plomo);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    max-width: 340px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.nombre-campeon-oro {
+    font-size: 1.85rem;
+    background: linear-gradient(135deg, #F5D77F 0%, #C5A03F 100%);
+    color: #1E1E24;
+    border-color: #FFF7D6;
+    box-shadow: 0 8px 24px rgba(245, 215, 127, 0.4);
+}
+
+.podio-felicitacion-chip {
+    padding: 4px 16px;
+    border-radius: 999px;
+    background: rgba(245, 215, 127, 0.2);
+    border: 1px solid #F5D77F;
+    color: #FFF3C4;
+    font-size: 0.84rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+}
+
+.podio-pedestal-bloque {
+    width: 100%;
+    border-radius: 28px 28px 0 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 24px 20px 20px;
+    gap: 12px;
+    position: relative;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.pedestal-oro {
+    height: 40vh;
+    max-height: 410px;
+    background: linear-gradient(180deg, #F5D77F 0%, #C5A03F 52%, #7D5E10 100%);
+    border: 3px solid #FFF5CC;
+    border-bottom: none;
+}
+
+.pedestal-plata {
+    height: 30vh;
+    max-height: 310px;
+    background: linear-gradient(180deg, #F1F5F9 0%, #94A3B8 58%, #475569 100%);
+    border: 3px solid #FFFFFF;
+    border-bottom: none;
+}
+
+.pedestal-bronce {
+    height: 23vh;
+    max-height: 240px;
+    background: linear-gradient(180deg, #F3C6A4 0%, #B87333 58%, #6E3F14 100%);
+    border: 3px solid #FAD9C0;
+    border-bottom: none;
+}
+
+.podio-medalla-pentagono {
+    width: 78px;
+    height: 78px;
+    clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.35rem;
+    font-weight: 900;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.medalla-oro {
+    background: #FFF9DB;
+    color: #7D5E10;
+}
+
+.medalla-plata {
+    background: #FFFFFF;
+    color: #334155;
+}
+
+.medalla-bronce {
+    background: #FFF3E8;
+    color: #6E3F14;
+}
+
+.podio-puesto-label {
+    font-size: 1.05rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.95);
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.pedestal-oro .podio-puesto-label {
+    color: #1E1E24;
+    text-shadow: none;
+}
+
+.podio-puntaje-caja {
+    margin-top: auto;
+    padding: 8px 22px;
+    border-radius: 16px;
+    background: rgba(11, 12, 16, 0.78);
+    color: #FFFFFF;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.podio-puntaje-caja strong {
+    font-size: 1.95rem;
+    font-weight: 900;
+    color: #FFF7D6;
+}
+
+.podio-puntaje-caja span {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #E5C158;
+}
+
+.podio-menciones-barra {
+    position: relative;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 12px 24px;
+    background: var(--trivia-div-plomo);
+    border-top: 1px solid rgba(229, 193, 88, 0.35);
+    font-size: 1rem;
+    font-weight: 700;
+    color: #FFFFFF;
+}

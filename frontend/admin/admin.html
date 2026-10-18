@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <!-- =======================================================================
+         PROYECTO: MVP WEB SEGALU
+         ARCHIVO: frontend/admin/admin.html
+         FASE 4.5: Panel del Administrador Único con Eliminación Física en Bucket,
+                   Cambio Instantáneo de Evento (<200ms), Generador de 10 Preguntas
+                   desde PDF con IA y Podio Escalonado de 3 Tarimas Estilo Kahoot
+         ======================================================================= -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Segalú Eventos | Panel del Administrador Único</title>
+    <link rel="icon" type="image/png" href="/static/img/logo_segalu.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;0,800;1,700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/admin/admin.css?v=20261018b" />
+</head>
+<body>
+
+    <!-- ENCABEZADO EJECUTIVO SEGALÚ (Logo PNG 100% transparente sin fondo negro) -->
+    <header class="admin-topbar">
+        <div class="topbar-brand">
+            <div class="admin-logo-box">
+                <img src="/static/img/logo_segalu.png" alt="Logo Oficial Segalú" onerror="this.style.display='none'" />
+            </div>
+            <div>
+                <span class="topbar-tag">CONSOLA EJECUTIVA • PRODUCCIÓN SEGALÚ</span>
+                <h1>Segalú Eventos • Administrador Único</h1>
+            </div>
+        </div>
+
+        <div id="admin-header-controls" class="topbar-actions hidden">
+            <button type="button" id="btn-abrir-proyector-topbar" class="btn-projector-gold-dark" title="Abrir Pantalla Gigante del Evento en nueva pestaña">
+                <span>🖥️ Abrir Proyector en Vivo</span>
+            </button>
+            <button type="button" id="btn-refrescar-panel" class="btn-outline-gold">
+                <svg class="svg-icon svg-xs" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                    <polyline points="21 3 21 9 15 9" />
+                </svg>
+                <span>Actualizar Datos</span>
+            </button>
+            <button type="button" id="btn-cerrar-admin" class="btn-subtle">
+                Cerrar Sesión
+            </button>
+        </div>
+    </header>
+
+    <main class="admin-main">
+        <!-- Caja de alertas -->
+        <div id="admin-alerta" class="alert-box hidden" role="alert"></div>
+
+        <!-- ===================================================================
+             VISTA 1: LOGIN CON CONTRASEÑA MAESTRA DEL ARCHIVO .env
+             =================================================================== -->
+        <section id="vista-login-admin" class="login-card">
+            <span class="section-pill">ACCESO RESTRINGIDO</span>
+            <h2>Ingreso del Administrador</h2>
+            <p>Introduce la contraseña maestra configurada en la variable <code>ADMIN_PASSWORD</code> de tu archivo <code>.env</code>.</p>
+
+            <form id="form-login-admin" novalidate>
+                <label for="input-admin-pass" class="field-label">Contraseña Maestra</label>
+                <input
+                    type="password"
+                    id="input-admin-pass"
+                    class="gala-input"
+                    placeholder="Ej: SegaluAdmin2026"
+                    required
+                />
+                <button type="submit" id="btn-login-admin" class="btn-gold-primary">
+                    <svg class="svg-icon svg-sm icon-dark" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="5" y="11" width="14" height="10" rx="2" />
+                        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                    </svg>
+                    <span>Desbloquear Panel de Control</span>
+                </button>
+            </form>
+        </section>
+
+        <!-- ===================================================================
+             VISTA 2: DASHBOARD DEL ADMINISTRADOR ÚNICO
+             =================================================================== -->
+        <section id="vista-dashboard-admin" class="dashboard-grid hidden">
+
+            <!-- COLUMNA IZQUIERDA: GESTIÓN DE EVENTOS Y SEDES DE SEGALÚ -->
+            <aside class="sidebar-column">
+                <div class="panel-card">
+                    <div class="event-selector-header">
+                        <span class="section-pill">EVENTO EN MODERACIÓN</span>
+                        <span id="badge-velocidad-evento" class="speed-latency-pill" title="Tiempo de carga consolidada en paralelo">
+                            ⚡ Instantáneo
+                        </span>
+                    </div>
+                    <h3>Seleccionar Evento</h3>
+                    <p class="card-helper">Elige qué evento deseas supervisar en vivo:</p>
+                    <select id="select-evento-activo" class="gala-select"></select>
+                    <div id="indicador-carga-evento" class="event-switching-banner hidden">
+                        <span class="spinner-mini"></span>
+                        <span>Sincronizando evento en paralelo...</span>
+                    </div>
+                    <div id="info-evento-seleccionado" class="event-summary-box"></div>
+
+                    <!-- =======================================================
+                         PANEL EJECUTIVO DE GESTIÓN DE BASE DE DATOS Y DESCARGA ZIP
+                         ======================================================= -->
+                    <div class="event-db-executive-panel" id="panel-acciones-ejecutivas-evento">
+                        <div class="executive-panel-header">
+                            <span class="section-pill">RESPALDO ZIP & MANTENIMIENTO CLOUD</span>
+                            <h4>Gestión de Fotos y Base de Datos del Evento</h4>
+                        </div>
+                        <div class="executive-actions-grid">
+                            <button
+                                type="button"
+                                id="btn-descargar-zip-con-marco"
+                                class="btn-exec-action btn-exec-zip-gold"
+                            >
+                                <span>📦 Descargar Fotos (Con Marco Segalú - ZIP)</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                id="btn-descargar-zip-originales"
+                                class="btn-exec-action btn-exec-zip-clean"
+                            >
+                                <span>📦 Descargar Fotos Originales (Sin Marco - ZIP)</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                id="btn-purgar-fotos-storage"
+                                class="btn-exec-action btn-exec-purge-storage"
+                            >
+                                <span>🧹 Vaciar / Purgar Fotos del Storage</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                id="btn-eliminar-evento-completo"
+                                class="btn-exec-action btn-exec-delete-event"
+                            >
+                                <span>🗑️ Eliminar Evento por Completo</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-card">
+                    <span class="section-pill">NUEVA CELEBRACIÓN</span>
+                    <h3>Crear Evento en Segalú</h3>
+                    <form id="form-crear-evento" novalidate>
+                        <div class="form-group">
+                            <label for="select-sede-local" class="field-label">Sede de Segalú</label>
+                            <select id="select-sede-local" class="gala-select" required></select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="input-nombre-evento" class="field-label">Nombre del Evento</label>
+                            <input
+                                type="text"
+                                id="input-nombre-evento"
+                                class="gala-input"
+                                placeholder="Ej: XV Años de Fernanda"
+                                required
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="input-codigo-qr" class="field-label">Código corto para el QR</label>
+                            <input
+                                type="text"
+                                id="input-codigo-qr"
+                                class="gala-input uppercase-input"
+                                placeholder="Ej: XV-FERNANDA"
+                                maxlength="20"
+                                required
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="input-fecha-evento" class="field-label">Fecha del Evento</label>
+                            <input
+                                type="date"
+                                id="input-fecha-evento"
+                                class="gala-input"
+                                required
+                            />
+                        </div>
+
+                        <button type="submit" id="btn-crear-evento" class="btn-gold-primary">
+                            <span>Crear Evento Activo</span>
+                        </button>
+                    </form>
+                </div>
+            </aside>
+
+            <!-- COLUMNA DERECHA: BANDEJA DE FOTOS, TRIVIA KAHOOT E INVITADOS -->
+            <div class="content-column">
+
+                <!-- ===========================================================
+                     1. BANDEJA DE MODERACIÓN DE FOTOS (CON APROBAR, RECHAZAR Y
+                        ELIMINAR DEFINITIVAMENTE DEL BUCKET + TABLA SQL)
+                     =========================================================== -->
+                <div class="panel-card">
+                    <div class="card-header-flex">
+                        <div>
+                            <span class="section-pill">FILTRO DE CONTENIDO EN VIVO</span>
+                            <h3>Bandeja de Moderación de Fotos</h3>
+                        </div>
+                        <div class="filter-tabs">
+                            <button type="button" class="filter-tab active" data-estado="pendiente">
+                                Pendientes (<span id="count-pendientes">0</span>)
+                            </button>
+                            <button type="button" class="filter-tab" data-estado="aprobado">
+                                Aprobadas (<span id="count-aprobadas">0</span>)
+                            </button>
+                            <button type="button" class="filter-tab" data-estado="rechazado">
+                                Rechazadas (<span id="count-rechazadas">0</span>)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- CONTROLES DE AUTO-APROBAR Y APROBACIÓN MASIVA -->
+                    <div class="moderation-automation-bar">
+                        <!-- Control 1: Interruptor Activable de Auto-Aprobar -->
+                        <button
+                            type="button"
+                            id="btn-toggle-auto-aprobar"
+                            class="btn-auto-approve-toggle"
+                            aria-pressed="false"
+                        >
+                            <span class="toggle-status-dot"></span>
+                            <div class="toggle-text-wrap">
+                                <strong id="titulo-auto-aprobar">⚡ Auto-Aprobar Fotos Automáticamente</strong>
+                                <span id="subtitulo-auto-aprobar">Inactivo • Las fotos nuevas requieren tu aprobación manual</span>
+                            </div>
+                            <span id="badge-auto-aprobar" class="toggle-pill-state">OFF</span>
+                        </button>
+
+                        <!-- Control 2: Botón de Acción Rápida para Aprobar Todas las Pendientes -->
+                        <button
+                            type="button"
+                            id="btn-aprobar-todas-bandeja"
+                            class="btn-bulk-approve"
+                        >
+                            <span>✅ Aprobar Todas las de la Bandeja (<strong id="count-aprobar-todas">0</strong>)</span>
+                        </button>
+                    </div>
+
+                    <!-- CONTROLES DE VISUALIZACIÓN DE GALERÍA EN EL PROYECTOR -->
+                    <div class="projector-gallery-controls-bar" id="panel-controles-galeria-proyector">
+                        <div class="gallery-mode-group">
+                            <span class="gallery-control-label">🖥️ Modo de Galería en Proyector:</span>
+                            <div class="gallery-mode-pills" role="group" aria-label="Modo de visualización de galería">
+                                <button type="button" class="btn-gallery-mode active" data-modo-galeria="ciclo_auto">
+                                    🔄 Modo Ciclo Automático (1x1 + Mosaico)
+                                </button>
+                                <button type="button" class="btn-gallery-mode" data-modo-galeria="individual">
+                                    🖼️ Solo Foto Individual (Carrusel 1x1)
+                                </button>
+                                <button type="button" class="btn-gallery-mode" data-modo-galeria="mosaico">
+                                    🧱 Solo Mosaico (6 a 8 fotos)
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="gallery-duration-group">
+                            <span class="gallery-control-label">⏱️ Duración por Foto:</span>
+                            <div class="gallery-duration-pills" role="group" aria-label="Duración de cada foto">
+                                <button type="button" class="btn-gallery-duration" data-duracion-foto="5">5s</button>
+                                <button type="button" class="btn-gallery-duration active" data-duracion-foto="8">8s</button>
+                                <button type="button" class="btn-gallery-duration" data-duracion-foto="12">12s</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="grid-moderacion-fotos" class="photos-moderation-grid">
+                        <!-- Se llena dinámicamente desde admin.js con Aprobar, Rechazar y 🗑️ Eliminar Definitivamente -->
+                    </div>
+                </div>
+
+                <!-- ===========================================================
+                     2. LISTA DE INVITADOS CONECTADOS Y RANKING DE PUNTAJES
+                        (Ubicada arriba de la Trivia para supervisión constante)
+                     =========================================================== -->
+                <div class="panel-card">
+                    <div class="card-header-flex">
+                        <div>
+                            <span class="section-pill">CONTROL DE AFORO DIGITAL & RANKING</span>
+                            <h3>Invitados Conectados (<span id="count-invitados">0</span>)</h3>
+                        </div>
+                        <button type="button" id="btn-limpiar-todos-invitados" class="btn-danger-outline">
+                            Vaciar Invitados del Evento
+                        </button>
+                    </div>
+
+                    <div id="lista-invitados-admin" class="guests-admin-list"></div>
+                </div>
+
+                <!-- ===========================================================
+                     3. RONDA DE PREGUNTAS ESTILO KAHOOT EN VIVO + PODIO DE 3 TARIMAS
+                        ESCALONADAS + GENERADOR DE 10 PREGUNTAS DESDE PDF CON IA
+                     =========================================================== -->
+                <div class="panel-card">
+                    <div class="card-header-flex">
+                        <div>
+                            <span class="section-pill">DINÁMICA INTERACTIVA EN TIEMPO REAL</span>
+                            <h3>Ronda de Preguntas Estilo Kahoot</h3>
+                        </div>
+                        <div class="trivia-live-status-badge" id="badge-estado-trivia-admin">
+                            <span class="live-pulse-dot"></span>
+                            <span id="texto-estado-trivia-admin">TRIVIA INACTIVA</span>
+                        </div>
+                    </div>
+
+                    <!-- CONSOLA DE 4 BOTONES DE DIRECCIÓN EN VIVO -->
+                    <div class="trivia-director-console">
+                        <div class="console-header-row">
+                            <strong>Controles en Vivo para Celulares y Pantalla:</strong>
+                            <span id="contador-votos-ronda" class="votes-counter-pill">
+                                Respuestas recibidas en pregunta activa: 0
+                            </span>
+                        </div>
+
+                        <div class="trivia-controls-grid">
+                            <button type="button" id="btn-trivia-abrir-lobby" class="btn-trivia-control control-lobby">
+                                <span class="control-step">1</span>
+                                <div>
+                                    <strong>Abrir Lobby de Trivia</strong>
+                                    <small>Sala de espera en celulares</small>
+                                </div>
+                            </button>
+
+                            <button type="button" id="btn-trivia-lanzar-pregunta" class="btn-trivia-control control-launch">
+                                <span class="control-step">2</span>
+                                <div>
+                                    <strong>Lanzar Pregunta en Vivo</strong>
+                                    <small>Activa las 4 opciones y el reloj</small>
+                                </div>
+                            </button>
+
+                            <button type="button" id="btn-trivia-revelar-respuesta" class="btn-trivia-control control-reveal">
+                                <span class="control-step">3</span>
+                                <div>
+                                    <strong>Revelar Respuesta Correcta</strong>
+                                    <small>Muestra la solución oficial</small>
+                                </div>
+                            </button>
+
+                            <button type="button" id="btn-trivia-mostrar-podio" class="btn-trivia-control control-podium">
+                                <span class="control-step">4</span>
+                                <div>
+                                    <strong>Mostrar Podio</strong>
+                                    <small>3 Tarimas escalonadas + Confeti</small>
+                                </div>
+                            </button>
+                        </div>
+
+                        <div class="console-secondary-actions">
+                            <button type="button" id="btn-trivia-reiniciar-puntajes" class="btn-subtle">
+                                ↺ Reiniciar Puntajes a 0
+                            </button>
+                            <button type="button" id="btn-trivia-cerrar" class="btn-close-trivia-solid">
+                                <span>⏹️ Finalizar / Cerrar Trivia (Volver a Galería en Proyector)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- BANCO DE PREGUNTAS DEL EVENTO -->
+                    <div class="questions-bank-section">
+                        <div class="bank-header-row">
+                            <div>
+                                <h4>Banco de Preguntas del Evento (<span id="count-preguntas-evento">0</span>)</h4>
+                                <span class="card-helper">Puedes lanzar cualquier pregunta directamente con el botón "🚀 Lanzar en Vivo"</span>
+                            </div>
+                            <button type="button" id="btn-abrir-modal-preguntas-inline" class="btn-outline-gold">
+                                ➕ Crear Preguntas (Manual o PDF con IA)
+                            </button>
+                        </div>
+                        <div id="lista-preguntas-admin" class="questions-admin-list">
+                            <!-- Se llena dinámicamente desde admin.js -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+    </main>
+
+    <!-- =======================================================================
+         MODAL FLOTANTE 1: ADMINISTRAR GALERÍA DE 4 FOTOS POR SEDE (1 SEDE A LA VEZ)
+         ======================================================================= -->
+    <div id="modal-gestor-sedes-admin" class="admin-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-sedes">
+        <div class="admin-popup-modal-card modal-sedes-single-card">
+            <div class="admin-popup-modal-header">
+                <div>
+                    <span class="section-pill">GALERÍA PROMOCIONAL EN EL CELULAR DEL INVITADO</span>
+                    <h3 id="titulo-modal-sedes">🖼️ Administrar Galería de Fotos por Sede</h3>
+                    <p class="card-helper">Las fotos se redimensionan a proporción 16:10 y se actualizan al instante en "Vive la Experiencia Segalú".</p>
+                </div>
+            </div>
+
+            <div class="admin-popup-modal-body">
+                <!-- Barra de navegación para alternar entre Sede 1 y Sede 2 (una sola sede a la vez) -->
+                <div class="admin-sede-switcher-bar">
+                    <div class="admin-sede-tabs-group">
+                        <button type="button" id="btn-admin-tab-sede1" class="btn-admin-sede-tab active" data-sede-admin="sede1">
+                            🏛️ Sede 1 - El Colocho
+                        </button>
+                        <button type="button" id="btn-admin-tab-sede2" class="btn-admin-sede-tab" data-sede-admin="sede2">
+                            ✨ Sede 2 - Crystal Garden
+                        </button>
+                    </div>
+                    <button type="button" id="btn-admin-sede-toggle-nav" class="btn-admin-sede-next">
+                        Sede Siguiente ➔
+                    </button>
+                </div>
+
+                <!-- VISTA SEDE 1 (4 FOTOS) -->
+                <div id="bloque-modal-sede1" class="sede-admin-block">
+                    <div class="sede-admin-block-header">
+                        <strong>🏛️ Sede 1 - El Colocho (Carabayllo)</strong>
+                        <span>sede1_foto1.jpg a sede1_foto4.jpg</span>
+                    </div>
+                    <div id="grid-fotos-admin-sede1" class="sede-slots-grid">
+                        <!-- Se renderizan los 4 slots (1/4 a 4/4) desde admin.js -->
+                    </div>
+                </div>
+
+                <!-- VISTA SEDE 2 (4 FOTOS - OCULTA POR DEFECTO, SE ALTERNA CON EL BOTÓN/PESTAÑA) -->
+                <div id="bloque-modal-sede2" class="sede-admin-block hidden">
+                    <div class="sede-admin-block-header">
+                        <strong>✨ Sede 2 - Crystal Garden (Carabayllo)</strong>
+                        <span>sede2_foto1.jpg a sede2_foto4.jpg</span>
+                    </div>
+                    <div id="grid-fotos-admin-sede2" class="sede-slots-grid">
+                        <!-- Se renderizan los 4 slots (1/4 a 4/4) desde admin.js -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-popup-modal-footer">
+                <button type="button" id="btn-guardar-modal-sedes" class="btn-gold-primary btn-modal-save-accept">
+                    <span>✅ Guardar y Cerrar Ventana</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         MODAL FLOTANTE 2: CREAR PREGUNTAS PARA EL EVENTO (MANUAL O PDF CON IA)
+         ======================================================================= -->
+    <div id="modal-crear-preguntas-admin" class="admin-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-preguntas">
+        <div class="admin-popup-modal-card modal-preguntas-card">
+            <div class="admin-popup-modal-header">
+                <div>
+                    <span class="section-pill">GENERADOR DE TRIVIA KAHOOT</span>
+                    <h3 id="titulo-modal-preguntas">➕ Crear Preguntas (Manual o PDF con IA)</h3>
+                    <p class="card-helper">Configura manualmente una pregunta o sube un documento PDF para que la IA cree 10 preguntas con distractores similares.</p>
+                </div>
+            </div>
+
+            <div class="admin-popup-modal-body">
+                <div class="trivia-builder-box modal-builder-clean">
+                    <div class="builder-header-row">
+                        <div>
+                            <h4>Generación Automática con IA desde Documento PDF</h4>
+                            <p class="card-helper">Extrae automáticamente 10 preguntas listas para jugar en vivo.</p>
+                        </div>
+                        <div class="builder-quick-actions">
+                            <input
+                                type="file"
+                                id="input-pdf-trivia-ia"
+                                accept="application/pdf,.pdf"
+                                class="hidden"
+                            />
+                            <button type="button" id="btn-subir-pdf-ia" class="btn-pdf-ai-generator">
+                                <span>📄 Subir PDF para Generar 10 Preguntas con IA</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Banner de progreso cuando se está analizando un PDF con IA -->
+                    <div id="estado-generacion-pdf-ia" class="pdf-ai-status-banner hidden">
+                        <span class="spinner-mini"></span>
+                        <span id="texto-estado-pdf-ia">Analizando documento PDF con IA y redactando 10 preguntas con 3 distractores similares...</span>
+                    </div>
+
+                    <form id="form-crear-pregunta" novalidate>
+                        <div class="form-group">
+                            <label for="input-enunciado-pregunta" class="field-label">Enunciado de la Pregunta</label>
+                            <input
+                                type="text"
+                                id="input-enunciado-pregunta"
+                                class="gala-input"
+                                placeholder="Ej: ¿En qué año se conocieron los novios?"
+                                maxlength="280"
+                                required
+                            />
+                        </div>
+
+                        <div class="options-ABCD-grid">
+                            <div class="option-input-wrap opt-a-border">
+                                <span class="opt-badge opt-badge-a">▲ Opción A (Rojo)</span>
+                                <input
+                                    type="text"
+                                    id="input-opcion-a"
+                                    class="gala-input"
+                                    placeholder="Escribe la alternativa A..."
+                                    required
+                                />
+                            </div>
+
+                            <div class="option-input-wrap opt-b-border">
+                                <span class="opt-badge opt-badge-b">◆ Opción B (Azul)</span>
+                                <input
+                                    type="text"
+                                    id="input-opcion-b"
+                                    class="gala-input"
+                                    placeholder="Escribe la alternativa B..."
+                                    required
+                                />
+                            </div>
+
+                            <div class="option-input-wrap opt-c-border">
+                                <span class="opt-badge opt-badge-c">● Opción C (Amarillo)</span>
+                                <input
+                                    type="text"
+                                    id="input-opcion-c"
+                                    class="gala-input"
+                                    placeholder="Escribe la alternativa C..."
+                                    required
+                                />
+                            </div>
+
+                            <div class="option-input-wrap opt-d-border">
+                                <span class="opt-badge opt-badge-d">■ Opción D (Verde)</span>
+                                <input
+                                    type="text"
+                                    id="input-opcion-d"
+                                    class="gala-input"
+                                    placeholder="Escribe la alternativa D..."
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div class="question-settings-row">
+                            <div class="form-group">
+                                <label for="select-respuesta-correcta" class="field-label">Alternativa Correcta</label>
+                                <select id="select-respuesta-correcta" class="gala-select">
+                                    <option value="A">Alternativa A (▲ Rojo)</option>
+                                    <option value="B">Alternativa B (◆ Azul)</option>
+                                    <option value="C">Alternativa C (● Amarillo)</option>
+                                    <option value="D">Alternativa D (■ Verde)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="select-tiempo-limite" class="field-label">Tiempo Límite (Segundos)</label>
+                                <select id="select-tiempo-limite" class="gala-select">
+                                    <option value="10">10 segundos (Rápida)</option>
+                                    <option value="15">15 segundos</option>
+                                    <option value="20" selected>20 segundos (Estándar Kahoot)</option>
+                                    <option value="30">30 segundos</option>
+                                    <option value="45">45 segundos</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group form-group-btn">
+                                <button type="submit" id="btn-guardar-pregunta" class="btn-gold-primary">
+                                    <span>✅ Guardar / Aceptar Pregunta</span>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="admin-popup-modal-footer">
+                <button type="button" id="btn-aceptar-modal-preguntas" class="btn-modal-close-clean">
+                    <span>Cerrar Ventana</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VISOR DE PROYECCIÓN COMPLETA CON DOBLE CAPA AMBIENT BLUR -->
+    <div id="modal-visor-foto-admin" class="admin-modal-backdrop hidden" role="dialog" aria-modal="true">
+        <div class="admin-lightbox-card">
+            <div class="admin-lightbox-header">
+                <strong id="visor-admin-autor">Vista Previa de Proyección</strong>
+                <button type="button" id="btn-cerrar-visor-admin" class="btn-modal-close-clean">Cerrar Ventana</button>
+            </div>
+            <div class="admin-lightbox-stage">
+                <div id="visor-admin-blur" class="ambient-blur-layer"></div>
+                <img id="visor-admin-img" src="" alt="Vista previa completa" class="ambient-sharp-img" />
+            </div>
+        </div>
+    </div>
+
+    <script src="/admin/admin.js?v=20261018b"></script>
+</body>
+</html>
