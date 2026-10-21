@@ -13,11 +13,14 @@ const vistaGaleriaEl = document.getElementById("vista-modo-galeria");
 const vistaLobbyKahootEl = document.getElementById("vista-modo-lobby-kahoot");
 const vistaPreguntaKahootEl = document.getElementById("vista-modo-pregunta-kahoot");
 const vistaPodioEl = document.getElementById("vista-modo-podio");
+const vistaRankingEl = document.getElementById("vista-modo-ranking");
+const rankingFilasContenedorEl = document.getElementById("ranking-filas-contenedor");
 
 // Elementos Modo GALERIA (Doble Capa Ambient Blur + Mosaico 6-8 Fotos)
 const galeriaCapaBlurFondoEl = document.getElementById("galeria-capa-blur-fondo");
 const galeriaContenedorFotoActivaEl = document.getElementById("galeria-contenedor-foto-activa");
 const galeriaImgNitidaEl = document.getElementById("galeria-img-nitida");
+const galeriaMarcoWrapperEl = document.getElementById("galeria-marco-wrapper");
 const galeriaContenedorMosaicoEl = document.getElementById("galeria-contenedor-mosaico");
 const galeriaGridMosaicoEl = document.getElementById("galeria-grid-mosaico");
 const galeriaAutorCapsulaEl = document.getElementById("galeria-autor-capsula");
@@ -151,24 +154,65 @@ const SVG_ACCESORIOS = {
         <polygon points="34,34 42,12 60,26 78,12 86,34" fill="#F5D77F" stroke="#8A6D1B" stroke-width="2.5"/>
         <circle cx="60" cy="18" r="3.5" fill="#E21B3C"/>
     `,
+    birrete: `
+        <polygon points="60,10 18,24 60,38 102,24" fill="#1E1E24" stroke="#D4AF37" stroke-width="2"/>
+        <rect x="44" y="32" width="32" height="12" rx="4" fill="#141419" stroke="#D4AF37" stroke-width="1.8"/>
+        <circle cx="60" cy="24" r="3" fill="#D4AF37"/>
+        <path d="M60 24 Q78 30 84 46" fill="none" stroke="#D4AF37" stroke-width="2.5"/>
+        <circle cx="84" cy="48" r="3.5" fill="#D4AF37"/>
+    `,
+    tiara_xv: `
+        <path d="M36 33 Q60 10 84 33 Z" fill="#EBF4FA" stroke="#D4AF37" stroke-width="2.2"/>
+        <polygon points="60,14 65,24 60,31 55,24" fill="#7CD4FD"/>
+        <circle cx="48" cy="24" r="2.5" fill="#E21B3C"/>
+        <circle cx="72" cy="24" r="2.5" fill="#E21B3C"/>
+    `,
+    tiara_diamantes: `
+        <path d="M36 33 Q60 10 84 33 Z" fill="#EBF4FA" stroke="#8A6D1B" stroke-width="2.2"/>
+        <polygon points="60,15 65,24 60,31 55,24" fill="#7CD4FD"/>
+    `,
+    corona_flores: `
+        <path d="M30 36 Q60 18 90 36" fill="none" stroke="#48BB78" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="34" cy="34" r="5" fill="#F687B3"/>
+        <circle cx="47" cy="27" r="5" fill="#FAF089"/>
+        <circle cx="60" cy="24" r="5.5" fill="#ED64A6"/>
+        <circle cx="73" cy="27" r="5" fill="#9F7AEA"/>
+        <circle cx="86" cy="34" r="5" fill="#F687B3"/>
+    `,
     lentes_vip: `
         <rect x="31" y="49" width="25" height="16" rx="4" fill="#16161D" stroke="#D4AF37" stroke-width="2.8"/>
         <rect x="64" y="49" width="25" height="16" rx="4" fill="#16161D" stroke="#D4AF37" stroke-width="2.8"/>
         <line x1="56" y1="56" x2="64" y2="56" stroke="#D4AF37" stroke-width="3"/>
+    `,
+    antifaz_15: `
+        <path d="M26 50 Q44 42 60 52 Q76 42 94 50 Q96 66 78 68 Q60 62 42 68 Q24 66 26 50 Z" fill="#44337A" stroke="#D4AF37" stroke-width="2.2"/>
+        <ellipse cx="44" cy="56" rx="7" ry="5" fill="#111116"/>
+        <ellipse cx="76" cy="56" rx="7" ry="5" fill="#111116"/>
     `,
     sombrero_copa: `
         <rect x="32" y="28" width="56" height="7" rx="3.5" fill="#1E1E24" stroke="#D4AF37" stroke-width="2"/>
         <rect x="41" y="6" width="38" height="24" rx="4" fill="#282832" stroke="#D4AF37" stroke-width="2"/>
         <rect x="41" y="22" width="38" height="5" fill="#D4AF37"/>
     `,
+    sombrero_gala: `
+        <rect x="32" y="28" width="56" height="7" rx="3.5" fill="#1E1E24" stroke="#D4AF37" stroke-width="2"/>
+        <rect x="41" y="6" width="38" height="24" rx="4" fill="#282832" stroke="#D4AF37" stroke-width="2"/>
+        <rect x="41" y="22" width="38" height="5" fill="#D4AF37"/>
+    `,
+    gorra_vip: `
+        <path d="M38 32 Q60 14 82 32 Z" fill="#2B1954" stroke="#D4AF37" stroke-width="2"/>
+        <ellipse cx="60" cy="32" rx="28" ry="6" fill="#1E1E24" stroke="#D4AF37" stroke-width="2"/>
+        <rect x="52" y="20" width="16" height="8" rx="2" fill="#D4AF37"/>
+    `,
     corbatin_dorado: `
         <polygon points="43,92 60,100 43,108" fill="#D4AF37" stroke="#7A5C12" stroke-width="2"/>
         <polygon points="77,92 60,100 77,108" fill="#D4AF37" stroke="#7A5C12" stroke-width="2"/>
         <circle cx="60" cy="100" r="4.5" fill="#F5D77F" stroke="#7A5C12" stroke-width="2"/>
     `,
-    tiara_diamantes: `
-        <path d="M36 33 Q60 10 84 33 Z" fill="#EBF4FA" stroke="#8A6D1B" stroke-width="2.2"/>
-        <polygon points="60,15 65,24 60,31 55,24" fill="#7CD4FD"/>
+    corbatin_gala: `
+        <polygon points="43,92 60,100 43,108" fill="#D4AF37" stroke="#7A5C12" stroke-width="2"/>
+        <polygon points="77,92 60,100 77,108" fill="#D4AF37" stroke="#7A5C12" stroke-width="2"/>
+        <circle cx="60" cy="100" r="4.5" fill="#F5D77F" stroke="#7A5C12" stroke-width="2"/>
     `,
     auriculares_dj: `
         <path d="M24 62 A36 36 0 0 1 96 62" fill="none" stroke="#D4AF37" stroke-width="6" stroke-linecap="round"/>
@@ -177,13 +221,48 @@ const SVG_ACCESORIOS = {
     `,
 };
 
+let catalogoAccesoriosProyector = {};
+
+async function cargarAccesoriosProyector() {
+    try {
+        const res = await fetch("/api/accesorios", { cache: "no-store" });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.ok && Array.isArray(data.personalizados)) {
+                data.personalizados.forEach((acc) => {
+                    if (acc && acc.id && acc.url) {
+                        catalogoAccesoriosProyector[acc.id] = acc.url;
+                    }
+                });
+                firmaLobbyRenderizado = "";
+                sincronizarEstadoProyector();
+            }
+        }
+    } catch (_) {}
+}
+
+const MAPA_RUTAS_ACCESORIOS_DEFAULT = {
+    corona_imperial: "/static/accessories/boda/corona_imperial.png",
+    corbatin_gala: "/static/accessories/boda/corbatin_gala.png",
+    corbatin_dorado: "/static/accessories/boda/corbatin_gala.png",
+    sombrero_gala: "/static/accessories/boda/sombrero_gala.png",
+    sombrero_copa: "/static/accessories/boda/sombrero_gala.png",
+    birrete: "/static/accessories/graduacion/birrete.png",
+    tiara_xv: "/static/accessories/quinceanero/tiara_xv.png",
+    tiara_diamantes: "/static/accessories/quinceanero/tiara_xv.png",
+    corona_flores: "/static/accessories/quinceanero/corona_flores.png",
+    antifaz_15: "/static/accessories/quinceanero/antifaz_15.png",
+    lentes_vip: "/static/accessories/general/lentes_vip.png",
+    gorra_vip: "/static/accessories/general/gorra_vip.png",
+};
+
 function descomponerAvatar(codigoAvatar) {
     const limpio = String(codigoAvatar || "").trim().toLowerCase();
     if (limpio.includes("|")) {
         const [p, a] = limpio.split("|", 2);
         return {
             personaje: SVG_PERSONAJES[p] ? p : "pug_real",
-            accesorio: SVG_ACCESORIOS[a] ? a : "corona_imperial",
+            accesorio: a || "sin_accesorio",
         };
     }
     if (MAPA_LEGACY_AVATARES[limpio]) {
@@ -194,10 +273,38 @@ function descomponerAvatar(codigoAvatar) {
 
 function generarSvgAvatarCompuesto(codigoAvatar) {
     const { personaje, accesorio } = descomponerAvatar(codigoAvatar);
+
+    let accesorioSvg = "";
+    if (accesorio && accesorio !== "sin_accesorio") {
+        const urlCustom = catalogoAccesoriosProyector[accesorio] || (accesorio.startsWith("acc_") ? `/static/accessories/general/${accesorio}.png` : "");
+        if (urlCustom) {
+            let x = "28", y = "2", w = "64", h = "42";
+            if (accesorio.includes("corbatin") || accesorio.includes("collar")) {
+                x = "36"; y = "82"; w = "48"; h = "28";
+            } else if (accesorio.includes("lentes") || accesorio.includes("antifaz") || accesorio.includes("gafas")) {
+                x = "26"; y = "44"; w = "68"; h = "28";
+            }
+            accesorioSvg = `<image href="${urlCustom}" xlink:href="${urlCustom}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" />`;
+        } else if (SVG_ACCESORIOS[accesorio]) {
+            accesorioSvg = SVG_ACCESORIOS[accesorio];
+        } else if (MAPA_RUTAS_ACCESORIOS_DEFAULT[accesorio]) {
+            const urlDef = MAPA_RUTAS_ACCESORIOS_DEFAULT[accesorio];
+            let x = "28", y = "2", w = "64", h = "42";
+            if (accesorio.includes("corbatin")) {
+                x = "36"; y = "82"; w = "48"; h = "28";
+            } else if (accesorio.includes("lentes") || accesorio.includes("antifaz")) {
+                x = "26"; y = "44"; w = "68"; h = "28";
+            }
+            accesorioSvg = `<image href="${urlDef}" xlink:href="${urlDef}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" />`;
+        } else {
+            accesorioSvg = SVG_ACCESORIOS.corona_imperial;
+        }
+    }
+
     return `
-        <svg viewBox="0 0 120 116" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Avatar invitado">
+        <svg viewBox="0 0 120 116" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-label="Avatar invitado">
             ${SVG_PERSONAJES[personaje] || SVG_PERSONAJES.pug_real}
-            ${SVG_ACCESORIOS[accesorio] || SVG_ACCESORIOS.corona_imperial}
+            ${accesorioSvg}
         </svg>
     `;
 }
@@ -213,10 +320,19 @@ function activarVistaModo(modo) {
     vistaGaleriaEl.classList.add("hidden");
     vistaLobbyKahootEl.classList.add("hidden");
     vistaPreguntaKahootEl.classList.add("hidden");
+    if (vistaRankingEl) vistaRankingEl.classList.add("hidden");
     vistaPodioEl.classList.add("hidden");
 
     if (modoPrevio === "PODIO" && modo !== "PODIO") {
         detenerSecuenciaFuegosPodio();
+    }
+
+    if (modoPrevio === "PREGUNTA_ACTIVA" && modo !== "PREGUNTA_ACTIVA") {
+        if (temporizadorLocalPregunta) {
+            clearInterval(temporizadorLocalPregunta);
+            temporizadorLocalPregunta = null;
+        }
+        idPreguntaActivaTimer = null;
     }
 
     if (modo === "GALERIA") {
@@ -225,6 +341,8 @@ function activarVistaModo(modo) {
         vistaLobbyKahootEl.classList.remove("hidden");
     } else if (modo === "PREGUNTA_ACTIVA" || modo === "RESULTADOS_PREGUNTA") {
         vistaPreguntaKahootEl.classList.remove("hidden");
+    } else if (modo === "RANKING") {
+        if (vistaRankingEl) vistaRankingEl.classList.remove("hidden");
     } else if (modo === "PODIO") {
         vistaPodioEl.classList.remove("hidden");
     }
@@ -277,14 +395,15 @@ function mostrarFotoIndividualEnPantalla(indice) {
     // CAPA 1: Fondo Desenfocado (Ambient Blur 100vw x 100vh)
     galeriaCapaBlurFondoEl.style.backgroundImage = `url("${urlFoto}")`;
 
-    // CAPA 2: Transición fluida (opacity + transform: scale) de la foto central
-    galeriaImgNitidaEl.classList.add("transicion-foto");
+    // CAPA 2: Transición fluida (opacity + transform: scale) de la foto central y su marco
+    const targetAnimacion = galeriaMarcoWrapperEl || galeriaImgNitidaEl;
+    targetAnimacion.classList.add("transicion-foto");
     setTimeout(() => {
         galeriaImgNitidaEl.src = urlFoto;
         galeriaImgNitidaEl.onload = () => {
-            galeriaImgNitidaEl.classList.remove("transicion-foto");
+            targetAnimacion.classList.remove("transicion-foto");
         };
-        setTimeout(() => galeriaImgNitidaEl.classList.remove("transicion-foto"), 140);
+        setTimeout(() => targetAnimacion.classList.remove("transicion-foto"), 140);
     }, 220);
 }
 
@@ -335,6 +454,9 @@ function mostrarVistaMosaico6a8() {
                 <div class="mosaico-item-card" style="animation-delay: ${delayMs}ms;">
                     <div class="mosaico-item-blur" style="background-image: url('${url}');"></div>
                     <img class="mosaico-item-img" src="${url}" alt="Foto de ${escaparHtml(autor)}" />
+                    <div class="mosaico-item-overlay-marca" aria-hidden="true">
+                        <img src="/static/img/logo_segalu.png" alt="Segalú" class="mosaico-logo-mini" onerror="this.style.display='none'" />
+                    </div>
                     <div class="mosaico-item-autor">
                         <span>📸 ${escaparHtml(autor)}</span>
                     </div>
@@ -469,7 +591,21 @@ function renderizarModoLobbyKahoot(invitados) {
     const lista = invitados || [];
     lobbyNumeroJugadoresEl.textContent = String(lista.length);
 
-    const firma = lista.map((i) => `${i.id}:${i.nombre}:${i.avatar}:${i.puntaje_total}`).join("|");
+    // Sistema de auto-escalado dinámico estilo Kahoot según cantidad de conectados
+    lobbyGridAvataresEl.classList.remove("grid-scale-lg", "grid-scale-md", "grid-scale-sm", "grid-scale-xs", "grid-scale-xxs");
+    if (lista.length <= 12) {
+        lobbyGridAvataresEl.classList.add("grid-scale-lg");
+    } else if (lista.length <= 28) {
+        lobbyGridAvataresEl.classList.add("grid-scale-md");
+    } else if (lista.length <= 64) {
+        lobbyGridAvataresEl.classList.add("grid-scale-sm");
+    } else if (lista.length <= 96) {
+        lobbyGridAvataresEl.classList.add("grid-scale-xs");
+    } else {
+        lobbyGridAvataresEl.classList.add("grid-scale-xxs");
+    }
+
+    const firma = lista.map((i) => `${i.id}:${i.nombre}:${i.avatar}`).join("|");
     if (firma === firmaLobbyRenderizado) return;
     firmaLobbyRenderizado = firma;
 
@@ -484,8 +620,8 @@ function renderizarModoLobbyKahoot(invitados) {
         return;
     }
 
+    // Sin limitador artificial de 28 jugadores y SIN texto de puntaje "0 pts"
     lobbyGridAvataresEl.innerHTML = lista
-        .slice(0, 28)
         .map(
             (inv) => `
             <div class="lobby-jugador-card">
@@ -494,7 +630,6 @@ function renderizarModoLobbyKahoot(invitados) {
                 </div>
                 <div class="lobby-jugador-info">
                     <strong class="lobby-jugador-nombre">${escaparHtml(inv.nombre || "Invitado")}</strong>
-                    <span class="lobby-jugador-pts">${Number(inv.puntaje_total || 0)} pts</span>
                 </div>
             </div>
         `
@@ -505,31 +640,82 @@ function renderizarModoLobbyKahoot(invitados) {
 // ------------------------------------------------------------------------------
 // 5. MODOS PREGUNTA_ACTIVA Y RESULTADOS_PREGUNTA (GRÁFICO DE BARRAS KAHOOT)
 // ------------------------------------------------------------------------------
+let temporizadorLocalPregunta = null;
+let idPreguntaActivaTimer = null;
+let segundosRestantesLocales = 0;
+let limiteSegundosLocal = 20;
+let instanteFinPreguntaMs = 0;
+
+function detenerTemporizadorLocalPregunta() {
+    if (temporizadorLocalPregunta) {
+        clearInterval(temporizadorLocalPregunta);
+        temporizadorLocalPregunta = null;
+    }
+}
+
+/**
+ * Temporizador local fluido: se ancla a un instante de fin calculado UNA sola vez
+ * (performance.now) y avanza con setInterval de 1 s. Al calcular el valor desde el
+ * reloj monotónico no acumula deriva aunque el navegador retrase algún tick.
+ */
+function iniciarTemporizadorLocalPregunta(segundosIniciales, limiteSeg) {
+    detenerTemporizadorLocalPregunta();
+    limiteSegundosLocal = Math.max(1, limiteSeg || 20);
+    segundosRestantesLocales = Math.min(limiteSegundosLocal, Math.round(segundosIniciales));
+    instanteFinPreguntaMs = performance.now() + segundosRestantesLocales * 1000;
+    actualizarGraficoReloj(segundosRestantesLocales, limiteSegundosLocal);
+
+    temporizadorLocalPregunta = setInterval(() => {
+        const restantes = Math.max(0, Math.round((instanteFinPreguntaMs - performance.now()) / 1000));
+        if (restantes !== segundosRestantesLocales) {
+            segundosRestantesLocales = restantes;
+            actualizarGraficoReloj(segundosRestantesLocales, limiteSegundosLocal);
+        }
+        if (restantes <= 0) detenerTemporizadorLocalPregunta();
+    }, 1000);
+}
+
+function actualizarGraficoReloj(restantesSeg, limiteSeg) {
+    const lim = Math.max(1, limiteSeg || 20);
+    const rest = Math.max(0, Math.min(lim, restantesSeg));
+    kahootSegundosNumeroEl.textContent = String(rest);
+
+    const circunferencia = 377;
+    const proporcion = Math.max(0, Math.min(1, rest / lim));
+    const offset = circunferencia * (1 - proporcion);
+    kahootRelojProgresoEl.style.strokeDashoffset = String(offset.toFixed(1));
+
+    if (rest <= 5) {
+        kahootRelojCirculoEl.classList.add("urgente");
+    } else {
+        kahootRelojCirculoEl.classList.remove("urgente");
+    }
+}
+
 function renderizarModoPreguntaYResultados(pregunta, modo) {
     if (!pregunta) return;
 
     const orden = Number(pregunta.orden || 1);
     const totalPreguntas = Math.max(orden, Number(pregunta.total_preguntas || 1));
     const limiteSeg = Math.max(1, Number(pregunta.tiempo_limite_segundos || 20));
-    const restantesSeg = Math.max(0, Number(pregunta.segundos_restantes ?? limiteSeg));
     const totalRespuestas = Number(pregunta.total_respuestas || 0);
     const esResultados = modo === "RESULTADOS_PREGUNTA" || Boolean(pregunta.ronda_cerrada);
     const correcta = String(pregunta.respuesta_correcta || "A").trim().toUpperCase();
 
     kahootBadgeNumeroPreguntaEl.textContent = `PREGUNTA ${orden} DE ${totalPreguntas}`;
     kahootTextoEnunciadoEl.textContent = pregunta.enunciado || "";
-    kahootSegundosNumeroEl.textContent = String(restantesSeg);
     kahootNumeroRespuestasEl.textContent = String(totalRespuestas);
 
-    const circunferencia = 377;
-    const proporcion = Math.max(0, Math.min(1, restantesSeg / limiteSeg));
-    const offset = circunferencia * (1 - proporcion);
-    kahootRelojProgresoEl.style.strokeDashoffset = String(offset.toFixed(1));
-
-    if (restantesSeg <= 5 && !esResultados) {
-        kahootRelojCirculoEl.classList.add("urgente");
-    } else {
-        kahootRelojCirculoEl.classList.remove("urgente");
+    if (esResultados) {
+        detenerTemporizadorLocalPregunta();
+        idPreguntaActivaTimer = null;
+        segundosRestantesLocales = 0;
+        actualizarGraficoReloj(0, limiteSeg);
+    } else if (idPreguntaActivaTimer !== pregunta.id) {
+        // Al renderizarse la pregunta en pantalla gigante, el contador arranca exactamente
+        // desde el total configurado (ej: 20s) sin desfase por latencia de red ni tirones.
+        idPreguntaActivaTimer = pregunta.id;
+        iniciarTemporizadorLocalPregunta(limiteSeg, limiteSeg);
     }
 
     const opciones = ["A", "B", "C", "D"];
@@ -816,8 +1002,74 @@ function renderizarModoPodioSecuencial(podioLista) {
 }
 
 // ------------------------------------------------------------------------------
+// 6.5. MODO RANKING / TABLA DE POSICIONES EN VIVO ESTILO KAHOOT
+// ------------------------------------------------------------------------------
+let firmaRankingRenderizado = "";
+
+function renderizarModoRanking(rankingLista) {
+    if (!rankingFilasContenedorEl) return;
+    const lista = (rankingLista || []).slice(0, 6);
+
+    const firma = lista
+        .map((i) => `${i.id}:${i.nombre}:${i.puntaje_total}:${i.delta_posicion}:${i.posicion}`)
+        .join("|");
+    if (firma === firmaRankingRenderizado) return;
+    firmaRankingRenderizado = firma;
+
+    if (!lista.length) {
+        rankingFilasContenedorEl.innerHTML = `
+            <div class="ranking-fila-card" style="justify-content: center; padding: 24px;">
+                <span style="color: #94A3B8; font-weight: 700;">Aún no hay puntajes registrados en esta ronda.</span>
+            </div>
+        `;
+        return;
+    }
+
+    rankingFilasContenedorEl.innerHTML = lista
+        .map((inv, idx) => {
+            const puesto = Number(inv.posicion || idx + 1);
+            const delta = Number(inv.delta_posicion || 0);
+            const claseTop = puesto === 1 ? "top-1" : puesto === 2 ? "top-2" : puesto === 3 ? "top-3" : "";
+
+            let deltaHtml = "";
+            if (delta > 0) {
+                // Subió puestos: flecha minimalista blanca sin números
+                deltaHtml = `<span class="ranking-delta-pill delta-up" title="Subió de posición" aria-label="Subió de posición">▲</span>`;
+            } else if (delta < 0) {
+                // Bajó puestos: flecha minimalista plomo/gris sin números
+                deltaHtml = `<span class="ranking-delta-pill delta-down" title="Bajó de posición" aria-label="Bajó de posición">▼</span>`;
+            } else {
+                // Mantuvo el puesto: indicador neutral plomo sin números
+                deltaHtml = `<span class="ranking-delta-pill delta-equal" title="Mantiene posición" aria-label="Mantiene posición">—</span>`;
+            }
+
+            return `
+                <div class="ranking-fila-card ${claseTop}" style="animation-delay: ${idx * 60}ms;">
+                    <div class="ranking-fila-izq">
+                        <div class="ranking-posicion-circulo">${puesto}</div>
+                        <div class="ranking-avatar-contenedor">
+                            ${generarSvgAvatarCompuesto(inv.avatar)}
+                        </div>
+                        <strong class="ranking-nombre-texto">${escaparHtml(inv.nombre || "Invitado")}</strong>
+                    </div>
+                    <div class="ranking-fila-der">
+                        ${deltaHtml}
+                        <div class="ranking-puntos-caja">
+                            <strong>${Number(inv.puntaje_total || 0).toLocaleString()}</strong>
+                            <span>pts</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        })
+        .join("");
+}
+
+// ------------------------------------------------------------------------------
 // 7. SINCRONIZACIÓN INSTANTÁNEA (BROADCASTCHANNEL + POLLING CADA 1 SEGUNDO)
 // ------------------------------------------------------------------------------
+let idEventoProyectado = "";
+
 function escaparHtml(texto) {
     return String(texto || "")
         .replace(/&/g, "&amp;")
@@ -831,6 +1083,11 @@ if (typeof BroadcastChannel !== "undefined") {
     const canalSync = new BroadcastChannel("segalu_proyector_sync");
     canalSync.onmessage = (ev) => {
         const msg = ev.data || {};
+        // Aislamiento Multi-Sede: si el mensaje pertenece a otro evento, no interferir
+        if (msg.evento_id && idEventoProyectado && msg.evento_id !== idEventoProyectado) {
+            return;
+        }
+
         if (msg.tipo === "CONFIG_GALERIA") {
             aplicarConfiguracionGaleriaEnVivo(msg.modo_galeria, msg.duracion_foto_segundos);
         } else if (msg.tipo === "ACCION_TRIVIA") {
@@ -839,6 +1096,11 @@ if (typeof BroadcastChannel !== "undefined") {
                 sincronizarModoGaleria(fotosAprobadasCache, null);
             }
             sincronizarEstadoProyector();
+        } else if (msg.tipo === "AVATAR_ACTUALIZADO") {
+            firmaLobbyRenderizado = "";
+            sincronizarEstadoProyector();
+        } else if (msg.tipo === "ACCESORIOS_ACTUALIZADOS") {
+            cargarAccesoriosProyector();
         }
     };
 }
@@ -863,15 +1125,26 @@ async function sincronizarEstadoProyector() {
         const query = new URLSearchParams();
         if (params.get("evento_id")) query.set("evento_id", params.get("evento_id"));
         if (params.get("codigo")) query.set("codigo", params.get("codigo"));
+        if (params.get("sede")) query.set("sede", params.get("sede"));
+        if (params.get("local_id")) query.set("local_id", params.get("local_id"));
 
         const url = query.toString()
             ? `/api/proyector/estado?${query.toString()}`
             : `/api/proyector/estado`;
 
-        const res = await fetch(url, { cache: "no-store" });
+        const controlador = new AbortController();
+        const temporizadorAbort = setTimeout(() => controlador.abort(), 5000);
+        const res = await fetch(url, { cache: "no-store", signal: controlador.signal });
+        clearTimeout(temporizadorAbort);
         if (!res.ok) return;
         const data = await res.json();
         if (!data || !data.evento) return;
+
+        idEventoProyectado = data.evento.id || "";
+
+        if (data.catalogo_accesorios && typeof data.catalogo_accesorios === "object") {
+            Object.assign(catalogoAccesoriosProyector, data.catalogo_accesorios);
+        }
 
         const modo = data.modo_proyector || "GALERIA";
         activarVistaModo(modo);
@@ -882,6 +1155,8 @@ async function sincronizarEstadoProyector() {
             renderizarModoLobbyKahoot(data.invitados || []);
         } else if (modo === "PREGUNTA_ACTIVA" || modo === "RESULTADOS_PREGUNTA") {
             renderizarModoPreguntaYResultados(data.pregunta_activa, modo);
+        } else if (modo === "RANKING") {
+            renderizarModoRanking(data.ranking || data.podio || []);
         } else if (modo === "PODIO") {
             renderizarModoPodioSecuencial(data.podio || []);
         }
@@ -892,5 +1167,24 @@ async function sincronizarEstadoProyector() {
     }
 }
 
-sincronizarEstadoProyector();
-setInterval(sincronizarEstadoProyector, 1000);
+// Sondeo ligero, secuencial y adaptativo (nunca se solapan peticiones). El reloj de la
+// pregunta NO depende de este ciclo: corre localmente, así que se puede sondear con calma.
+const INTERVALO_SONDEO_POR_MODO_MS = {
+    GALERIA: 3000,
+    LOBBY_KAHOOT: 1500,
+    PREGUNTA_ACTIVA: 2000,
+    RESULTADOS_PREGUNTA: 2000,
+    RANKING: 2500,
+    PODIO: 3000,
+};
+
+async function cicloSondeoProyector() {
+    await sincronizarEstadoProyector();
+    const espera = document.hidden
+        ? 6000
+        : INTERVALO_SONDEO_POR_MODO_MS[modoProyectorActual] || 2000;
+    setTimeout(cicloSondeoProyector, espera);
+}
+
+cargarAccesoriosProyector();
+cicloSondeoProyector();

@@ -21,6 +21,12 @@ __pycache__/
 # Estado temporal local
 backend/estado_eventos_segalu.json
 
+# Archivos subidos dinámicamente por invitados (no versionar archivos multimedia locales)
+frontend/static/uploads/multimedia/*
+!frontend/static/uploads/multimedia/.gitkeep
+frontend/static/uploads/originales/*
+!frontend/static/uploads/originales/.gitkeep
+
 # Archivos temporales del sistema operativo
 .DS_Store
 Thumbs.db

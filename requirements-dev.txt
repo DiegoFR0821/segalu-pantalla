@@ -1,0 +1,12 @@
+# ==============================================================================
+# PROYECTO: SEGALÚ (segalu-pantalla)
+# ARCHIVO: requirements-dev.txt (Herramientas para Pruebas de Estrés y Carga)
+# ==============================================================================
+# Instalación local: pip install -r requirements-dev.txt
+# ==============================================================================
+
+# Framework de pruebas de carga distribuida en Python
+locust>=2.24.0
+
+# Biblioteca para generación sintética de imágenes en memoria RAM
+Pillow>=10.3.0

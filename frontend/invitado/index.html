@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;0,800;1,700&display=swap" rel="stylesheet">
 
     <!-- Hoja de estilos Modo Claro: Gala Marfil, Blanco Puro y Bronce Dorado -->
-    <link rel="stylesheet" href="styles.css?v=20261018b" />
+    <link rel="stylesheet" href="styles.css?v=20261018d" />
 </head>
 <body>
 
@@ -127,13 +127,13 @@
 
                 <div class="form-group">
                     <label for="input-nombre" class="field-label">
-                        ¿Cuál es tu nombre para la pantalla gigante?
+                        ¿Cuál es tu Nombre y Apellido para la pantalla gigante?
                     </label>
                     <input
                         type="text"
                         id="input-nombre"
                         class="gala-input"
-                        placeholder="Ej: Diego, Tía Gloria, Familia Ramos..."
+                        placeholder="Ej: Juan Perez"
                         maxlength="60"
                         required
                         autocomplete="off"
@@ -226,16 +226,16 @@
                     <div class="action-circle-arrow">→</div>
                 </button>
 
-                <!-- Botón Grande 2: Jugar Ronda de Preguntas -->
-                <button type="button" id="btn-ir-trivia" class="gala-action-btn">
-                    <div class="action-icon-box pearl-gold-box">
-                        <!-- SVG Mando de Trivia / Trofeo lineal sobrio -->
-                        <svg class="svg-icon svg-md" viewBox="0 0 24 24" aria-hidden="true">
+                <!-- Botón Grande 2: Jugar Ronda de Preguntas con Identidad Morado Vibrante Kahoot -->
+                <button type="button" id="btn-ir-trivia" class="gala-action-btn action-btn-trivia">
+                    <div class="action-icon-box purple-game-box">
+                        <!-- SVG Mando de Trivia / Trofeo lineal en blanco puro -->
+                        <svg class="svg-icon svg-md icon-white" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="2" y="6" width="20" height="12" rx="6" />
                             <path d="M6 12h4" />
                             <path d="M8 10v4" />
-                            <circle cx="15" cy="11" r="1" />
-                            <circle cx="17" cy="13" r="1" />
+                            <circle cx="15" cy="11" r="1" fill="currentColor" />
+                            <circle cx="17" cy="13" r="1" fill="currentColor" />
                         </svg>
                     </div>
                     <div class="action-content">
@@ -243,7 +243,22 @@
                         <p>Participa en la trivia estilo Kahoot en vivo del salón.</p>
                         <span id="etiqueta-estado-trivia-lobby" class="host-wait-tag">⏳ En espera del Host</span>
                     </div>
-                    <div class="action-circle-arrow">›</div>
+                    <div class="action-circle-arrow action-arrow-purple">›</div>
+                </button>
+
+                <!-- Botón Grande 3: Reclama tu Pase VIP & Descuento Especial (CRM Leads) -->
+                <button type="button" id="btn-abrir-modal-lead" class="gala-action-btn action-btn-vip-lead">
+                    <div class="action-icon-box gold-gradient-box">
+                        <span class="lead-icon-gift">🎁</span>
+                    </div>
+                    <div class="action-content">
+                        <div class="vip-lead-badge-row">
+                            <span class="vip-lead-pill">BENEFICIO DE INVITADO</span>
+                        </div>
+                        <h3>¡Reclama tu Pase VIP & Descuento Especial!</h3>
+                        <p>Obtén un cupón promocional con código QR para tu próximo evento en Segalú.</p>
+                    </div>
+                    <div class="action-circle-arrow action-arrow-gold">›</div>
                 </button>
             </div>
 
@@ -307,40 +322,34 @@
                     </article>
                 </div>
 
-                <!-- Botón dedicado para abrir el visor completo de Galería (1/4 a 4/4 por Sede) -->
-                <button type="button" id="btn-conoce-segalu" class="btn-gallery-banner">
-                    <span>Conoce Segalú: Galería de Fotos por Sede (1/4 a 4/4)</span>
-                    <span>Ver fotos →</span>
-                </button>
-
-                <!-- NUEVA SECCIÓN: 📍 NUESTRAS SEDES Y CÓMO LLEGAR (GOOGLE MAPS + COMPARTIR WHATSAPP) -->
+                <!-- SECCIÓN: 📍 NUESTRAS SEDES Y CÓMO LLEGAR (MAPA EMBEBIDO GOOGLE MAPS + COMPARTIR WHATSAPP) -->
                 <div class="sedes-ubicacion-section">
                     <div class="section-header-row">
                         <span class="section-title-gold">📍 Nuestras Sedes y Cómo Llegar</span>
-                        <span class="section-tag">GPS & WhatsApp</span>
+                        <span class="section-tag">GPS & Mapa en Vivo</span>
                     </div>
                     <div id="contenedor-tarjetas-ubicacion" class="sedes-ubicacion-list">
-                        <!-- Se genera dinámicamente desde CONFIG_SEDES_SEGALU en app.js -->
+                        <!-- Se genera dinámicamente desde CONFIG_SEDES_SEGALU en app.js con el iframe de Google Maps -->
                     </div>
                 </div>
 
-                <!-- Botón de Contacto Directo WhatsApp en línea sobria (Blanco, Perla y Bronce Dorado) -->
+                <!-- Botón de Contacto Directo WhatsApp Oficial con Estilo Elegante Segalú -->
                 <a
-                    href="#"
+                    href="https://wa.me/51922574048?text=%C2%A1Hola%20Eventos%20Segal%C3%BA!%20%F0%9F%8E%89%20Estoy%20participando%20en%20vivo%20desde%20la%20app%20interactiva%20y%20me%20encantar%C3%ADa%20cotizar%20una%20fecha%20con%20mi%20beneficio%20especial%20de%20invitado."
                     id="btn-whatsapp-segalu"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="btn-whatsapp-cta"
                 >
                     <div class="wa-icon-circle">
-                        <!-- SVG Burbuja de Contacto lineal en dorado/bronce -->
-                        <svg class="svg-icon svg-md" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                        <!-- Ícono SVG Oficial de WhatsApp en color verde oficial -->
+                        <svg class="svg-icon svg-md wa-official-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+                            <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24zm4.52 11.66c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.26-1.5-1.41-1.75-.14-.25-.02-.39.11-.51.11-.11.25-.29.37-.44.13-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.61.19 1.16.17 1.6.1.49-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.07-.1-.23-.17-.48-.3z"/>
                         </svg>
                     </div>
                     <div class="wa-text">
-                        <strong>¿Te gusta este evento?</strong>
-                        <span>Cotiza tu evento con Segalú (WhatsApp)</span>
+                        <strong>Cotiza tu evento con Segalú</strong>
+                        <span>Reserva tu fecha y vive la experiencia</span>
                     </div>
                     <span class="wa-arrow">→</span>
                 </a>
@@ -465,27 +474,41 @@
             <!-- SUB-PANEL C: [FASE 4.5 - REQUERIMIENTO D] PANTALLA DE RESULTADO ÚNICO Y DEFINITIVO
                  (Aparece SOLO cuando el tiempo de la pregunta llega a 0 o el Admin revela la respuesta) -->
             <div id="trivia-panel-resultado" class="kahoot-result-card hidden">
-                <!-- Ícono gigante ✅ o ❌ -->
-                <div id="trivia-resultado-icono" class="kahoot-giant-icon">✅</div>
+                <!-- Ícono SVG dentro de insignia circular con brillo y relieve -->
+                <div class="kahoot-result-badge-wrap">
+                    <div id="trivia-resultado-icono" class="kahoot-result-badge">
+                        <svg class="result-badge-svg" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </div>
+                </div>
 
                 <h2 id="trivia-resultado-titulo" class="kahoot-result-title">¡RESPUESTA CORRECTA!</h2>
 
-                <!-- Puntos ganados en esta pregunta -->
-                <div id="trivia-resultado-puntos" class="kahoot-points-pill">
-                    +920 puntos en esta pregunta
+                <!-- Puntos ganados con tipografía grande y estilizada -->
+                <div class="kahoot-score-hero">
+                    <span class="score-hero-label">PUNTOS GANADOS</span>
+                    <div id="trivia-resultado-puntos" class="score-hero-value">+920 pts</div>
                 </div>
 
-                <!-- Puesto actual en el ranking y Puntaje Total Acumulado -->
-                <div class="kahoot-stats-strip">
-                    <span id="trivia-resultado-puesto" class="kahoot-stat-chip">Puesto actual: #1</span>
-                    <span id="trivia-resultado-total-acumulado" class="kahoot-stat-chip">Puntaje total: 920 pts</span>
-                </div>
+                <!-- Fila limpia de 2 columnas junto al avatar -->
+                <div class="result-stats-and-avatar-row">
+                    <div class="result-stat-col">
+                        <span class="result-stat-label">PUESTO ACTUAL</span>
+                        <strong id="trivia-resultado-puesto" class="result-stat-val">#1</strong>
+                    </div>
 
-                <!-- Muñequito compuesto del invitado (Festejando si acertó) -->
-                <div class="result-avatar-wrap">
-                    <div class="avatar-stage avatar-stage-lg" id="trivia-resultado-stage">
-                        <div class="avatar-layer-character" id="trivia-resultado-char">🐶</div>
-                        <div class="avatar-layer-accessory" id="trivia-resultado-acc">👑</div>
+                    <!-- Muñequito compuesto del invitado (Festejando si acertó) -->
+                    <div class="result-avatar-center">
+                        <div class="avatar-stage avatar-stage-lg" id="trivia-resultado-stage">
+                            <div class="avatar-layer-character" id="trivia-resultado-char">🐶</div>
+                            <div class="avatar-layer-accessory" id="trivia-resultado-acc">👑</div>
+                        </div>
+                    </div>
+
+                    <div class="result-stat-col">
+                        <span class="result-stat-label">PUNTAJE TOTAL</span>
+                        <strong id="trivia-resultado-total-acumulado" class="result-stat-val">920 pts</strong>
                     </div>
                 </div>
 
@@ -493,8 +516,8 @@
                     ¡Excelente reflejo! Prepárate para la siguiente pregunta.
                 </p>
 
-                <!-- Solución oficial validada por el servidor -->
-                <div id="trivia-solucion-oficial" class="kahoot-official-answer hidden"></div>
+                <!-- Solución oficial validada por el servidor en el pie de la tarjeta -->
+                <div id="trivia-solucion-oficial" class="kahoot-official-footer kahoot-official-answer hidden"></div>
             </div>
 
             <!-- SUB-PANEL D: [FASE 4.5 - REQUERIMIENTO E] CUADRO CUADRADO CENTRADO DE PODIO
@@ -642,23 +665,13 @@
             <div class="gallery-modal-header">
                 <div>
                     <span class="exclusive-tag">PORTAFOLIO OFICIAL</span>
-                    <h3>Galería de Eventos Segalú</h3>
+                    <h3 id="galeria-modal-sede-nombre">Galería de Eventos Segalú</h3>
                 </div>
                 <button type="button" id="btn-cerrar-galeria" class="btn-close-circle" aria-label="Cerrar galería">✕</button>
             </div>
 
-            <!-- Pestañas para alternar entre Sede 1 (4 fotos) y Sede 2 (4 fotos) -->
-            <div class="gallery-sede-tabs" id="gallery-sede-tabs-container">
-                <button type="button" id="btn-tab-sede1" class="btn-sede-tab active" data-sede="sede1" data-sede-tab="sede1">
-                    🏛️ Sede 1 - El Colocho
-                </button>
-                <button type="button" id="btn-tab-sede2" class="btn-sede-tab" data-sede="sede2" data-sede-tab="sede2">
-                    ✨ Sede 2 - Crystal Garden
-                </button>
-            </div>
-
-            <!-- Diapositiva activa del carrusel (aspect-ratio: 16/10, object-fit: cover) -->
-            <div id="galeria-slide-visual" class="gallery-slide-visual">
+            <!-- Visor en Formato Vertical Protagonista (4:5) con Botones Flotantes Circulares -->
+            <div id="galeria-slide-visual" class="gallery-slide-visual vertical-stage">
                 <img
                     id="galeria-slide-img"
                     class="gallery-slide-photo"
@@ -666,50 +679,16 @@
                     alt="Foto de Sede Segalú"
                     onerror="this.classList.add('hidden')"
                 />
-                <span id="galeria-slide-badge" class="space-tag gallery-floating-badge">Sede 1 • Foto 1/4</span>
-                <div id="galeria-slide-icono" class="gallery-hero-icon">🏛️</div>
+                <button type="button" id="btn-galeria-prev" class="btn-gallery-float btn-gallery-prev" aria-label="Foto anterior">‹</button>
+                <button type="button" id="btn-galeria-next" class="btn-gallery-float btn-gallery-next" aria-label="Foto siguiente">›</button>
+                <span id="galeria-slide-badge" class="space-tag gallery-floating-badge">Foto 1 / 4</span>
+                <div id="galeria-slide-icono" class="gallery-hero-icon hidden">🏛️</div>
             </div>
 
-            <div class="gallery-slide-body">
-                <h4 id="galeria-slide-titulo">Sede 1 - El Colocho (Carabayllo)</h4>
-                <p id="galeria-slide-desc">
-                    Amplio local con capacidad para 300 invitados en Av. Manuel Prado - KM 22. Iluminación arquitectónica, pista LED y pantalla interactiva en vivo.
-                </p>
-            </div>
-
-            <!-- Controles del carrusel (1/4 a 4/4) -->
-            <div class="gallery-controls">
-                <button type="button" id="btn-galeria-prev" class="btn-outline-gold">◀ Anterior</button>
-                <span id="galeria-indicador" class="gallery-counter">1 / 4</span>
-                <button type="button" id="btn-galeria-next" class="btn-outline-gold">Siguiente ▶</button>
-            </div>
-
-            <!-- Ubicación y cómo llegar de la sede activa dentro del modal -->
-            <div class="gallery-modal-location-box">
-                <div class="gallery-loc-address">
-                    <span>📍</span>
-                    <span id="galeria-modal-direccion-texto">Av. Manuel Prado - KM 22, Carabayllo</span>
-                </div>
-                <div class="sede-loc-actions">
-                    <a
-                        id="btn-modal-abrir-maps"
-                        href="#"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="btn-sede-maps"
-                    >
-                        🗺️ Abrir en Google Maps
-                    </a>
-                    <a
-                        id="btn-modal-compartir-wa"
-                        href="#"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="btn-sede-share-wa"
-                    >
-                        📲 Compartir dirección a un invitado
-                    </a>
-                </div>
+            <!-- Pie minimalista: Título corto y elegante junto al contador numérico -->
+            <div class="gallery-slide-footer">
+                <h4 id="galeria-slide-titulo" class="gallery-clean-title">Salón Principal y Pista LED</h4>
+                <span id="galeria-indicador" class="gallery-counter-pill">1 / 4</span>
             </div>
         </div>
     </div>
@@ -790,7 +769,106 @@
         </div>
     </div>
 
+    <!-- BOTÓN FLOTANTE RÁPIDO CRM: PASE VIP & DESCUENTO -->
+    <button type="button" id="btn-flotante-vip-lead" class="btn-flotante-vip-lead hidden" title="🎁 Reclama tu Pase VIP">
+        <span class="btn-flotante-icon">🎁</span>
+        <span class="btn-flotante-text">Pase VIP & Descuento</span>
+    </button>
+
+    <!-- MODAL CRM: PASE VIP & CUPÓN PROMOCIONAL SEGALÚ (LIGHTBOX POPUP CENTRADO) -->
+    <div id="modal-crm-lead" class="crm-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-crm-title">
+        <div class="crm-lightbox-card">
+            <!-- VISTA 1: FORMULARIO DE CAPTURA DEL LEAD -->
+            <div id="vista-lead-formulario">
+                <div class="crm-lightbox-header">
+                    <span class="vip-sheet-pill">BENEFICIO EXCLUSIVO DE INVITADO</span>
+                    <h2 id="modal-crm-title">🎁 Pase VIP & Descuento Especial</h2>
+                    <p>Completa tus datos para recibir tu cupón digital con descuento exclusivo para tu próxima celebración en Segalú.</p>
+                </div>
+
+                <form id="form-crm-lead" class="crm-lead-form">
+                    <div class="crm-form-group">
+                        <label for="lead-nombre">Nombre y Apellido <span class="required-star">*</span></label>
+                        <input type="text" id="lead-nombre" class="crm-input-text" placeholder="Ej. Camila Morales" required maxlength="120" autocomplete="name" />
+                    </div>
+
+                    <div class="crm-form-group">
+                        <label for="lead-telefono">Número de Celular / WhatsApp (9 dígitos) <span class="required-star">*</span></label>
+                        <input type="tel" id="lead-telefono" class="crm-input-text" placeholder="Ej. 987654321" required maxlength="9" pattern="[0-9]{9}" inputmode="numeric" autocomplete="tel" />
+                        <span class="crm-field-hint">Ingresa exactamente los 9 dígitos de tu celular</span>
+                    </div>
+
+                    <div class="crm-form-group">
+                        <label for="lead-nacimiento">Fecha de Nacimiento <span class="required-star">*</span></label>
+                        <input type="date" id="lead-nacimiento" class="crm-input-text" required />
+                        <span class="crm-field-hint">Para enviarte un beneficio sorpresa en tu fecha especial 🎂</span>
+                    </div>
+
+                    <div class="crm-form-group">
+                        <label for="lead-genero">Género <span class="optional-tag">(Opcional)</span></label>
+                        <select id="lead-genero" class="crm-input-text crm-select">
+                            <option value="No especificado">Selecciona tu género...</option>
+                            <option value="Femenino">Femenino</option>
+                            <option value="Masculino">Masculino</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+
+                    <div class="crm-form-group">
+                        <label for="lead-correo">Correo Electrónico <span class="optional-tag">(Opcional)</span></label>
+                        <input type="email" id="lead-correo" class="crm-input-text" placeholder="ejemplo@correo.com" maxlength="120" autocomplete="email" />
+                    </div>
+
+                    <div class="crm-form-actions-stack">
+                        <button type="submit" id="btn-enviar-lead" class="btn-gold-primary btn-block-lead">
+                            <span>✨ Obtener Mi Pase VIP y Descuento</span>
+                        </button>
+                        <button type="button" id="btn-cancelar-modal-lead" class="btn-cancel-modal-lead">
+                            <span>Cerrar</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- VISTA 2: TARJETA DIGITAL GENERADA CON CÓDIGO Y QR -->
+            <div id="vista-lead-exito" class="hidden">
+                <div class="crm-lightbox-header">
+                    <span class="vip-sheet-pill badge-success">¡PASE VIP GENERADO! 🎉</span>
+                    <h2>Tu Cupón Promocional Exclusivo</h2>
+                    <p>Presenta este pase digital en cualquiera de nuestras sedes o por WhatsApp para validar tu beneficio.</p>
+                </div>
+
+                <div class="digital-voucher-card" id="digital-voucher-capture">
+                    <div class="voucher-top-brand">
+                        <span class="voucher-logo">✨ SEGALÚ EVENTOS</span>
+                        <span class="voucher-vip-tag">PASE VIP INVITADO</span>
+                    </div>
+                    <div class="voucher-body">
+                        <div class="voucher-holder-name" id="voucher-nombre-invitado">Invitado VIP</div>
+                        <div class="voucher-code-display">
+                            <span class="voucher-code-label">CÓDIGO ÚNICO:</span>
+                            <strong id="voucher-codigo-promocional">SEGALU-PROMO-XXXX</strong>
+                        </div>
+                        <div class="voucher-qr-box">
+                            <img id="voucher-qr-img" src="" alt="Código QR Promocional" class="voucher-qr-img" />
+                        </div>
+                        <p class="voucher-terms">Válido para cotizaciones y reservas en Sede 1 (El Colocho) y Sede 2 (Crystal Garden). No acumulable con otras promociones.</p>
+                    </div>
+                </div>
+
+                <div class="voucher-actions-row">
+                    <a id="btn-compartir-cupon-wa" href="#" target="_blank" rel="noopener noreferrer" class="btn-wa-voucher">
+                        <span>📲 Validar por WhatsApp</span>
+                    </a>
+                    <button type="button" id="btn-cerrar-cupon" class="btn-cancel-modal-lead">
+                        <span>Cerrar</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Script con arquitectura modular de paquetes temáticos y conexión a FastAPI -->
-    <script src="app.js?v=20261018b"></script>
+    <script src="app.js?v=20261018d"></script>
 </body>
 </html>

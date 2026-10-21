@@ -167,14 +167,17 @@ body {
     padding: 0;
 }
 
-.galeria-img-nitida {
+/* Contenedor responsivo que abraza la foto exacta (vertical u horizontal) sin deformar */
+.galeria-marco-corporativo-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     max-height: var(--foto-max-height);
     max-width: var(--foto-max-width);
-    width: auto;
-    height: auto;
-    object-fit: contain;
     border-radius: var(--foto-border-radius);
-    box-shadow: 0 28px 72px rgba(0, 0, 0, 0.52);
+    overflow: hidden;
+    box-shadow: 0 28px 72px rgba(0, 0, 0, 0.65), 0 0 0 1.5px rgba(245, 215, 127, 0.35);
     opacity: 1;
     transform: scale(1);
     transition:
@@ -183,9 +186,37 @@ body {
     will-change: opacity, transform;
 }
 
-.galeria-img-nitida.transicion-foto {
+.galeria-marco-corporativo-wrapper.transicion-foto {
     opacity: 0;
     transform: scale(0.965);
+}
+
+.galeria-img-nitida {
+    max-height: var(--foto-max-height);
+    max-width: var(--foto-max-width);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+}
+
+/* Capa flotante superpuesta mediante CSS del Marco y Logo de Segalú */
+.galeria-overlay-marca-flotante {
+    position: absolute;
+    top: 20px;
+    left: 24px;
+    z-index: 10;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.75));
+}
+
+.galeria-logo-marca-overlay {
+    height: clamp(40px, 6.5vh, 70px);
+    width: auto;
+    object-fit: contain;
+    opacity: 0.94;
 }
 
 /* CAPA 2B: Vista Mosaico de 6 a 8 Fotos Aprobadas sobre el Fondo Desenfocado */
@@ -232,9 +263,9 @@ body {
     height: 100%;
     border-radius: var(--foto-border-radius);
     overflow: hidden;
-    background: rgba(20, 20, 28, 0.45);
-    border: 1.5px solid rgba(255, 255, 255, 0.22);
-    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.4);
+    background: rgba(20, 20, 28, 0.55);
+    border: 1.5px solid rgba(245, 215, 127, 0.3);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
     opacity: 0;
     transform: translateY(14px) scale(0.96);
     animation: aparicionTarjetaMosaico 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -252,8 +283,8 @@ body {
     inset: -16px;
     background-size: cover;
     background-position: center;
-    filter: blur(18px) brightness(0.75);
-    transform: scale(1.1);
+    filter: blur(20px) brightness(0.7);
+    transform: scale(1.15);
 }
 
 .mosaico-item-img {
@@ -261,21 +292,37 @@ body {
     z-index: 2;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     display: block;
+}
+
+.mosaico-item-overlay-marca {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    z-index: 4;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7));
+}
+
+.mosaico-logo-mini {
+    height: 24px;
+    width: auto;
+    object-fit: contain;
+    opacity: 0.9;
 }
 
 .mosaico-item-autor {
     position: absolute;
     left: 12px;
     bottom: 12px;
-    z-index: 3;
+    z-index: 5;
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 5px 12px;
     border-radius: 999px;
-    background: rgba(15, 15, 20, 0.52);
+    background: rgba(15, 15, 20, 0.55);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: #FFFFFF;
@@ -503,11 +550,126 @@ body {
     min-height: 0;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    grid-auto-rows: 112px;
-    gap: 16px;
-    overflow: hidden;
+    gap: 14px;
+    overflow-y: auto;
+    overflow-x: hidden;
     align-content: start;
-    padding: 4px;
+    padding: 6px 10px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(229, 193, 88, 0.3) transparent;
+}
+
+/* 1 a 12 invitados: Tarjetas amplias y destacadas */
+.lobby-grid-avatares.grid-scale-lg {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 18px;
+}
+.lobby-grid-avatares.grid-scale-lg .lobby-jugador-card {
+    padding: 16px 20px;
+    border-radius: 20px;
+    gap: 16px;
+}
+.lobby-grid-avatares.grid-scale-lg .lobby-jugador-avatar {
+    width: 76px;
+    height: 76px;
+}
+.lobby-grid-avatares.grid-scale-lg .lobby-jugador-avatar svg {
+    width: 64px;
+    height: 64px;
+}
+.lobby-grid-avatares.grid-scale-lg .lobby-jugador-nombre {
+    font-size: 1.3rem;
+}
+
+/* 13 a 28 invitados: Formato equilibrado */
+.lobby-grid-avatares.grid-scale-md {
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 14px;
+}
+.lobby-grid-avatares.grid-scale-md .lobby-jugador-card {
+    padding: 12px 16px;
+    border-radius: 18px;
+    gap: 12px;
+}
+.lobby-grid-avatares.grid-scale-md .lobby-jugador-avatar {
+    width: 60px;
+    height: 60px;
+}
+.lobby-grid-avatares.grid-scale-md .lobby-jugador-avatar svg {
+    width: 50px;
+    height: 50px;
+}
+.lobby-grid-avatares.grid-scale-md .lobby-jugador-nombre {
+    font-size: 1.1rem;
+}
+
+/* 29 a 64 invitados: Formato compacto */
+.lobby-grid-avatares.grid-scale-sm {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 10px;
+}
+.lobby-grid-avatares.grid-scale-sm .lobby-jugador-card {
+    padding: 8px 12px;
+    border-radius: 14px;
+    gap: 10px;
+}
+.lobby-grid-avatares.grid-scale-sm .lobby-jugador-avatar {
+    width: 48px;
+    height: 48px;
+    border-width: 1.5px;
+}
+.lobby-grid-avatares.grid-scale-sm .lobby-jugador-avatar svg {
+    width: 40px;
+    height: 40px;
+}
+.lobby-grid-avatares.grid-scale-sm .lobby-jugador-nombre {
+    font-size: 0.94rem;
+}
+
+/* 65 a 120+ invitados: Alta densidad sin desborde */
+.lobby-grid-avatares.grid-scale-xs {
+    grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+    gap: 6px;
+}
+.lobby-grid-avatares.grid-scale-xs .lobby-jugador-card {
+    padding: 6px 8px;
+    border-radius: 10px;
+    gap: 8px;
+}
+.lobby-grid-avatares.grid-scale-xs .lobby-jugador-avatar {
+    width: 36px;
+    height: 36px;
+    border-width: 1.5px;
+}
+.lobby-grid-avatares.grid-scale-xs .lobby-jugador-avatar svg {
+    width: 30px;
+    height: 30px;
+}
+.lobby-grid-avatares.grid-scale-xs .lobby-jugador-nombre {
+    font-size: 0.8rem;
+}
+
+/* 97 a 150+ invitados: Ultra densidad para grandes aforos sin desborde */
+.lobby-grid-avatares.grid-scale-xxs {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 4px;
+}
+.lobby-grid-avatares.grid-scale-xxs .lobby-jugador-card {
+    padding: 4px 6px;
+    border-radius: 8px;
+    gap: 6px;
+}
+.lobby-grid-avatares.grid-scale-xxs .lobby-jugador-avatar {
+    width: 28px;
+    height: 28px;
+    border-width: 1px;
+}
+.lobby-grid-avatares.grid-scale-xxs .lobby-jugador-avatar svg {
+    width: 24px;
+    height: 24px;
+}
+.lobby-grid-avatares.grid-scale-xxs .lobby-jugador-nombre {
+    font-size: 0.72rem;
 }
 
 .lobby-jugador-card {
@@ -518,8 +680,9 @@ body {
     border-radius: 20px;
     background: var(--trivia-div-plomo);
     border: 1.5px solid var(--trivia-borde-sutil);
-    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.38);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
     animation: saltoEntradaJugador 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    min-width: 0;
 }
 
 @keyframes saltoEntradaJugador {
@@ -534,8 +697,8 @@ body {
 }
 
 .lobby-jugador-avatar {
-    width: 72px;
-    height: 72px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
     background: rgba(11, 12, 16, 0.65);
     border: 2px solid #E5C158;
@@ -544,11 +707,13 @@ body {
     justify-content: center;
     flex-shrink: 0;
     animation: flotarAvatarSuave 2.8s ease-in-out infinite;
+    overflow: hidden;
 }
 
 .lobby-jugador-avatar svg {
-    width: 60px;
-    height: 60px;
+    width: 54px;
+    height: 54px;
+    display: block;
 }
 
 @keyframes flotarAvatarSuave {
@@ -564,21 +729,16 @@ body {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    flex: 1;
 }
 
 .lobby-jugador-nombre {
-    font-size: 1.18rem;
+    font-size: 1.15rem;
     font-weight: 800;
     color: #FFFFFF;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.lobby-jugador-pts {
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: #F5D77F;
 }
 
 /* ========================================================================== */
@@ -696,7 +856,7 @@ body {
     stroke-linecap: round;
     stroke-dasharray: 377;
     stroke-dashoffset: 0;
-    transition: stroke-dashoffset 0.45s linear, stroke 0.3s ease;
+    transition: stroke-dashoffset 0.95s linear, stroke 0.3s ease;
 }
 
 .kahoot-reloj-circulo.urgente .kahoot-reloj-progreso {
@@ -1304,4 +1464,243 @@ body {
     font-size: 1rem;
     font-weight: 700;
     color: #FFFFFF;
+}
+
+/* ========================================================================== */
+/* 7. MODO RANKING / TABLA DE POSICIONES EN VIVO ESTILO KAHOOT                */
+/* ========================================================================== */
+.ranking-kahoot-contenedor {
+    width: 100vw;
+    height: 100vh;
+    padding: 40px 60px;
+    background: radial-gradient(
+        circle at 50% 20%,
+        var(--trivia-bg-radial) 0%,
+        var(--trivia-bg-negro) 100%
+    );
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.ranking-kahoot-banner {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.ranking-badge-fase {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(229, 193, 88, 0.16);
+    border: 1px solid rgba(229, 193, 88, 0.45);
+    color: #F5D77F;
+    padding: 6px 18px;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.ranking-titulo-gala {
+    font-size: 2.8rem;
+    font-weight: 900;
+    color: #FFFFFF;
+    margin: 10px 0 6px 0;
+    letter-spacing: -0.02em;
+    text-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
+}
+
+.ranking-subtitulo-gala {
+    font-size: 1.15rem;
+    color: #94A3B8;
+    margin: 0;
+    font-weight: 500;
+}
+
+.ranking-filas-contenedor {
+    width: 100%;
+    max-width: 980px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.ranking-fila-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(90deg, rgba(22, 24, 30, 0.94) 0%, rgba(30, 34, 44, 0.94) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 12px 28px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s ease;
+    animation: slideUpRankingFila 0.45s ease-out both;
+}
+
+.ranking-fila-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+.ranking-fila-card.top-1 {
+    border-color: rgba(229, 193, 88, 0.7);
+    background: linear-gradient(90deg, rgba(42, 34, 18, 0.94) 0%, rgba(28, 25, 20, 0.94) 100%);
+}
+
+.ranking-fila-card.top-2 {
+    border-color: rgba(203, 213, 225, 0.55);
+}
+
+.ranking-fila-card.top-3 {
+    border-color: rgba(180, 115, 60, 0.55);
+}
+
+@keyframes slideUpRankingFila {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.ranking-fila-izq {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    min-width: 0;
+}
+
+.ranking-posicion-circulo {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    font-weight: 900;
+    color: #FFFFFF;
+    flex-shrink: 0;
+}
+
+.top-1 .ranking-posicion-circulo {
+    background: linear-gradient(135deg, #D4AF37, #AA820A);
+    color: #121008;
+    border: none;
+    box-shadow: 0 0 16px rgba(212, 175, 55, 0.4);
+}
+
+.top-2 .ranking-posicion-circulo {
+    background: linear-gradient(135deg, #E2E8F0, #94A3B8);
+    color: #0F172A;
+    border: none;
+}
+
+.top-3 .ranking-posicion-circulo {
+    background: linear-gradient(135deg, #D97706, #92400E);
+    color: #FFFFFF;
+    border: none;
+}
+
+.ranking-avatar-contenedor {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.ranking-avatar-contenedor svg {
+    width: 48px;
+    height: 48px;
+}
+
+.ranking-nombre-texto {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #FFFFFF;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ranking-fila-der {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-shrink: 0;
+}
+
+/* Indicadores visuales neutros de cambio de posición (blanco / plomo) */
+.ranking-delta-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 50%;
+    padding: 0;
+    font-size: 0.92rem;
+    font-weight: 800;
+    transition: all 0.3s ease;
+}
+
+/* Subió puestos: Flecha blanca limpia sobre fondo oscuro translúcido */
+.ranking-delta-pill.delta-up {
+    color: #FFFFFF;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.32);
+}
+
+/* Bajó puestos: Flecha plomo/gris sobre fondo oscuro neutro */
+.ranking-delta-pill.delta-down {
+    color: #94A3B8;
+    background: rgba(148, 163, 184, 0.1);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+/* Mantuvo el puesto: Guión o símbolo plomo tenue */
+.ranking-delta-pill.delta-equal {
+    color: #64748B;
+    background: rgba(100, 116, 139, 0.06);
+    border: 1px solid rgba(100, 116, 139, 0.16);
+}
+
+.ranking-puntos-caja {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 120px;
+    justify-content: flex-end;
+}
+
+.ranking-puntos-caja strong {
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: #F5D77F;
+    letter-spacing: -0.01em;
+}
+
+.ranking-puntos-caja span {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #CBD5E1;
 }

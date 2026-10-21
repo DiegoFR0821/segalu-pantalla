@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/proyector/proyector.css?v=20261018b" />
+    <link rel="stylesheet" href="/proyector/proyector.css?v=20261018c" />
 </head>
 <body>
     <!-- Lienzo de Fuegos Artificiales a 60 FPS para el Podio -->
@@ -32,12 +32,23 @@
 
                 <!-- CAPA 2A: Vista de Foto Individual Nítida (max-height: 92vh, max-width: 90vw) -->
                 <div id="galeria-contenedor-foto-activa" class="galeria-contenedor-foto-activa">
-                    <img
-                        id="galeria-img-nitida"
-                        class="galeria-img-nitida"
-                        src=""
-                        alt="Fotografía aprobada del evento"
-                    />
+                    <div class="galeria-marco-corporativo-wrapper" id="galeria-marco-wrapper">
+                        <img
+                            id="galeria-img-nitida"
+                            class="galeria-img-nitida"
+                            src=""
+                            alt="Fotografía aprobada del evento"
+                        />
+                        <!-- Capa flotante superpuesta mediante CSS del Marco y Logo de Segalú -->
+                        <div class="galeria-overlay-marca-flotante" aria-hidden="true">
+                            <img
+                                src="/static/img/logo_segalu.png"
+                                alt="Sello Segalú"
+                                class="galeria-logo-marca-overlay"
+                                onerror="this.style.display='none'"
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 <!-- CAPA 2B: Vista Mosaico Elegante de 6 a 8 Fotos Aprobadas -->
@@ -236,6 +247,23 @@
         </section>
 
         <!-- ================================================================== -->
+        <!-- MODO: RANKING / TABLA DE POSICIONES EN VIVO ESTILO KAHOOT           -->
+        <!-- ================================================================== -->
+        <section id="vista-modo-ranking" class="vista-modo-proyector hidden">
+            <div class="ranking-kahoot-contenedor">
+                <div class="ranking-kahoot-banner">
+                    <div class="ranking-badge-fase">📊 MARCADOR OFICIAL EN VIVO</div>
+                    <h2 class="ranking-titulo-gala">Tabla de Posiciones</h2>
+                    <p class="ranking-subtitulo-gala">Puntajes acumulados en tiempo real tras la ronda</p>
+                </div>
+
+                <div id="ranking-filas-contenedor" class="ranking-filas-contenedor">
+                    <!-- Filas renderizadas dinámicamente con flechas neutras blanco / plomo -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ================================================================== -->
         <!-- MODO 5: PODIO DE GALA SECUENCIAL (3° -> 2° -> 1° CON EXPLOSIONES)  -->
         <!-- ================================================================== -->
         <section id="vista-modo-podio" class="vista-modo-proyector hidden">
@@ -324,6 +352,6 @@
 
     <!-- Librería ligera canvas-confetti + motor propio de fuegos artificiales a 60 FPS -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
-    <script src="/proyector/proyector.js?v=20261018b"></script>
+    <script src="/proyector/proyector.js?v=20261018c"></script>
 </body>
 </html>

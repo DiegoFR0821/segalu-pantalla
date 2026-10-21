@@ -1,0 +1,81 @@
+# ==============================================================================
+# PROYECTO: SEGALÚ (segalu-pantalla)
+# ARCHIVO: docker-compose.yml (Entorno de Pruebas de Estrés con Límites de Hardware)
+# ==============================================================================
+# Comandos rápidos:
+#   1) Iniciar contenedor limitado: docker compose up --build -d
+#   2) Monitorear en vivo (CPU/RAM): docker stats
+#   3) Ver registros de logs:       docker compose logs -f
+#   4) Detener entorno:             docker compose down
+# ==============================================================================
+
+services:
+  segalu-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: segalu-pantalla-limite
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Montaje del estado de eventos para persistencia de la trivia durante el test
+      - ./backend/estado_eventos_segalu.json:/app/backend/estado_eventos_segalu.json
+      # Montaje para inspeccionar las fotos subidas localmente sin borrarlas al reiniciar
+      - ./frontend/static/uploads:/app/frontend/static/uploads
+
+    # ==========================================================================
+    # [ESCENARIO 1 - ACTIVO]: PLAN RENDER STARTER ($7 USD / mes)
+    # LÍMITES ESTRICTOS: 0.50 vCPU y 512 MB de memoria RAM.
+    # En este escenario evaluamos si 200 invitados concurrentes saturan la CPU
+    # o activan el OOM Killer (reinicio del contenedor) por consumo de memoria.
+    # ==========================================================================
+    # cpus: 0.50
+    # mem_limit: 512m
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.50'
+    #       memory: 512M
+    #     reservations:
+    #       cpus: '0.25'
+    #       memory: 256M
+
+    # ==========================================================================
+    # [ESCENARIO 2 - ALTERNATIVO]: PLAN RENDER STANDARD ($25 USD / mes)
+    # LÍMITES AMPLIADOS: 1.00 vCPU y 2 GB (2048 MB) de memoria RAM.
+    # INSTRUCCIONES PARA ACTIVAR:
+    # 1. Comenta las 11 líneas del [ESCENARIO 1] justo arriba.
+    # 2. Descomenta las siguientes 11 líneas del [ESCENARIO 2].
+    # 3. Reinicia con: docker compose up -d
+    # ==========================================================================
+    cpus: 1.00
+    mem_limit: 2048m
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 2048M
+        reservations:
+          cpus: '0.50'
+          memory: 512M
+
+  # ============================================================================
+  # SERVICIO DE PRUEBAS DE ESTRÉS: LOCUST (Interfaz Web en http://localhost:8089)
+  # ============================================================================
+  locust:
+    image: locustio/locust:latest
+    container_name: segalu-locust-runner
+    restart: unless-stopped
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./tests:/mnt/locust
+    command: -f /mnt/locust/locustfile.py --host http://segalu-server:8000
+    depends_on:
+      - segalu-server

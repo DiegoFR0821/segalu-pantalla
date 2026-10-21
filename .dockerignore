@@ -1,0 +1,18 @@
+# Archivos y directorios ignorados en el contexto de compilación de Docker
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+venv/
+.venv/
+tests/
+.vscode/
+*.md
+Procfile
+render.yaml
+docker-compose.yml
+Dockerfile
+.dockerignore

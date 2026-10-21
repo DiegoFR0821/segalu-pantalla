@@ -13,7 +13,11 @@
 #   - Proyector OBS 1080p:   http://localhost:8000/proyector
 # ==============================================================================
 
+from __future__ import annotations
+
 import concurrent.futures
+import hashlib
+import hmac
 import io
 import json
 import os
@@ -26,10 +30,11 @@ import zipfile
 import zlib
 from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import Any
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps
 from pydantic import BaseModel, Field, field_validator
@@ -81,6 +86,22 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "SegaluAdmin2026").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip() or "gemini-3.5-flash-lite"
 
+# Secreto para firmar (HMAC) el token de sesión del invitado. Es "stateless": no requiere
+# columna nueva en Supabase y sigue siendo válido aunque Render reinicie el servidor.
+SESSION_SECRET = (os.getenv("SESSION_SECRET") or f"segalu::{ADMIN_PASSWORD}::{SUPABASE_URL or ''}").encode()
+
+
+def generar_token_sesion_invitado(invitado_id: str, evento_id: str) -> str:
+    mensaje = f"{str(invitado_id).strip()}|{str(evento_id).strip()}".encode()
+    return hmac.new(SESSION_SECRET, mensaje, hashlib.sha256).hexdigest()
+
+
+def verificar_token_sesion_invitado(invitado_id: str, evento_id: str, token: str) -> bool:
+    if not token:
+        return False
+    esperado = generar_token_sesion_invitado(invitado_id, evento_id)
+    return hmac.compare_digest(esperado, str(token).strip())
+
 supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_KEY and "tu-proyecto-id" not in SUPABASE_URL:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -89,10 +110,73 @@ else:
         "⚠️ [AVISO DIDÁCTICO]: Aún no has configurado tu archivo .env con SUPABASE_URL y SUPABASE_KEY reales."
     )
 
-# Cachés de alta velocidad en memoria para responder en <200ms al cambiar de evento
+# ==============================================================================
+# SISTEMA DE CACHÉ INTELIGENTE EN MEMORIA RAM CON INVALIDACIÓN INSTANTÁNEA
+# (TTL: 2.0s por Evento para Reducción Drástica de Egress & Log Ingestion)
+# ==============================================================================
 _CACHE_LOCALES: list | None = None
 _CACHE_DASHBOARD_POR_EVENTO: dict[str, dict] = {}
+_CACHE_RAM_SISTEMA: dict[str, dict] = {}
+_EVENTO_A_CLAVES_CACHE: dict[str, set[str]] = {}
+_CACHE_META_EVENTOS_PROYECTOR: dict[str, dict] = {}
 _CACHE_TTL_SEGUNDOS = 2.0
+
+
+def obtener_cache_ram(clave: str) -> Any | None:
+    """
+    Lógica de Lectura (GET): Si no han pasado 2 segundos ni ha habido cambios,
+    responde en <1ms directamente desde memoria RAM interna sin consultas a Supabase.
+    """
+    ahora = time.time()
+    entrada = _CACHE_RAM_SISTEMA.get(clave)
+    if entrada and (ahora - entrada["ts"]) <= _CACHE_TTL_SEGUNDOS:
+        return entrada["datos"]
+    return None
+
+
+def guardar_cache_ram(clave: str, datos: Any, evento_id: str | None = None):
+    """Guarda un resultado en memoria RAM indexado por evento para invalidación instantánea."""
+    _CACHE_RAM_SISTEMA[clave] = {
+        "ts": time.time(),
+        "datos": datos,
+        "evento_id": evento_id,
+    }
+    if evento_id:
+        eid_clean = str(evento_id).strip()
+        if eid_clean not in _EVENTO_A_CLAVES_CACHE:
+            _EVENTO_A_CLAVES_CACHE[eid_clean] = set()
+        _EVENTO_A_CLAVES_CACHE[eid_clean].add(clave)
+
+
+def invalidar_cache_evento(evento_id: str | None = None):
+    """
+    LÓGICA DE ESCRITURA E INVALIDACIÓN INSTANTÁNEA (0 ms):
+    En el milisegundo exacto en que ocurra CUALQUIER modificación en el servidor
+    (registro, edición de avatar/nombre, respuesta de trivia, subida o moderación
+    de foto, lanzamiento de pregunta o cambio de estado de trivia), la operación
+    se ejecuta en Supabase y de inmediato se borran las entradas de caché de ese evento
+    en la RAM. El siguiente GET traerá el dato nuevo al instante sin esperar los 2s.
+    """
+    if evento_id:
+        eid_clean = str(evento_id).strip()
+        claves = _EVENTO_A_CLAVES_CACHE.pop(eid_clean, set())
+        for k in claves:
+            _CACHE_RAM_SISTEMA.pop(k, None)
+        _CACHE_DASHBOARD_POR_EVENTO.pop(eid_clean, None)
+
+        claves_extra = [
+            k for k, v in list(_CACHE_RAM_SISTEMA.items())
+            if v.get("evento_id") == eid_clean or eid_clean in k
+        ]
+        for k in claves_extra:
+            _CACHE_RAM_SISTEMA.pop(k, None)
+    else:
+        _CACHE_RAM_SISTEMA.clear()
+        _EVENTO_A_CLAVES_CACHE.clear()
+        _CACHE_DASHBOARD_POR_EVENTO.clear()
+
+    _CACHE_META_EVENTOS_PROYECTOR.clear()
+
 
 # ------------------------------------------------------------------------------
 # 2. ESTADO EN TIEMPO REAL POR EVENTO (AUTO-APROBAR FOTOS Y MOTOR DE TRIVIA)
@@ -143,13 +227,6 @@ def obtener_estado_evento(evento_id: str) -> dict:
     return estado
 
 
-def invalidar_cache_evento(evento_id: str | None = None):
-    if evento_id:
-        _CACHE_DASHBOARD_POR_EVENTO.pop(evento_id.strip(), None)
-    else:
-        _CACHE_DASHBOARD_POR_EVENTO.clear()
-
-
 # ------------------------------------------------------------------------------
 # 3. CONFIGURACIÓN DE FASTAPI
 # ------------------------------------------------------------------------------
@@ -179,7 +256,7 @@ PERSONAJES_PERMITIDOS = {
 
 def validar_formato_avatar_kahoot(valor: str) -> str:
     valor_limpio = valor.strip().lower()
-    if not re.match(r"^[a-z0-9_]+(\|[a-z0-9_]+)?$", valor_limpio) or len(valor_limpio) > 50:
+    if not re.match(r"^[a-z0-9_]+(\|[a-z0-9_\-\./]+)?$", valor_limpio) or len(valor_limpio) > 100:
         raise ValueError("Formato de muñequito o accesorio inválido.")
 
     partes = valor_limpio.split("|")
@@ -235,6 +312,32 @@ class CrearEventoAdminInput(BaseModel):
     nombre: str = Field(..., min_length=3, max_length=120)
     codigo_acceso: str = Field(..., min_length=3, max_length=20)
     fecha_evento: str = Field(default_factory=lambda: date.today().isoformat())
+    tematica_accesorios: str | None = Field(default="todos")
+
+
+class ActualizarTematicaEventoInput(BaseModel):
+    tematica_accesorios: str = Field(..., max_length=50)
+
+
+class RenombrarInvitadoInput(BaseModel):
+    nombre: str | None = Field(default=None, max_length=100)
+    nuevo_nombre: str | None = Field(default=None, max_length=100)
+
+
+class TituloFotoSedeInput(BaseModel):
+    sede: str = Field(..., max_length=20)
+    numero_foto: int = Field(..., ge=1, le=4)
+    titulo: str = Field(..., max_length=120)
+
+
+class EditarPreguntaAdminInput(BaseModel):
+    enunciado: str | None = Field(default=None, max_length=280)
+    opcion_a: str | None = Field(default=None, max_length=140)
+    opcion_b: str | None = Field(default=None, max_length=140)
+    opcion_c: str | None = Field(default=None, max_length=140)
+    opcion_d: str | None = Field(default=None, max_length=140)
+    respuesta_correcta: str | None = Field(default=None, pattern="^[ABCDabcd]?$")
+    tiempo_limite_segundos: int | None = Field(default=None, ge=5, le=60)
 
 
 class ModerarMultimediaInput(BaseModel):
@@ -259,7 +362,7 @@ class CrearPreguntaAdminInput(BaseModel):
 class ControlTriviaInput(BaseModel):
     accion: str = Field(
         ...,
-        pattern="^(abrir_lobby|lanzar_pregunta|revelar_respuesta|mostrar_podio|cerrar_trivia|reiniciar_puntajes)$",
+        pattern="^(abrir_lobby|lanzar_pregunta|revelar_respuesta|mostrar_ranking|mostrar_podio|cerrar_trivia|reiniciar_puntajes)$",
     )
     pregunta_id: str | None = Field(default=None)
 
@@ -270,6 +373,15 @@ class ResponderTriviaInput(BaseModel):
     invitado_id: str = Field(..., min_length=10, max_length=50)
     opcion_elegida: str = Field(..., pattern="^[ABCDTabcdt]$")
     tiempo_respuesta_ms: int = Field(default=5000, ge=0, le=120000)
+
+
+class RegistroLeadInput(BaseModel):
+    evento_id: str = Field(..., min_length=5, max_length=60)
+    nombre: str = Field(..., min_length=2, max_length=150)
+    telefono: str = Field(..., min_length=1, max_length=50)
+    fecha_nacimiento: str = Field(..., min_length=4, max_length=30)
+    genero: str | None = Field(default="No especificado", max_length=30)
+    correo: str | None = Field(default=None, max_length=150)
 
 
 # ------------------------------------------------------------------------------
@@ -926,68 +1038,40 @@ def analizar_seguridad_imagen_ia(imagen_rgb: Image.Image) -> dict:
     }
 
 
-def estampar_marca_agua_y_comprimir(archivo_bytes: bytes) -> tuple[bytes, dict]:
+def procesar_ia_background(
+    multimedia_id: str,
+    evento_id: str,
+    contenido_bytes: bytes,
+    puntaje_ia_cliente: int,
+    auto_aprobar_activo: bool,
+):
+    """
+    Tarea en segundo plano (FastAPI BackgroundTasks):
+    Ejecuta el filtrado IA local sobre los píxeles de la foto sin bloquear la respuesta
+    inmediata al celular del invitado.
+    """
     try:
-        imagen_original = Image.open(io.BytesIO(archivo_bytes))
-        imagen_original.verify()
-    except Exception:
-        raise HTTPException(
-            status_code=400,
-            detail="El archivo enviado no es una imagen válida (usa JPG, PNG o WebP).",
+        img = Image.open(io.BytesIO(contenido_bytes))
+        img = ImageOps.exif_transpose(img)
+        img_rgb = img.convert("RGB")
+        resultado_ia = analizar_seguridad_imagen_ia(img_rgb)
+        puntaje_ia = resultado_ia.get("puntaje_ia_seguridad", 95)
+        puntaje_final = min(max(0, min(100, int(puntaje_ia_cliente))), puntaje_ia)
+        aprobado_final = puntaje_final >= 70
+
+        nuevo_estado = "aprobado" if (auto_aprobar_activo and aprobado_final) else "pendiente"
+        ejecutar_consulta_segura(
+            lambda db: db.table("multimedia")
+            .update({
+                "filtro_ia_aprobado": aprobado_final,
+                "estado_moderacion": nuevo_estado,
+            })
+            .eq("id", multimedia_id)
+            .execute()
         )
-
-    img = Image.open(io.BytesIO(archivo_bytes))
-    img = ImageOps.exif_transpose(img)
-    img_rgb = img.convert("RGB")
-
-    resultado_ia = analizar_seguridad_imagen_ia(img_rgb)
-
-    img_rgb.thumbnail((1280, 1280), Image.Resampling.LANCZOS)
-
-    # 1. Versión ORIGINAL LIMPIA (100% sin marca de agua) para `originales/{uuid}_original.jpg`
-    img_original_limpia = img_rgb.copy()
-    calidad_orig = 85
-    bytes_sin_marca = b""
-    while calidad_orig >= 55:
-        buf_orig = io.BytesIO()
-        img_original_limpia.save(buf_orig, format="JPEG", quality=calidad_orig, optimize=True)
-        bytes_sin_marca = buf_orig.getvalue()
-        if len(bytes_sin_marca) <= 320 * 1024:
-            break
-        calidad_orig -= 8
-
-    # 2. Versión CON MARCO / SELLO SEGALÚ para `multimedia/{uuid}_con_marco.jpg`
-    imagen_base = img_rgb.copy().convert("RGBA")
-    ancho, alto = imagen_base.size
-
-    if LOGO_SEGALU_PATH.exists():
-        try:
-            logo_png = Image.open(LOGO_SEGALU_PATH).convert("RGBA")
-            tamano_logo = max(75, min(165, int(min(ancho, alto) * 0.15)))
-            logo_png.thumbnail((tamano_logo, tamano_logo), Image.Resampling.LANCZOS)
-
-            pos_x = int(ancho * 0.03)
-            pos_y = int(alto * 0.03)
-
-            imagen_base.paste(logo_png, (pos_x, pos_y), mask=logo_png)
-        except Exception as err:
-            print(f"Aviso al estampar logo_segalu.png: {err}")
-
-    imagen_final_rgb = imagen_base.convert("RGB")
-
-    calidad = 84
-    bytes_salida = b""
-    while calidad >= 55:
-        buffer = io.BytesIO()
-        imagen_final_rgb.save(buffer, format="JPEG", quality=calidad, optimize=True)
-        bytes_salida = buffer.getvalue()
-        if len(bytes_salida) <= 310 * 1024:
-            break
-        calidad -= 8
-
-    resultado_ia["peso_kb"] = round(len(bytes_salida) / 1024, 1)
-    resultado_ia["bytes_sin_marca"] = bytes_sin_marca
-    return bytes_salida, resultado_ia
+        invalidar_cache_evento(evento_id)
+    except Exception as err:
+        print(f"Aviso en background IA de foto {multimedia_id}: {err}")
 
 
 def extraer_puntaje_ia_de_url(url_original: str | None, filtro_aprobado: bool) -> int:
@@ -1002,11 +1086,7 @@ def extraer_puntaje_ia_de_url(url_original: str | None, filtro_aprobado: bool) -
 
 def extraer_ruta_storage_de_url(url_multimedia: str | None, evento_id: str = "") -> str | None:
     """
-    DIDÁCTICA:
-    Obtiene la ruta exacta dentro del Bucket de Supabase Storage:
-    - 'originales/<uuid>_original.jpg'
-    - 'multimedia/<uuid>_con_marco.jpg'
-    - o rutas anteriores 'eventos/<evento_id>/segalu_xxxx.jpg'
+    Obtiene la ruta exacta dentro del Bucket de Supabase Storage en la carpeta multimedia/
     """
     if not url_multimedia:
         return None
@@ -1016,39 +1096,61 @@ def extraer_ruta_storage_de_url(url_multimedia: str | None, evento_id: str = "")
     if marcador_bucket in url_sin_hash:
         return url_sin_hash.split(marcador_bucket, 1)[1].lstrip("/")
 
-    if "/static/uploads/originales/" in url_sin_hash:
-        return "originales/" + url_sin_hash.split("/static/uploads/originales/", 1)[1].lstrip("/")
     if "/static/uploads/multimedia/" in url_sin_hash:
         return "multimedia/" + url_sin_hash.split("/static/uploads/multimedia/", 1)[1].lstrip("/")
+    if "/static/uploads/originales/" in url_sin_hash:
+        return "multimedia/" + url_sin_hash.split("/static/uploads/originales/", 1)[1].lstrip("/")
+    if "/static/uploads/" in url_sin_hash:
+        return "multimedia/" + url_sin_hash.split("/static/uploads/", 1)[1].lstrip("/")
 
     nombre_archivo = url_sin_hash.split("/")[-1]
-    if nombre_archivo.endswith("_original.jpg"):
-        return f"originales/{nombre_archivo}"
-    if nombre_archivo.endswith("_con_marco.jpg"):
+    if nombre_archivo:
+        if nombre_archivo.endswith("_con_marco.jpg") or nombre_archivo.endswith("_original.jpg"):
+            # Compatibilidad
+            return f"multimedia/{nombre_archivo}"
         return f"multimedia/{nombre_archivo}"
-    if (nombre_archivo.startswith("segalu_") or nombre_archivo.startswith("orig_segalu_")) and evento_id:
-        return f"eventos/{evento_id.strip()}/{nombre_archivo}"
     return None
+
 
 
 # ------------------------------------------------------------------------------
 # 9. ENDPOINTS PÚBLICOS DEL INVITADO (REGISTRO, FOTOS Y TRIVIA KAHOOT)
 # ------------------------------------------------------------------------------
 @app.get("/api/eventos/{codigo_acceso}")
-def obtener_evento_por_codigo(codigo_acceso: str):
+def obtener_evento_por_codigo(
+    codigo_acceso: str,
+    local_id: str | None = None,
+    sede: str | None = None,
+):
     codigo_limpio = codigo_acceso.strip().upper()
 
     try:
-        respuesta = ejecutar_consulta_segura(
-            lambda db: db.table("eventos")
-            .select(
-                "id, nombre, codigo_acceso, fecha_evento, estado, trivia_activa, locales(nombre, direccion, telefono_contacto)"
-            )
-            .eq("codigo_acceso", codigo_limpio)
-            .eq("estado", "activo")
-            .execute()
-        )
+        lid_filtro = local_id.strip() if local_id and local_id.strip() else None
+        if not lid_filtro and sede and _CACHE_LOCALES:
+            s_clean = sede.strip().lower()
+            idx = 0 if "1" in s_clean else 1
+            if idx < len(_CACHE_LOCALES):
+                lid_filtro = _CACHE_LOCALES[idx]["id"]
 
+        clave_cache = f"evento_codigo:{codigo_limpio}:{lid_filtro or ''}"
+        cache_hit = obtener_cache_ram(clave_cache)
+        if cache_hit:
+            return cache_hit
+
+        def _query_ev(db):
+            q = (
+                db.table("eventos")
+                .select(
+                    "id, local_id, nombre, codigo_acceso, fecha_evento, estado, trivia_activa, locales(nombre, direccion, telefono_contacto)"
+                )
+                .eq("codigo_acceso", codigo_limpio)
+                .eq("estado", "activo")
+            )
+            if lid_filtro:
+                q = q.eq("local_id", lid_filtro)
+            return q.order("created_at", desc=True).limit(1).execute()
+
+        respuesta = ejecutar_consulta_segura(_query_ev)
         datos = respuesta.data
         if not datos:
             raise HTTPException(
@@ -1059,7 +1161,14 @@ def obtener_evento_por_codigo(codigo_acceso: str):
         evento = datos[0]
         estado_ev = obtener_estado_evento(evento["id"])
         evento["fase_trivia"] = estado_ev.get("fase_trivia", "inactiva")
-        return {"ok": True, "evento": evento}
+        evento["tematica_accesorios"] = (
+            evento.get("tematica_accesorios")
+            or estado_ev.get("tematica_accesorios")
+            or "todos"
+        )
+        resultado = {"ok": True, "evento": evento}
+        guardar_cache_ram(clave_cache, resultado, evento_id=evento["id"])
+        return resultado
     except HTTPException:
         raise
     except Exception as error:
@@ -1105,6 +1214,9 @@ def registrar_invitado(datos: RegistroInvitadoInput):
             "ok": True,
             "mensaje": f"¡Bienvenido/a a la Gala de Segalú, {invitado_creado['nombre']}!",
             "invitado": invitado_creado,
+            "token_sesion": generar_token_sesion_invitado(
+                invitado_creado["id"], invitado_creado.get("evento_id") or datos.evento_id
+            ),
         }
     except HTTPException:
         raise
@@ -1148,6 +1260,19 @@ def _eliminar_invitado_por_completo(invitado_id: str):
     if not iid:
         return
 
+    # 0. Obtener nombre y evento_id del invitado antes de borrarlo para limpiar su lead/cupón
+    inv_nombre = None
+    ev_id = None
+    try:
+        inv_res = ejecutar_consulta_segura(
+            lambda db: db.table("invitados").select("nombre, evento_id").eq("id", iid).limit(1).execute()
+        )
+        if inv_res and inv_res.data:
+            inv_nombre = inv_res.data[0].get("nombre")
+            ev_id = inv_res.data[0].get("evento_id")
+    except Exception as err_inv:
+        print(f"Aviso al obtener datos previos del invitado: {err_inv}")
+
     # 1. Limpiar inmediatamente de cualquier Lobby de Trivia en memoria
     for val in _ESTADO_EVENTOS.values():
         if isinstance(val, dict):
@@ -1166,7 +1291,28 @@ def _eliminar_invitado_por_completo(invitado_id: str):
     except Exception:
         pass
 
-    # 3. Desvincular fotos subidas por el invitado (si la columna lo permite) para conservar las fotos del evento
+    # 3. Eliminar cupón / lead en crm_leads si este invitado lo había reclamado
+    if inv_nombre and ev_id:
+        try:
+            ejecutar_consulta_segura(
+                lambda db: db.table("crm_leads")
+                .delete()
+                .eq("evento_id", ev_id)
+                .ilike("nombre", inv_nombre.strip())
+                .execute()
+            )
+        except Exception as err_crm:
+            print(f"Aviso al eliminar crm_lead del invitado en Supabase: {err_crm}")
+
+        # Limpiar también del respaldo local en memoria y disco
+        if ev_id in _ESTADO_EVENTOS and isinstance(_ESTADO_EVENTOS[ev_id], dict):
+            leads_loc = _ESTADO_EVENTOS[ev_id].get("crm_leads") or []
+            _ESTADO_EVENTOS[ev_id]["crm_leads"] = [
+                l for l in leads_loc if str(l.get("nombre") or "").strip().lower() != inv_nombre.strip().lower()
+            ]
+            _guardar_estado_eventos_disco()
+
+    # 4. Desvincular fotos subidas por el invitado (multimedia.invitado_id = NULL) para CONSERVAR LAS FOTOS DEL EVENTO
     try:
         ejecutar_consulta_segura(
             lambda db: db.table("multimedia")
@@ -1177,16 +1323,19 @@ def _eliminar_invitado_por_completo(invitado_id: str):
     except Exception:
         pass
 
-    # 4. Eliminar físicamente la sesión del invitado de la tabla invitados
+    # 5. Eliminar físicamente la sesión del invitado de la tabla invitados
     ejecutar_consulta_segura(
         lambda db: db.table("invitados").delete().eq("id", iid).execute()
     )
-    invalidar_cache_evento()
+    if ev_id:
+        invalidar_cache_evento(ev_id)
+    else:
+        invalidar_cache_evento()
 
 
 @app.delete("/api/invitados/{invitado_id}")
-@app.post("/api/invitados/{invitado_id}/desconectar")
 def eliminar_invitado(invitado_id: str):
+    """Borrado definitivo: solo cuando el invitado pulsa "Salir / Corregir mi nombre" o el Admin lo elimina."""
     try:
         _eliminar_invitado_por_completo(invitado_id)
         return {
@@ -1197,6 +1346,104 @@ def eliminar_invitado(invitado_id: str):
         raise HTTPException(
             status_code=500,
             detail=f"Error al eliminar el registro del invitado: {str(error)}",
+        )
+
+
+@app.post("/api/invitados/{invitado_id}/desconectar")
+def desconectar_invitado_presencia(invitado_id: str):
+    """
+    Desconexión SUAVE (pagehide / recarga / bloqueo de pantalla del celular):
+    retira al invitado del lobby de trivia y del pulso de presencia en memoria, pero
+    CONSERVA su registro, avatar y puntaje en Supabase para que pueda reconectarse.
+    """
+    iid = invitado_id.strip()
+    for eid, val in list(_ESTADO_EVENTOS.items()):
+        if not isinstance(val, dict):
+            continue
+        sala_ts = val.get("jugadores_sala_trivia_ts")
+        hb_ts = val.get("heartbeat_invitados_ts")
+        removido = False
+        if isinstance(sala_ts, dict) and sala_ts.pop(iid, None) is not None:
+            removido = True
+        if isinstance(hb_ts, dict) and hb_ts.pop(iid, None) is not None:
+            removido = True
+        if removido:
+            invalidar_cache_evento(eid)
+    return {"ok": True, "mensaje": "Presencia del invitado pausada. Su sesión sigue disponible."}
+
+
+class ReconectarInvitadoInput(BaseModel):
+    invitado_id: str = Field(..., min_length=1)
+    evento_id: str = Field(..., min_length=1)
+    token_sesion: str = Field(..., min_length=10)
+
+
+@app.post("/api/invitados/reconectar")
+def reconectar_invitado(datos: ReconectarInvitadoInput):
+    """
+    Restaura la sesión del invitado tras recargar la página (localStorage):
+    valida el token firmado, confirma que el invitado y el evento siguen existiendo
+    y devuelve sus datos actualizados (nombre, avatar, puntaje) para no expulsarlo al login.
+    """
+    iid = datos.invitado_id.strip()
+    eid = datos.evento_id.strip()
+
+    if not verificar_token_sesion_invitado(iid, eid, datos.token_sesion):
+        raise HTTPException(status_code=401, detail="Sesión inválida. Vuelve a registrarte.")
+
+    try:
+        resp_inv = ejecutar_consulta_segura(
+            lambda db: db.table("invitados")
+            .select("id, evento_id, nombre, avatar, puntaje_total")
+            .eq("id", iid)
+            .limit(1)
+            .execute()
+        )
+        if not resp_inv.data or str(resp_inv.data[0].get("evento_id")) != eid:
+            raise HTTPException(
+                status_code=404,
+                detail="Tu registro ya no existe en este evento. Ingresa nuevamente tu nombre.",
+            )
+
+        resp_ev = ejecutar_consulta_segura(
+            lambda db: db.table("eventos")
+            .select(
+                "id, local_id, nombre, codigo_acceso, fecha_evento, estado, trivia_activa, locales(nombre, direccion, telefono_contacto)"
+            )
+            .eq("id", eid)
+            .limit(1)
+            .execute()
+        )
+        if not resp_ev.data or resp_ev.data[0].get("estado") != "activo":
+            raise HTTPException(status_code=404, detail="El evento ya no está activo.")
+
+        evento = resp_ev.data[0]
+        estado_ev = obtener_estado_evento(eid)
+        evento["fase_trivia"] = estado_ev.get("fase_trivia", "inactiva")
+
+        # Obtenemos su posición y puntaje actualizado en el ranking del evento
+        _, puntaje_inv, posicion_ranking = obtener_ranking_evento(eid, iid)
+        inv_data = dict(resp_inv.data[0])
+        inv_data["puntaje_total"] = puntaje_inv
+        inv_data["posicion_ranking"] = posicion_ranking
+
+        # Reactivamos su pulso de presencia de inmediato
+        estado_ev.setdefault("heartbeat_invitados_ts", {})[iid] = time.time()
+
+        return {
+            "ok": True,
+            "mensaje": f"¡Bienvenido/a de nuevo, {inv_data['nombre']}!",
+            "invitado": inv_data,
+            "evento": evento,
+            "posicion_ranking": posicion_ranking,
+            "token_sesion": datos.token_sesion,
+        }
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(
+            status_code=503,
+            detail=f"No se pudo verificar tu sesión en este momento: {str(error)}",
         )
 
 
@@ -1225,11 +1472,19 @@ def limpiar_invitados_de_evento(evento_id: str):
 
 @app.post("/api/multimedia/subir")
 def subir_foto_invitado(
+    background_tasks: BackgroundTasks,
     evento_id: str = Form(...),
     invitado_id: str = Form(...),
     puntaje_ia_cliente: int = Form(default=95),
     archivo: UploadFile = File(...),
 ):
+    """
+    Subida directa y sin quemar marcos:
+    1. Recibe la foto comprimida desde el móvil y la guarda DIRECTAMENTE una sola vez
+       en Supabase Storage (carpeta multimedia/) sin quemar marcas ni usar Pillow.
+    2. Ejecuta la validación de IA local en segundo plano (FastAPI BackgroundTasks)
+       para responder de inmediato al celular del invitado en menos de 1 segundo ("¡Foto enviada!").
+    """
     contenido_bytes = archivo.file.read()
     if not contenido_bytes:
         raise HTTPException(status_code=400, detail="El archivo de imagen está vacío.")
@@ -1240,75 +1495,52 @@ def subir_foto_invitado(
             detail="La imagen original supera los 15 MB permitidos.",
         )
 
-    jpeg_procesado, info_ia = estampar_marca_agua_y_comprimir(contenido_bytes)
-
-    puntaje_final = min(
-        max(0, min(100, int(puntaje_ia_cliente))),
-        info_ia["puntaje_ia_seguridad"],
-    )
-    aprobado_ia = puntaje_final >= 70
-
-    estado_ev = obtener_estado_evento(evento_id.strip())
-    auto_aprobar_activo = bool(estado_ev.get("auto_aprobar_fotos", False))
-    aprobar_directamente = auto_aprobar_activo and aprobado_ia
-
     uid_hex = uuid.uuid4().hex[:12]
-    nombre_archivo_orig = f"{uid_hex}_original.jpg"
-    nombre_archivo_marca = f"{uid_hex}_con_marco.jpg"
+    nombre_archivo = f"{uid_hex}.jpg"
+    ruta_storage = f"multimedia/{nombre_archivo}"
 
-    ruta_storage_orig = f"originales/{nombre_archivo_orig}"
-    ruta_storage_marca = f"multimedia/{nombre_archivo_marca}"
+    # Guardado local único para respaldo
+    dir_local = LOCAL_UPLOADS_DIR / "multimedia"
+    dir_local.mkdir(parents=True, exist_ok=True)
+    (dir_local / nombre_archivo).write_bytes(contenido_bytes)
 
-    bytes_sin_marca = info_ia.get("bytes_sin_marca") or jpeg_procesado
-
-    # Guardamos copias físicas separadas en carpetas locales (`originales/` y `multimedia/`)
-    dir_local_orig = LOCAL_UPLOADS_DIR / "originales"
-    dir_local_marca = LOCAL_UPLOADS_DIR / "multimedia"
-    dir_local_orig.mkdir(parents=True, exist_ok=True)
-    dir_local_marca.mkdir(parents=True, exist_ok=True)
-
-    (dir_local_orig / nombre_archivo_orig).write_bytes(bytes_sin_marca)
-    (dir_local_marca / nombre_archivo_marca).write_bytes(jpeg_procesado)
-
-    url_marca_publica = f"/static/uploads/multimedia/{nombre_archivo_marca}"
-    url_orig_publica = f"/static/uploads/originales/{nombre_archivo_orig}"
+    url_publica = f"/static/uploads/multimedia/{nombre_archivo}"
     origen_almacenamiento = "local_fallback"
 
     try:
         db = verificar_conexion_supabase()
-        # a) Subir versión ORIGINAL LIMPIA (sin marca de agua) -> originales/{uuid}_original.jpg
         db.storage.from_(SUPABASE_BUCKET).upload(
-            path=ruta_storage_orig,
-            file=bytes_sin_marca,
-            file_options={"content-type": "image/jpeg", "upsert": "true"},
+            path=ruta_storage,
+            file=contenido_bytes,
+            file_options={
+                "content-type": "image/jpeg",
+                "upsert": "true",
+                "cache-control": "86400",
+                "cacheControl": "86400",
+            },
         )
-        url_orig_sb = db.storage.from_(SUPABASE_BUCKET).get_public_url(ruta_storage_orig)
-        if url_orig_sb:
-            url_orig_publica = url_orig_sb
-
-        # b) Subir versión CON MARCO SEGALÚ -> multimedia/{uuid}_con_marco.jpg
-        db.storage.from_(SUPABASE_BUCKET).upload(
-            path=ruta_storage_marca,
-            file=jpeg_procesado,
-            file_options={"content-type": "image/jpeg", "upsert": "true"},
-        )
-        url_marca_sb = db.storage.from_(SUPABASE_BUCKET).get_public_url(ruta_storage_marca)
-        if url_marca_sb:
-            url_marca_publica = url_marca_sb
-
+        url_sb = db.storage.from_(SUPABASE_BUCKET).get_public_url(ruta_storage)
+        if url_sb:
+            url_publica = url_sb
         origen_almacenamiento = "supabase_storage"
     except Exception as storage_err:
         print(f"Aviso Supabase Storage ({SUPABASE_BUCKET}): {storage_err}")
+
+    estado_ev = obtener_estado_evento(evento_id.strip())
+    auto_aprobar_activo = bool(estado_ev.get("auto_aprobar_fotos", False))
+    puntaje_cliente_int = max(0, min(100, int(puntaje_ia_cliente)))
+    aprobado_cliente = puntaje_cliente_int >= 70
+    estado_inicial = "aprobado" if (auto_aprobar_activo and aprobado_cliente) else "pendiente"
 
     try:
         nueva_multimedia = {
             "evento_id": evento_id.strip(),
             "invitado_id": invitado_id.strip(),
-            "url_original": f"{url_orig_publica}#ia={puntaje_final}",
-            "url_con_marca": url_marca_publica,
+            "url_original": url_publica,
+            "url_con_marca": url_publica,
             "tipo": "foto",
-            "filtro_ia_aprobado": aprobado_ia,
-            "estado_moderacion": "pendiente",
+            "filtro_ia_aprobado": aprobado_cliente,
+            "estado_moderacion": estado_inicial,
         }
 
         respuesta_db = ejecutar_consulta_segura(
@@ -1321,36 +1553,34 @@ def subir_foto_invitado(
             )
 
         fila_creada = respuesta_db.data[0]
-
-        if aprobar_directamente:
-            res_auto = ejecutar_consulta_segura(
-                lambda db: db.table("multimedia")
-                .update({"estado_moderacion": "aprobado"})
-                .eq("id", fila_creada["id"])
-                .execute()
-            )
-            if res_auto.data:
-                fila_creada = res_auto.data[0]
-            else:
-                fila_creada["estado_moderacion"] = "aprobado"
-
         invalidar_cache_evento(evento_id)
 
+        # Encolar la validación IA local en segundo plano (BackgroundTasks)
+        background_tasks.add_task(
+            procesar_ia_background,
+            fila_creada["id"],
+            evento_id.strip(),
+            contenido_bytes,
+            puntaje_cliente_int,
+            auto_aprobar_activo,
+        )
+
+        peso_kb = round(len(contenido_bytes) / 1024, 1)
         mensaje_exito = (
-            "¡Foto aprobada automáticamente con el sello de Segalú! Ya está lista para la pantalla gigante."
-            if aprobar_directamente
-            else "¡Foto enviada con el sello de Segalú! Está en espera de aprobación del Administrador."
+            "¡Foto enviada! Aprobada automáticamente para la pantalla gigante."
+            if estado_inicial == "aprobado"
+            else "¡Foto enviada! Está en espera de aprobación del Administrador."
         )
 
         return {
             "ok": True,
             "mensaje": mensaje_exito,
-            "auto_aprobada": aprobar_directamente,
+            "auto_aprobada": estado_inicial == "aprobado",
             "multimedia": fila_creada,
             "analisis_ia": {
-                "puntaje_ia_seguridad": puntaje_final,
-                "filtro_ia_aprobado": aprobado_ia,
-                "peso_kb": info_ia["peso_kb"],
+                "puntaje_ia_seguridad": puntaje_cliente_int,
+                "filtro_ia_aprobado": aprobado_cliente,
+                "peso_kb": peso_kb,
                 "almacenamiento": origen_almacenamiento,
             },
         }
@@ -1435,6 +1665,11 @@ def obtener_estado_trivia_invitado(
                 jugadores_sala.pop(iid_clean, None)
                 invalidar_cache_evento(eid)
 
+    clave_cache = f"trivia_estado:{eid}:{invitado_id or ''}:{1 if en_sala_trivia else 0}"
+    cache_hit = obtener_cache_ram(clave_cache)
+    if cache_hit:
+        return cache_hit
+
     lista_inv, puntaje_invitado, posicion_ranking = obtener_ranking_evento(eid, invitado_id)
     podio_top = lista_inv[:10]
 
@@ -1456,13 +1691,20 @@ def obtener_estado_trivia_invitado(
     if pregunta_actual and fase in ("pregunta_activa", "respuesta_revelada"):
         limite_seg = int(pregunta_actual.get("tiempo_limite_segundos") or 20)
         ts_inicio = float(estado_ev.get("timestamp_lanzamiento") or 0.0)
+        BUFFER_GRACIA_SEGUNDOS = 3.0
         if ts_inicio > 0:
             transcurrido = max(0.0, time.time() - ts_inicio)
             segundos_restantes = max(0, int(round(limite_seg - transcurrido)))
         else:
+            transcurrido = 0.0
             segundos_restantes = limite_seg
 
-        if fase == "respuesta_revelada" or bool(pregunta_actual.get("revelar_respuesta")) or segundos_restantes <= 0:
+        # Margen de gracia (+3 segundos) para compensar latencia móvil y no cortar antes de tiempo
+        if (
+            fase == "respuesta_revelada"
+            or bool(pregunta_actual.get("revelar_respuesta"))
+            or (ts_inicio > 0 and transcurrido >= (limite_seg + BUFFER_GRACIA_SEGUNDOS))
+        ):
             ronda_cerrada = True
             segundos_restantes = 0
 
@@ -1496,7 +1738,7 @@ def obtener_estado_trivia_invitado(
             "respuesta_correcta": pregunta_actual["respuesta_correcta"] if ronda_cerrada else None,
         }
 
-    return {
+    resultado = {
         "ok": True,
         "fase": fase,
         "trivia_activa": fase != "inactiva",
@@ -1509,6 +1751,8 @@ def obtener_estado_trivia_invitado(
         "mi_respuesta": mi_respuesta,
         "podio": podio_top,
     }
+    guardar_cache_ram(clave_cache, resultado, evento_id=eid)
+    return resultado
 
 
 @app.post("/api/trivia/responder")
@@ -1753,18 +1997,27 @@ def login_administrador(datos: LoginAdminInput):
     }
 
 
-def fijar_evento_proyector(evento_id: str | None):
+def fijar_evento_proyector(evento_id: str | None, local_id: str | None = None):
     if not evento_id:
         return
     eid = evento_id.strip()
-    if eid and _ESTADO_EVENTOS.get("__proyector_evento_id__") != eid:
+    if eid:
         _ESTADO_EVENTOS["__proyector_evento_id__"] = eid
+        if local_id:
+            lid = local_id.strip()
+            if "__proyector_por_sede__" not in _ESTADO_EVENTOS or not isinstance(
+                _ESTADO_EVENTOS["__proyector_por_sede__"], dict
+            ):
+                _ESTADO_EVENTOS["__proyector_por_sede__"] = {}
+            _ESTADO_EVENTOS["__proyector_por_sede__"][lid] = eid
         _guardar_estado_eventos_disco()
 
 
 @app.get("/api/admin/eventos/{evento_id}/dashboard-completo")
 def obtener_dashboard_completo_evento(
     evento_id: str,
+    local_id: str | None = None,
+    force_refresh: bool = False,
     x_admin_password: str | None = Header(default=None),
 ):
     """
@@ -1772,12 +2025,17 @@ def obtener_dashboard_completo_evento(
     Endpoint consolidado ultrarrápido (<200ms) que devuelve fotos, preguntas,
     estado de trivia e invitados al cambiar de evento en el selector del Admin.
     Además sincroniza automáticamente el evento proyectado en /proyector (OBS Studio).
+    Si force_refresh=True, purga la caché en RAM y consulta datos frescos de Supabase.
     """
     verificar_admin_password(x_admin_password)
     t0 = time.perf_counter()
+    if force_refresh:
+        invalidar_cache_evento(evento_id)
+        _CACHE_DASHBOARD_POR_EVENTO.pop(evento_id.strip(), None)
+
     try:
-        fijar_evento_proyector(evento_id)
-        datos = construir_dashboard_evento_rapido(evento_id, usar_cache=True)
+        fijar_evento_proyector(evento_id, local_id)
+        datos = construir_dashboard_evento_rapido(evento_id, usar_cache=not force_refresh)
         ms = round((time.perf_counter() - t0) * 1000, 1)
         return {
             "ok": True,
@@ -1794,11 +2052,17 @@ def obtener_dashboard_completo_evento(
 @app.get("/api/admin/resumen")
 def obtener_resumen_admin(
     evento_id: str | None = None,
+    force_refresh: bool = False,
     x_admin_password: str | None = Header(default=None),
 ):
     global _CACHE_LOCALES
     verificar_admin_password(x_admin_password)
     t0 = time.perf_counter()
+
+    if force_refresh:
+        invalidar_cache_evento(None)
+        _CACHE_LOCALES = []
+        _CACHE_DASHBOARD_POR_EVENTO.clear()
 
     try:
         if not _CACHE_LOCALES:
@@ -1814,6 +2078,9 @@ def obtener_resumen_admin(
             .execute()
         )
         eventos = eventos_res.data or []
+        for ev in eventos:
+            st_ev = obtener_estado_evento(ev["id"])
+            ev["tematica_accesorios"] = ev.get("tematica_accesorios") or st_ev.get("tematica_accesorios") or "todos"
 
         evento_seleccionado_id = evento_id
         if not evento_seleccionado_id and eventos:
@@ -1869,33 +2136,110 @@ def crear_evento_admin(
             detail="El código de acceso debe tener al menos 3 letras o números.",
         )
 
+    lid = datos.local_id.strip()
+
+    # Validación estricta de Código Corto: si ya existe en la base de datos, advertir
+    # con un mensaje de error claro para evitar conflictos entre sedes y pantallas.
+    try:
+        dup = ejecutar_consulta_segura(
+            lambda db: db.table("eventos")
+            .select("id, nombre, local_id, locales(nombre)")
+            .eq("codigo_acceso", codigo_limpio)
+            .limit(1)
+            .execute()
+        )
+        if dup.data:
+            ev_existente = dup.data[0]
+            sede_info = ev_existente.get("locales")
+            nombre_sede = (
+                sede_info.get("nombre")
+                if isinstance(sede_info, dict) and sede_info.get("nombre")
+                else "otra sede"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"El código corto '{codigo_limpio}' ya está en uso en el evento '{ev_existente.get('nombre')}' ({nombre_sede}). Por favor elige un código diferente para evitar conflictos entre sedes.",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    tematica_sel = (datos.tematica_accesorios or "todos").strip().lower()
     try:
         nuevo_evento = {
-            "local_id": datos.local_id.strip(),
+            "local_id": lid,
             "nombre": datos.nombre.strip(),
             "codigo_acceso": codigo_limpio,
             "fecha_evento": datos.fecha_evento,
             "estado": "activo",
             "trivia_activa": False,
+            "tematica_accesorios": tematica_sel,
         }
-        res = ejecutar_consulta_segura(
-            lambda db: db.table("eventos").insert(nuevo_evento).execute()
-        )
+        try:
+            res = ejecutar_consulta_segura(
+                lambda db: db.table("eventos").insert(nuevo_evento).execute()
+            )
+        except Exception:
+            nuevo_evento_simple = {k: v for k, v in nuevo_evento.items() if k != "tematica_accesorios"}
+            res = ejecutar_consulta_segura(
+                lambda db: db.table("eventos").insert(nuevo_evento_simple).execute()
+            )
+
         if not res.data:
             raise HTTPException(status_code=500, detail="No se pudo crear el evento.")
 
+        ev_creado = res.data[0]
+        ev_creado["tematica_accesorios"] = tematica_sel
+        estado_ev = obtener_estado_evento(ev_creado["id"])
+        estado_ev["tematica_accesorios"] = tematica_sel
+        fijar_evento_proyector(ev_creado["id"], lid)
+
         return {
             "ok": True,
-            "mensaje": f"Evento '{datos.nombre}' creado con éxito (Código QR: {codigo_limpio}).",
-            "evento": res.data[0],
+            "mensaje": f"Evento '{datos.nombre}' creado con éxito en la sede (Código QR: {codigo_limpio}).",
+            "evento": ev_creado,
         }
     except HTTPException:
         raise
     except Exception as error:
+        err_msg = str(error)
+        if "duplicate key" in err_msg.lower() or "unique constraint" in err_msg.lower():
+            raise HTTPException(
+                status_code=400,
+                detail=f"El código corto '{codigo_limpio}' ya está en uso en la base de datos. Por favor elige otro código para evitar conflictos entre sedes.",
+            )
         raise HTTPException(
             status_code=500,
-            detail=f"Error al crear el evento (verifica que el código QR no esté repetido): {str(error)}",
+            detail=f"Error al crear el evento: {err_msg}",
         )
+
+
+@app.patch("/api/admin/eventos/{evento_id}/tematica")
+def actualizar_tematica_evento_admin(
+    evento_id: str,
+    datos: ActualizarTematicaEventoInput,
+    x_admin_password: str | None = Header(default=None),
+):
+    verificar_admin_password(x_admin_password)
+    eid = evento_id.strip()
+    tematica_nueva = datos.tematica_accesorios.strip().lower()
+    try:
+        ejecutar_consulta_segura(
+            lambda db: db.table("eventos").update({"tematica_accesorios": tematica_nueva}).eq("id", eid).execute()
+        )
+    except Exception as err:
+        print(f"Aviso al actualizar tematica en BD: {err}")
+
+    estado_ev = obtener_estado_evento(eid)
+    estado_ev["tematica_accesorios"] = tematica_nueva
+    invalidar_cache_evento(eid)
+    return {
+        "ok": True,
+        "mensaje": f"Temática de accesorios del evento actualizada a '{tematica_nueva}'.",
+        "evento_id": eid,
+        "tematica_accesorios": tematica_nueva,
+    }
 
 
 @app.patch("/api/admin/multimedia/{multimedia_id}")
@@ -1992,7 +2336,6 @@ def eliminar_multimedia_definitivamente(
         for u in (url_marca, url_orig):
             nombre_archivo = u.split("#")[0].split("?")[0].split("/")[-1]
             for posible_ruta in (
-                LOCAL_UPLOADS_DIR / "originales" / nombre_archivo,
                 LOCAL_UPLOADS_DIR / "multimedia" / nombre_archivo,
                 LOCAL_UPLOADS_DIR / nombre_archivo,
             ):
@@ -2027,91 +2370,21 @@ def eliminar_multimedia_definitivamente(
 # ------------------------------------------------------------------------------
 # GESTIÓN EJECUTIVA DE BASE DE DATOS Y DESCARGA ZIP DEL EVENTO (CON / SIN MARCO)
 # ------------------------------------------------------------------------------
-def _extraer_uuid_de_urls_foto(url_marca: str, url_orig: str) -> str | None:
+def _descargar_bytes_foto_limpia(url_foto: str, evento_id: str) -> bytes | None:
     """
-    Extrae el identificador hexadecimal de 12 caracteres de una foto para poder
-    resolver directamente `originales/{uuid}_original.jpg` o `multimedia/{uuid}_con_marco.jpg`.
+    Recupera los bytes JPEG limpios originales tal como los subió el invitado,
+    desde el almacenamiento local o directamente desde Supabase Storage.
     """
-    for u in (url_orig, url_marca):
-        if not u:
-            continue
-        nombre = u.split("#")[0].split("?")[0].split("/")[-1]
-        m = re.match(r"^([a-f0-9]{12})_(?:original|con_marco)\.jpg$", nombre)
-        if m:
-            return m.group(1)
-        m2 = re.match(r"^(?:orig_)?segalu_([a-f0-9]{12})\.jpg$", nombre)
-        if m2:
-            return m2.group(1)
-    return None
+    if not url_foto:
+        return None
+    url_limpia = url_foto.split("#")[0].split("?")[0].strip()
+    nombre_archivo = url_limpia.split("/")[-1]
 
-
-def _descargar_bytes_por_version_foto(
-    url_marca: str,
-    url_orig: str,
-    evento_id: str,
-    con_marca_agua: bool,
-) -> bytes | None:
-    """
-    Recupera los bytes JPEG de la carpeta correspondiente según `con_marca_agua`:
-    - `con_marca_agua=True`  -> lee de `multimedia/{uuid}_con_marco.jpg` (`url_con_marca`)
-    - `con_marca_agua=False` -> lee de `originales/{uuid}_original.jpg` (`url_original`)
-    """
-    uid_foto = _extraer_uuid_de_urls_foto(url_marca, url_orig)
-    carpeta_objetivo = "multimedia" if con_marca_agua else "originales"
-    url_primaria = (url_marca if con_marca_agua else url_orig).split("#")[0].strip()
-
-    # 1. Intentar desde las carpetas locales `originales/` o `multimedia/` por UUID directo
-    if uid_foto:
-        nombre_directo = (
-            f"{uid_foto}_con_marco.jpg" if con_marca_agua else f"{uid_foto}_original.jpg"
-        )
-        ruta_local_directa = LOCAL_UPLOADS_DIR / carpeta_objetivo / nombre_directo
-        if ruta_local_directa.exists():
-            try:
-                return ruta_local_directa.read_bytes()
-            except Exception:
-                pass
-
-        # Compatibilidad con fotos subidas con prefijo anterior (`orig_segalu_` / `segalu_`)
-        nombre_legacy = f"segalu_{uid_foto}.jpg" if con_marca_agua else f"orig_segalu_{uid_foto}.jpg"
-        ruta_local_legacy = LOCAL_UPLOADS_DIR / nombre_legacy
-        if ruta_local_legacy.exists():
-            try:
-                return ruta_local_legacy.read_bytes()
-            except Exception:
-                pass
-
-    # 2. Intentar descarga desde el Bucket de Supabase Storage en la carpeta correspondiente
-    rutas_storage_candidatas: list[str] = []
-    if uid_foto:
-        if con_marca_agua:
-            rutas_storage_candidatas.append(f"multimedia/{uid_foto}_con_marco.jpg")
-            rutas_storage_candidatas.append(f"eventos/{evento_id}/{f'segalu_{uid_foto}.jpg'}")
-        else:
-            rutas_storage_candidatas.append(f"originales/{uid_foto}_original.jpg")
-            rutas_storage_candidatas.append(f"eventos/{evento_id}/{f'orig_segalu_{uid_foto}.jpg'}")
-
-    ruta_desde_url = extraer_ruta_storage_de_url(url_primaria, evento_id)
-    if ruta_desde_url and ruta_desde_url not in rutas_storage_candidatas:
-        # Evitar usar una ruta de `multimedia/` cuando se pidieron `originales/`
-        if con_marca_agua or not ruta_desde_url.startswith("multimedia/"):
-            rutas_storage_candidatas.append(ruta_desde_url)
-
-    if supabase is not None:
-        for ruta_st in rutas_storage_candidatas:
-            try:
-                datos = supabase.storage.from_(SUPABASE_BUCKET).download(ruta_st)
-                if datos:
-                    return datos
-            except Exception:
-                pass
-
-    # 3. Intentar desde disco local por nombre de archivo en `url_primaria`
-    nombre_url = url_primaria.split("?")[0].split("/")[-1]
-    if nombre_url:
+    # 1. Intentar desde disco local
+    if nombre_archivo:
         for cand_local in (
-            LOCAL_UPLOADS_DIR / carpeta_objetivo / nombre_url,
-            LOCAL_UPLOADS_DIR / nombre_url,
+            LOCAL_UPLOADS_DIR / "multimedia" / nombre_archivo,
+            LOCAL_UPLOADS_DIR / nombre_archivo,
         ):
             if cand_local.exists():
                 try:
@@ -2119,11 +2392,28 @@ def _descargar_bytes_por_version_foto(
                 except Exception:
                     pass
 
-    # 4. Intentar vía HTTP público desde la URL correspondiente
-    if url_primaria.startswith("http://") or url_primaria.startswith("https://"):
+    # 2. Intentar descarga desde Supabase Storage
+    ruta_st = extraer_ruta_storage_de_url(url_limpia, evento_id)
+    rutas_candidatas = [ruta_st] if ruta_st else []
+    if nombre_archivo and f"multimedia/{nombre_archivo}" not in rutas_candidatas:
+        rutas_candidatas.append(f"multimedia/{nombre_archivo}")
+
+    if supabase is not None:
+        for r in rutas_candidatas:
+            if not r:
+                continue
+            try:
+                datos = supabase.storage.from_(SUPABASE_BUCKET).download(r)
+                if datos:
+                    return datos
+            except Exception:
+                pass
+
+    # 3. Intentar descarga vía HTTP si es URL pública
+    if url_limpia.startswith("http://") or url_limpia.startswith("https://"):
         try:
             req = urllib.request.Request(
-                url_primaria,
+                url_limpia,
                 headers={"User-Agent": "SegaluAdminZipDownloader/1.0"},
             )
             with urllib.request.urlopen(req, timeout=12) as resp:
@@ -2137,14 +2427,14 @@ def _descargar_bytes_por_version_foto(
 @app.get("/api/admin/eventos/{evento_id}/descargar-zip")
 def descargar_fotos_evento_zip(
     evento_id: str,
-    con_marca_agua: bool = True,
+    con_marca_agua: bool = False,
     admin_password: str | None = None,
     x_admin_password: str | None = Header(default=None),
 ):
     """
-    Genera y descarga al instante un archivo .ZIP con todas las fotografías del evento:
-    - ?con_marca_agua=true  -> Lee de `multimedia/{uuid}_con_marco.jpg` (con logo Segalú)
-    - ?con_marca_agua=false -> Lee de `originales/{uuid}_original.jpg` (originales limpias sin marca)
+    Descarga limpia:
+    Genera y descarga al instante un archivo .ZIP con todas las fotografías limpias
+    originales tal como las subió el invitado.
     """
     clave_recibida = x_admin_password or admin_password
     verificar_admin_password(clave_recibida)
@@ -2184,14 +2474,11 @@ def descargar_fotos_evento_zip(
 
         with zipfile.ZipFile(buffer_zip, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
             for idx, item in enumerate(lista_fotos, start=1):
-                url_marca = (item.get("url_con_marca") or "").strip()
-                url_orig = (item.get("url_original") or "").split("#")[0].strip()
+                url_foto = (item.get("url_con_marca") or item.get("url_original") or "").strip()
 
-                img_bytes = _descargar_bytes_por_version_foto(
-                    url_marca=url_marca,
-                    url_orig=url_orig,
+                img_bytes = _descargar_bytes_foto_limpia(
+                    url_foto=url_foto,
                     evento_id=eid,
-                    con_marca_agua=con_marca_agua,
                 )
                 if not img_bytes:
                     continue
@@ -2199,8 +2486,7 @@ def descargar_fotos_evento_zip(
                 autor_raw = (item.get("invitados") or {}).get("nombre") or "Invitado"
                 autor_slug = re.sub(r"[^A-Za-z0-9]+", "_", autor_raw).strip("_") or "Invitado"
                 estado_slug = str(item.get("estado_moderacion") or "foto").upper()
-                sufijo_tipo = "CON_MARCO" if con_marca_agua else "ORIGINAL_SIN_MARCO"
-                nombre_en_zip = f"{idx:03d}_{autor_slug}_{estado_slug}_{sufijo_tipo}.jpg"
+                nombre_en_zip = f"{idx:03d}_{autor_slug}_{estado_slug}_ORIGINAL.jpg"
 
                 zf.writestr(nombre_en_zip, img_bytes)
                 archivos_agregados += 1
@@ -2212,8 +2498,7 @@ def descargar_fotos_evento_zip(
             )
 
         buffer_zip.seek(0)
-        etiqueta_zip = "Con_Marco_Segalu" if con_marca_agua else "Originales_Sin_Marco"
-        nombre_zip = f"Fotos_{codigo_limpio}_{etiqueta_zip}.zip"
+        nombre_zip = f"Fotos_{codigo_limpio}_Originales.zip"
 
         return StreamingResponse(
             buffer_zip,
@@ -2235,7 +2520,7 @@ def descargar_fotos_evento_zip(
 def _purgar_archivos_storage_de_evento(evento_id: str) -> tuple[int, int]:
     """
     Auxiliar reutilizable que borra todas las fotos de un evento en Supabase Storage
-    (tanto de `originales/` como de `multimedia/`) y elimina los registros de `multimedia`.
+    y elimina los registros de `multimedia`.
     """
     eid = evento_id.strip()
     mult_res = ejecutar_consulta_segura(
@@ -2248,14 +2533,6 @@ def _purgar_archivos_storage_de_evento(evento_id: str) -> tuple[int, int]:
     rutas_storage: list[str] = []
 
     for reg in registros:
-        url_marca = reg.get("url_con_marca") or ""
-        url_orig = reg.get("url_original") or ""
-        uid_foto = _extraer_uuid_de_urls_foto(url_marca, url_orig)
-        if uid_foto:
-            for r_uid in (f"originales/{uid_foto}_original.jpg", f"multimedia/{uid_foto}_con_marco.jpg"):
-                if r_uid not in rutas_storage:
-                    rutas_storage.append(r_uid)
-
         for campo in ("url_con_marca", "url_original"):
             url_val = reg.get(campo) or ""
             ruta_st = extraer_ruta_storage_de_url(url_val, eid)
@@ -2265,7 +2542,6 @@ def _purgar_archivos_storage_de_evento(evento_id: str) -> tuple[int, int]:
             nombre_local = url_val.split("#")[0].split("?")[0].split("/")[-1]
             if nombre_local:
                 for archivo_local in (
-                    LOCAL_UPLOADS_DIR / "originales" / nombre_local,
                     LOCAL_UPLOADS_DIR / "multimedia" / nombre_local,
                     LOCAL_UPLOADS_DIR / nombre_local,
                 ):
@@ -2278,7 +2554,6 @@ def _purgar_archivos_storage_de_evento(evento_id: str) -> tuple[int, int]:
     if rutas_storage:
         try:
             db = verificar_conexion_supabase()
-            # Supabase Storage permite borrar listas de rutas en lote
             db.storage.from_(SUPABASE_BUCKET).remove(rutas_storage)
         except Exception as st_err:
             print(f"Aviso al purgar lote de fotos en Supabase Storage: {st_err}")
@@ -2468,10 +2743,28 @@ def _construir_catalogo_fotos_sedes() -> tuple[dict, dict]:
     """
     Construye la estructura unificada de las 4 fotos de Sede 1 y Sede 2
     combinando las URLs de Supabase Storage guardadas en configuración y
-    verificando archivos locales si existieran.
+    verificando archivos locales si existieran, incluyendo títulos personalizados.
     """
     guardadas_raw = _ESTADO_EVENTOS.get("__fotos_sedes__")
     guardadas = guardadas_raw if isinstance(guardadas_raw, dict) else {}
+
+    titulos_raw = _ESTADO_EVENTOS.get("__titulos_sedes__")
+    titulos_guardados = titulos_raw if isinstance(titulos_raw, dict) else {}
+
+    titulos_default = {
+        "sede1": {
+            "1": "Salón Principal y Pista LED",
+            "2": "Área de Recepción y Fotocall",
+            "3": "Mesa de Honor y Arreglos Florales",
+            "4": "Entrada de Gala e Iluminación",
+        },
+        "sede2": {
+            "1": "Jardín Central y Altar Soñado",
+            "2": "Pérgola Iluminada de Recepción",
+            "3": "Salón Crystal con Candelabros",
+            "4": "Zona Lounge y Espacios Abiertos",
+        },
+    }
 
     fotos_listas: dict[str, list[dict]] = {"sede1": [], "sede2": []}
     fotos_mapa: dict[str, dict[str, str]] = {"sede1": {}, "sede2": {}}
@@ -2481,10 +2774,17 @@ def _construir_catalogo_fotos_sedes() -> tuple[dict, dict]:
         if not isinstance(mapa_sede, dict):
             mapa_sede = {}
 
+        mapa_titulos = titulos_guardados.get(sede_key)
+        if not isinstance(mapa_titulos, dict):
+            mapa_titulos = {}
+
         for num in range(1, 5):
             nombre_jpg = f"{sede_key}_foto{num}.jpg"
             ruta_local = SEDES_IMG_DIR / nombre_jpg
             url_guardada = str(mapa_sede.get(str(num)) or "").strip()
+            titulo_personalizado = str(mapa_titulos.get(str(num)) or "").strip()
+            titulo_def = titulos_default.get(sede_key, {}).get(str(num), f"Foto {num}")
+            titulo_final = titulo_personalizado or titulo_def
 
             if url_guardada:
                 url_final = url_guardada
@@ -2506,6 +2806,7 @@ def _construir_catalogo_fotos_sedes() -> tuple[dict, dict]:
                     "archivo": nombre_jpg,
                     "url": url_final,
                     "existe": existe_foto,
+                    "titulo": titulo_final,
                 }
             )
 
@@ -2531,15 +2832,16 @@ def subir_foto_sede_admin(
     numero_foto: int | None = Form(default=None),
     indice_foto: int | None = Form(default=None),
     archivo: UploadFile = File(...),
+    titulo: str | None = Form(default=None),
     x_admin_password: str | None = Header(default=None),
 ):
     """
     Sube cualquiera de las 4 fotos promocionales de Sede 1 o Sede 2:
-    1. Redimensiona y optimiza en proporción 16:10 (1280x800 JPEG).
+    1. Redimensiona y optimiza en formato vertical protagonista 4:5 (1080x1350 JPEG).
     2. Sube el archivo al Bucket de Supabase Storage (`sedes/sede1_foto1.jpg` con upsert=true)
        y guarda también una copia en `frontend/static/img/sedes/`.
-    3. Registra la URL pública en la configuración de la sede para que se refleje
-       de inmediato en `index.html` y en el Panel de Administrador.
+    3. Registra la URL pública y el título en la configuración de la sede para que se refleje
+       de inmediato en el visor vertical del invitado y en el Panel de Administrador.
     """
     verificar_admin_password(x_admin_password)
 
@@ -2559,11 +2861,11 @@ def subir_foto_sede_admin(
     try:
         img = Image.open(io.BytesIO(raw_bytes))
         img = ImageOps.exif_transpose(img).convert("RGB")
-        # Recorte inteligente 16:10 (1280x800) para que las tarjetas luzcan uniformes
-        img_16_10 = ImageOps.fit(img, (1280, 800), method=Image.Resampling.LANCZOS)
+        # Recorte inteligente vertical 4:5 (1080x1350) protagonista para celular
+        img_vertical = ImageOps.fit(img, (1080, 1350), method=Image.Resampling.LANCZOS)
 
         buf = io.BytesIO()
-        img_16_10.save(buf, format="JPEG", quality=86, optimize=True)
+        img_vertical.save(buf, format="JPEG", quality=86, optimize=True)
         jpeg_bytes = buf.getvalue()
 
         nombre_jpg = f"{sede_recibida}_foto{num}.jpg"
@@ -2581,7 +2883,12 @@ def subir_foto_sede_admin(
             db.storage.from_(SUPABASE_BUCKET).upload(
                 path=ruta_storage_sede,
                 file=jpeg_bytes,
-                file_options={"content-type": "image/jpeg", "upsert": "true"},
+                file_options={
+                "content-type": "image/jpeg",
+                "upsert": "true",
+                "cache-control": "86400",
+                "cacheControl": "86400",
+            },
             )
             url_sb = db.storage.from_(SUPABASE_BUCKET).get_public_url(ruta_storage_sede)
             if url_sb:
@@ -2597,6 +2904,14 @@ def subir_foto_sede_admin(
             _ESTADO_EVENTOS["__fotos_sedes__"][sede_recibida] = {}
 
         _ESTADO_EVENTOS["__fotos_sedes__"][sede_recibida][str(num)] = url_publica
+
+        if titulo and titulo.strip():
+            if not isinstance(_ESTADO_EVENTOS.get("__titulos_sedes__"), dict):
+                _ESTADO_EVENTOS["__titulos_sedes__"] = {}
+            if not isinstance(_ESTADO_EVENTOS["__titulos_sedes__"].get(sede_recibida), dict):
+                _ESTADO_EVENTOS["__titulos_sedes__"][sede_recibida] = {}
+            _ESTADO_EVENTOS["__titulos_sedes__"][sede_recibida][str(num)] = titulo.strip()
+
         _guardar_estado_eventos_disco()
 
         fotos_listas, fotos_mapa = _construir_catalogo_fotos_sedes()
@@ -2613,7 +2928,7 @@ def subir_foto_sede_admin(
             "almacenamiento": origen_storage,
             "fotos": fotos_listas,
             "fotos_sedes": fotos_mapa,
-            "mensaje": f"✅ Foto {num}/4 de {sede_recibida.upper()} subida y actualizada en la galería de invitados.",
+            "mensaje": f"✅ Foto vertical {num}/4 de {sede_recibida.upper()} subida y actualizada con éxito.",
         }
     except HTTPException:
         raise
@@ -2622,6 +2937,48 @@ def subir_foto_sede_admin(
             status_code=400,
             detail=f"No se pudo procesar o subir la foto de la sede: {str(err)}",
         )
+
+
+@app.patch("/api/admin/sedes/galeria/titulo")
+@app.post("/api/admin/sedes/galeria/titulo")
+def actualizar_titulo_foto_sede(
+    datos: TituloFotoSedeInput,
+    x_admin_password: str | None = Header(default=None),
+):
+    try:
+        verificar_admin_password(x_admin_password)
+        sede_key = datos.sede.strip().lower()
+        if sede_key not in ("sede1", "sede2"):
+            return JSONResponse(status_code=400, content={"ok": False, "detail": "Sede inválida. Usa 'sede1' o 'sede2'."})
+        num = max(1, min(4, int(datos.numero_foto)))
+        titulo_limpio = datos.titulo.strip()
+
+        if not isinstance(_ESTADO_EVENTOS.get("__titulos_sedes__"), dict):
+            _ESTADO_EVENTOS["__titulos_sedes__"] = {}
+        if not isinstance(_ESTADO_EVENTOS["__titulos_sedes__"].get(sede_key), dict):
+            _ESTADO_EVENTOS["__titulos_sedes__"][sede_key] = {}
+
+        _ESTADO_EVENTOS["__titulos_sedes__"][sede_key][str(num)] = titulo_limpio
+        _guardar_estado_eventos_disco()
+
+        fotos_listas, fotos_mapa = _construir_catalogo_fotos_sedes()
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "ok": True,
+                "mensaje": f"✅ Título de la foto {num} actualizado a '{titulo_limpio}'.",
+                "sede": sede_key,
+                "numero_foto": num,
+                "titulo": titulo_limpio,
+                "fotos": fotos_listas,
+                "fotos_sedes": fotos_mapa,
+            }
+        )
+    except HTTPException as he:
+        return JSONResponse(status_code=he.status_code, content={"ok": False, "detail": he.detail})
+    except Exception as err:
+        return JSONResponse(status_code=500, content={"ok": False, "detail": f"Error al actualizar título: {str(err)}"})
 
 
 @app.post("/api/admin/eventos/{evento_id}/auto-aprobar")
@@ -2727,6 +3084,7 @@ def crear_pregunta_admin(
 def generar_preguntas_desde_pdf_admin(
     evento_id: str,
     archivo_pdf: UploadFile = File(...),
+    tiempo_limite_segundos: int = Form(default=20),
     x_admin_password: str | None = Header(default=None),
 ):
     """
@@ -2787,7 +3145,7 @@ def generar_preguntas_desde_pdf_admin(
             "opcion_c": q["opcion_c"],
             "opcion_d": q["opcion_d"],
             "respuesta_correcta": q["respuesta_correcta"],
-            "tiempo_limite_segundos": int(q.get("tiempo_limite_segundos") or 20),
+            "tiempo_limite_segundos": int(tiempo_limite_segundos or q.get("tiempo_limite_segundos") or 20),
             "orden": base_orden + idx + 1,
             "activa": False,
             "revelar_respuesta": False,
@@ -2878,6 +3236,297 @@ def eliminar_pregunta_admin(
     }
 
 
+@app.patch("/api/admin/preguntas/{pregunta_id}")
+def editar_pregunta_admin(
+    pregunta_id: str,
+    datos: EditarPreguntaAdminInput,
+    x_admin_password: str | None = Header(default=None),
+):
+    try:
+        verificar_admin_password(x_admin_password)
+        pid = pregunta_id.strip()
+
+        campos_update = {}
+        if datos.enunciado is not None and datos.enunciado.strip():
+            campos_update["enunciado"] = datos.enunciado.strip()
+        if datos.opcion_a is not None and datos.opcion_a.strip():
+            campos_update["opcion_a"] = datos.opcion_a.strip()
+        if datos.opcion_b is not None and datos.opcion_b.strip():
+            campos_update["opcion_b"] = datos.opcion_b.strip()
+        if datos.opcion_c is not None and datos.opcion_c.strip():
+            campos_update["opcion_c"] = datos.opcion_c.strip()
+        if datos.opcion_d is not None and datos.opcion_d.strip():
+            campos_update["opcion_d"] = datos.opcion_d.strip()
+        if datos.respuesta_correcta is not None and datos.respuesta_correcta.strip():
+            campos_update["respuesta_correcta"] = datos.respuesta_correcta.strip().upper()
+        if datos.tiempo_limite_segundos is not None:
+            campos_update["tiempo_limite_segundos"] = int(datos.tiempo_limite_segundos)
+
+        if not campos_update:
+            return JSONResponse(status_code=400, content={"ok": False, "detail": "No se enviaron campos válidos para editar."})
+
+        # Actualizar en la tabla oficial de Supabase 'preguntas'
+        try:
+            ejecutar_consulta_segura(
+                lambda db: db.table("preguntas").update(campos_update).eq("id", pid).execute()
+            )
+        except Exception as err:
+            print(f"Aviso actualizando pregunta en Supabase ('preguntas'): {err}")
+
+        # Sincronizar en la memoria local
+        evento_id_afectado = None
+        with ESTADOS_EVENTOS_LOCK:
+            for eid, estado_ev in ESTADOS_EVENTOS.items():
+                for q in estado_ev.get("preguntas_fallback", []):
+                    if q.get("id") == pid:
+                        q.update(campos_update)
+                        evento_id_afectado = eid
+                        break
+
+        if evento_id_afectado:
+            invalidar_cache_evento(evento_id_afectado)
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "ok": True,
+                "mensaje": "✅ Pregunta actualizada correctamente en la base de datos.",
+                "pregunta_id": pid,
+                "campos": campos_update,
+            }
+        )
+    except HTTPException as he:
+        return JSONResponse(status_code=he.status_code, content={"ok": False, "detail": he.detail})
+    except Exception as err:
+        return JSONResponse(status_code=500, content={"ok": False, "detail": f"Error interno al editar pregunta: {str(err)}"})
+
+
+@app.patch("/api/admin/invitados/{invitado_id}/renombrar")
+def renombrar_invitado_admin(
+    invitado_id: str,
+    datos: RenombrarInvitadoInput,
+    x_admin_password: str | None = Header(default=None),
+):
+    try:
+        verificar_admin_password(x_admin_password)
+        iid = invitado_id.strip()
+        nuevo_nombre = ((datos.nuevo_nombre or datos.nombre) or "").strip()
+        if len(nuevo_nombre) < 2:
+            return JSONResponse(status_code=400, content={"ok": False, "detail": "El nombre debe tener al menos 2 caracteres."})
+
+        try:
+            ejecutar_consulta_segura(
+                lambda db: db.table("invitados").update({"nombre": nuevo_nombre}).eq("id", iid).execute()
+            )
+        except Exception as err:
+            print(f"Aviso actualizando nombre de invitado en Supabase: {err}")
+
+        with ESTADOS_EVENTOS_LOCK:
+            for eid, estado_ev in ESTADOS_EVENTOS.items():
+                for inv in estado_ev.get("invitados_fallback", []):
+                    if inv.get("id") == iid:
+                        inv["nombre"] = nuevo_nombre
+                        invalidar_cache_evento(eid)
+                        break
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "ok": True,
+                "mensaje": f"Invitado renombrado exitosamente a '{nuevo_nombre}'.",
+                "invitado_id": iid,
+                "nombre": nuevo_nombre,
+            }
+        )
+    except HTTPException as he:
+        return JSONResponse(status_code=he.status_code, content={"ok": False, "detail": he.detail})
+    except Exception as err:
+        return JSONResponse(status_code=500, content={"ok": False, "detail": f"Error interno al renombrar invitado: {str(err)}"})
+
+
+@app.post("/api/admin/accesorios/subir")
+def subir_accesorio_png_admin(
+    archivo: UploadFile = File(None),
+    archivo_png: UploadFile = File(None),
+    tematica: str = Form("general"),
+    nombre: str = Form(""),
+    id_accesorio: str | None = Form(None),
+    icono: str = Form(default="✨"),
+    subtitulo: str = Form(default="Personalizado"),
+    x_admin_password: str | None = Header(default=None),
+):
+    try:
+        verificar_admin_password(x_admin_password)
+        file_obj = archivo or archivo_png
+        if not file_obj:
+            return JSONResponse(status_code=400, content={"ok": False, "detail": "Por favor selecciona un archivo PNG."})
+
+        nombre_archivo_orig = (file_obj.filename or "").lower()
+        if not nombre_archivo_orig.endswith(".png"):
+            return JSONResponse(status_code=400, content={"ok": False, "detail": "Solo se permiten archivos en formato PNG transparente."})
+
+        tematica_limpia = tematica.strip().lower()
+        mapa_carpetas = {
+            "15_anos": "quinceanero",
+            "15anos": "quinceanero",
+            "quinceanero": "quinceanero",
+            "graduacion": "graduacion",
+            "gala_boda": "boda",
+            "gala_bodas": "boda",
+            "boda": "boda",
+            "fiesta_vip": "vip",
+            "vip": "vip",
+            "general": "general",
+            "todos": "general",
+        }
+        carpeta_sub = mapa_carpetas.get(tematica_limpia, "general")
+
+        id_limpio = re.sub(r"[^a-z0-9_]", "", (id_accesorio or "").strip().lower())
+        if not id_limpio:
+            nombre_limpio = re.sub(r"[^a-z0-9_]", "_", (nombre or "").strip().lower())
+            id_limpio = f"acc_{nombre_limpio}_{int(time.time())}"[:40]
+
+        dir_destino = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / carpeta_sub
+        dir_destino.mkdir(parents=True, exist_ok=True)
+        nombre_archivo = f"{id_limpio}.png"
+        ruta_guardado = dir_destino / nombre_archivo
+
+        bytes_img = file_obj.file.read()
+        try:
+            from PIL import Image
+            img = Image.open(io.BytesIO(bytes_img))
+            if img.format != "PNG":
+                return JSONResponse(status_code=400, content={"ok": False, "detail": "El archivo no es una imagen PNG válida."})
+            if img.size != (256, 256):
+                img = img.resize((256, 256), Image.Resampling.LANCZOS)
+            img.save(ruta_guardado, format="PNG")
+        except Exception:
+            with open(ruta_guardado, "wb") as f:
+                f.write(bytes_img)
+
+        ruta_relativa = f"/static/accessories/{carpeta_sub}/{nombre_archivo}"
+
+        ruta_catalogo = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / "accesorios_personalizados.json"
+        catalogo = []
+        if ruta_catalogo.exists():
+            try:
+                catalogo = json.loads(ruta_catalogo.read_text(encoding="utf-8"))
+            except Exception:
+                catalogo = []
+
+        nuevo_item = {
+            "id": id_limpio,
+            "nombre": (nombre or id_limpio).strip(),
+            "subtitulo": subtitulo.strip(),
+            "icono": icono.strip() or "✨",
+            "archivo": nombre_archivo,
+            "tematica": carpeta_sub,
+            "url": ruta_relativa,
+        }
+        catalogo = [c for c in catalogo if c.get("id") != id_limpio]
+        catalogo.append(nuevo_item)
+        ruta_catalogo.write_text(json.dumps(catalogo, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "ok": True,
+                "mensaje": f"Accesorio '{(nombre or id_limpio).strip()}' subido con éxito a la temática '{carpeta_sub}'.",
+                "accesorio": nuevo_item,
+            }
+        )
+    except HTTPException as he:
+        return JSONResponse(status_code=he.status_code, content={"ok": False, "detail": he.detail})
+    except Exception as err:
+        return JSONResponse(status_code=500, content={"ok": False, "detail": f"Error interno al procesar accesorio: {str(err)}"})
+
+
+@app.get("/api/accesorios")
+def obtener_catalogo_accesorios():
+    ruta_catalogo = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / "accesorios_personalizados.json"
+    personalizados = []
+    if ruta_catalogo.exists():
+        try:
+            personalizados = json.loads(ruta_catalogo.read_text(encoding="utf-8"))
+        except Exception:
+            personalizados = []
+
+    # Escaneo dinámico de accesorios físicos existentes en frontend/static/accessories
+    dir_acc = Path(__file__).parent.parent / "frontend" / "static" / "accessories"
+    ids_existentes = {p["id"] for p in personalizados if isinstance(p, dict) and "id" in p}
+
+    if dir_acc.exists():
+        for sub in dir_acc.iterdir():
+            if sub.is_dir():
+                tematica = sub.name.lower()
+                for png_file in sub.glob("*.png"):
+                    acc_id = png_file.stem
+                    if acc_id not in ids_existentes:
+                        nombre_formateado = acc_id.replace("acc_", "").replace("_", " ").title()
+                        personalizados.append({
+                            "id": acc_id,
+                            "nombre": nombre_formateado,
+                            "subtitulo": "Accesorio Real",
+                            "icono": "✨",
+                            "archivo": png_file.name,
+                            "tematica": tematica,
+                            "url": f"/static/accessories/{tematica}/{png_file.name}",
+                        })
+                        ids_existentes.add(acc_id)
+
+    return {"ok": True, "personalizados": personalizados}
+
+
+@app.delete("/api/admin/eventos/{evento_id}/preguntas")
+def vaciar_preguntas_evento_admin(
+    evento_id: str,
+    x_admin_password: str | None = Header(default=None),
+):
+    """
+    Vacía de forma rápida y limpia todas las preguntas del banco del evento,
+    eliminando las respuestas asociadas y limpiando la memoria caché.
+    """
+    verificar_admin_password(x_admin_password)
+    eid = evento_id.strip()
+
+    # 1. Eliminar respuestas_trivia asociadas a las preguntas del evento
+    preguntas_ev = listar_preguntas_evento(eid)
+    for p in preguntas_ev:
+        pid = p.get("id")
+        if pid:
+            try:
+                ejecutar_consulta_segura(
+                    lambda db, _pid=pid: db.table("respuestas_trivia")
+                    .delete()
+                    .eq("pregunta_id", _pid)
+                    .execute()
+                )
+            except Exception:
+                pass
+
+    # 2. Eliminar todas las preguntas del evento de la tabla SQL
+    try:
+        ejecutar_consulta_segura(
+            lambda db: db.table("preguntas").delete().eq("evento_id", eid).execute()
+        )
+    except Exception:
+        pass
+
+    # 3. Limpiar estado en memoria RAM y disco
+    estado_ev = obtener_estado_evento(eid)
+    estado_ev["preguntas_fallback"] = []
+    estado_ev["pregunta_activa_id"] = None
+    estado_ev["respuestas_fallback"] = []
+    _guardar_estado_eventos_disco()
+    invalidar_cache_evento(eid)
+
+    return {
+        "ok": True,
+        "preguntas_eliminadas": len(preguntas_ev),
+        "mensaje": "🗑️ Se eliminaron todas las preguntas del banco de este evento.",
+    }
+
+
 @app.post("/api/admin/eventos/{evento_id}/trivia/control")
 def controlar_trivia_en_vivo(
     evento_id: str,
@@ -2946,6 +3595,15 @@ def controlar_trivia_en_vivo(
         except Exception:
             pass
 
+        # Guardar snapshot de posiciones previas para calcular deltas de ranking
+        try:
+            lista_inv_previa, _, _ = obtener_ranking_evento(eid, None)
+            estado_ev["posiciones_previas"] = {
+                inv["id"]: idx + 1 for idx, inv in enumerate(lista_inv_previa)
+            }
+        except Exception:
+            estado_ev["posiciones_previas"] = {}
+
         estado_ev["fase_trivia"] = "pregunta_activa"
         estado_ev["pregunta_activa_id"] = pregunta_elegida["id"]
         estado_ev["timestamp_lanzamiento"] = time.time()
@@ -2978,6 +3636,24 @@ def controlar_trivia_en_vivo(
             "fase": "respuesta_revelada",
             "pregunta_activa_id": actual_id,
             "mensaje": "¡Tiempo cerrado y respuesta oficial revelada en todos los celulares!",
+        }
+
+    if accion == "mostrar_ranking":
+        try:
+            ejecutar_consulta_segura(
+                lambda db: db.table("eventos")
+                .update({"trivia_activa": True})
+                .eq("id", eid)
+                .execute()
+            )
+        except Exception:
+            pass
+
+        estado_ev["fase_trivia"] = "ranking"
+        return {
+            "ok": True,
+            "fase": "ranking",
+            "mensaje": "¡Tabla de Posiciones en vivo activada en el proyector!",
         }
 
     if accion == "mostrar_podio":
@@ -3018,6 +3694,7 @@ def controlar_trivia_en_vivo(
             pass
 
         estado_ev["respuestas_fallback"] = []
+        estado_ev["posiciones_previas"] = {}
         estado_ev["fase_trivia"] = "lobby"
         estado_ev["pregunta_activa_id"] = None
         actualizar_flags_preguntas_evento(eid, None, False)
@@ -3053,24 +3730,34 @@ def controlar_trivia_en_vivo(
 # ------------------------------------------------------------------------------
 # 13. FASE 5: MOTOR EN VIVO DE LA PANTALLA GIGANTE DE PROYECCIÓN (1920x1080 OBS)
 # ------------------------------------------------------------------------------
-_CACHE_META_EVENTOS_PROYECTOR: dict[str, dict] = {}
 
 
 def resolver_evento_proyector(
     evento_id: str | None = None,
     codigo: str | None = None,
+    sede: str | None = None,
+    local_id: str | None = None,
 ) -> dict | None:
     """
     Resuelve automáticamente el evento que debe proyectarse en /proyector:
-    1. Si se pasa ?codigo=SEGALU-2026 o ?evento_id=UUID en la URL, usa ese evento.
-    2. Si se abre http://localhost:8000/proyector directo en OBS Studio sin parámetros,
-       toma el evento que el Administrador tenga seleccionado en /admin (o el último activo).
+    1. Si se pasa ?evento_id=UUID, proyecta ese evento específico.
+    2. Si se pasa ?codigo=SEGALU-2026 (y opcionalmente &sede=sede1 / &local_id=...), proyecta ese evento en la sede.
+    3. Si se pasa ?sede=sede1 o ?local_id=UUID (ej. OBS en local específico), proyecta el evento activo de ese local.
+    4. Fallback global al último evento activo seleccionado en /admin.
     """
     ahora = time.time()
+    lid_busqueda = local_id.strip() if local_id and local_id.strip() else ""
+    if not lid_busqueda and sede:
+        s_clean = sede.strip().lower()
+        if _CACHE_LOCALES:
+            idx = 0 if "1" in s_clean else 1
+            if idx < len(_CACHE_LOCALES):
+                lid_busqueda = _CACHE_LOCALES[idx]["id"]
+
     clave_busqueda = (
-        f"cod:{codigo.strip().upper()}"
+        f"cod:{codigo.strip().upper()}:lid:{lid_busqueda}"
         if codigo and codigo.strip()
-        else f"id:{(evento_id or _ESTADO_EVENTOS.get('__proyector_evento_id__') or '').strip()}"
+        else f"id:{(evento_id or '').strip()}:lid:{lid_busqueda}"
     )
 
     if clave_busqueda in _CACHE_META_EVENTOS_PROYECTOR:
@@ -3080,24 +3767,59 @@ def resolver_evento_proyector(
 
     try:
         ev = None
-        if codigo and codigo.strip():
-            cod_limpio = re.sub(r"[^A-Z0-9\-]", "", codigo.strip().upper())
+        # 1. Por ID directo
+        if evento_id and evento_id.strip():
             res = ejecutar_consulta_segura(
                 lambda db: db.table("eventos")
                 .select("*, locales(nombre, direccion)")
-                .eq("codigo_acceso", cod_limpio)
+                .eq("id", evento_id.strip())
                 .limit(1)
                 .execute()
             )
             if res.data:
                 ev = res.data[0]
 
+        # 2. Por Código (con filtro por sede si aplica)
+        if not ev and codigo and codigo.strip():
+            cod_limpio = re.sub(r"[^A-Z0-9\-]", "", codigo.strip().upper())
+            def _q_cod(db):
+                q = db.table("eventos").select("*, locales(nombre, direccion)").eq("codigo_acceso", cod_limpio)
+                if lid_busqueda:
+                    q = q.eq("local_id", lid_busqueda)
+                return q.order("created_at", desc=True).limit(1).execute()
+            res = ejecutar_consulta_segura(_q_cod)
+            if res.data:
+                ev = res.data[0]
+
+        # 3. Por Sede específica (aislamiento de pantallas independientes por local)
+        if not ev and lid_busqueda:
+            eid_sede = (_ESTADO_EVENTOS.get("__proyector_por_sede__") or {}).get(lid_busqueda)
+            if eid_sede:
+                res = ejecutar_consulta_segura(
+                    lambda db: db.table("eventos")
+                    .select("*, locales(nombre, direccion)")
+                    .eq("id", eid_sede)
+                    .limit(1)
+                    .execute()
+                )
+                if res.data:
+                    ev = res.data[0]
+
+            if not ev:
+                res = ejecutar_consulta_segura(
+                    lambda db: db.table("eventos")
+                    .select("*, locales(nombre, direccion)")
+                    .eq("local_id", lid_busqueda)
+                    .order("created_at", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                if res.data:
+                    ev = res.data[0]
+
+        # 4. Fallback global: último evento fijado en memoria o último activo
         if not ev:
-            eid_candidato = (
-                evento_id.strip()
-                if (evento_id and evento_id.strip())
-                else str(_ESTADO_EVENTOS.get("__proyector_evento_id__") or "").strip()
-            )
+            eid_candidato = str(_ESTADO_EVENTOS.get("__proyector_evento_id__") or "").strip()
             if eid_candidato:
                 res = ejecutar_consulta_segura(
                     lambda db: db.table("eventos")
@@ -3133,6 +3855,8 @@ def resolver_evento_proyector(
 def obtener_estado_proyector_en_vivo(
     evento_id: str | None = None,
     codigo: str | None = None,
+    sede: str | None = None,
+    local_id: str | None = None,
 ):
     """
     DIDÁCTICA (Fase 5 - Pantalla Gigante de Proyección 1920x1080 para OBS Studio):
@@ -3142,9 +3866,17 @@ def obtener_estado_proyector_en_vivo(
         * 'LOBBY_KAHOOT'         -> Invitados uniéndose en vivo con sus avatares compuestos
         * 'PREGUNTA_ACTIVA'      -> Enunciado gigante, cronómetro, contador y 4 tarjetas Kahoot
         * 'RESULTADOS_PREGUNTA'  -> Check ✅ en la correcta + Gráfico de Barras (A, B, C, D)
+        * 'RANKING'              -> Tabla de posiciones animada con flechas neutras
         * 'PODIO'                -> Gala secuencial 3° -> 2° -> 1° con explosiones
     """
-    evento = resolver_evento_proyector(evento_id=evento_id, codigo=codigo)
+    clave_cache = f"proyector_estado:{evento_id or ''}:{codigo or ''}:{sede or ''}:{local_id or ''}"
+    cache_hit = obtener_cache_ram(clave_cache)
+    if cache_hit:
+        return cache_hit
+
+    evento = resolver_evento_proyector(
+        evento_id=evento_id, codigo=codigo, sede=sede, local_id=local_id
+    )
     if not evento:
         return {
             "ok": False,
@@ -3211,10 +3943,11 @@ def obtener_estado_proyector_en_vivo(
         else:
             segundos_restantes = limite_seg
 
+        BUFFER_GRACIA_SEGUNDOS = 3.0
         if (
             fase == "respuesta_revelada"
             or bool(pregunta_actual.get("revelar_respuesta"))
-            or segundos_restantes <= 0
+            or (ts_inicio > 0 and transcurrido >= (limite_seg + BUFFER_GRACIA_SEGUNDOS))
         ):
             ronda_cerrada = True
             segundos_restantes = 0
@@ -3250,13 +3983,45 @@ def obtener_estado_proyector_en_vivo(
         modo_proyector = "LOBBY_KAHOOT"
     elif fase in ("pregunta_activa", "respuesta_revelada") and datos_pregunta_proyector:
         modo_proyector = "RESULTADOS_PREGUNTA" if ronda_cerrada else "PREGUNTA_ACTIVA"
+    elif fase == "ranking":
+        modo_proyector = "RANKING"
     elif fase == "podio":
         modo_proyector = "PODIO"
     else:
         modo_proyector = "GALERIA"
 
+    # Calcular ranking animado estilo Kahoot con indicador de subida/bajada neutro
+    posiciones_previas = estado_ev.get("posiciones_previas") or {}
+    ranking_con_delta = []
+    for idx, inv in enumerate(invitados_ranking[:10]):
+        pos_actual = idx + 1
+        pos_prev = posiciones_previas.get(inv.get("id"))
+        delta = (int(pos_prev) - pos_actual) if pos_prev is not None else 0
+        ranking_con_delta.append({
+            "id": inv.get("id"),
+            "nombre": inv.get("nombre", "Invitado"),
+            "avatar": inv.get("avatar", "pug_real|corona_imperial"),
+            "puntaje_total": int(inv.get("puntaje_total") or 0),
+            "posicion": pos_actual,
+            "posicion_previa": pos_prev or pos_actual,
+            "delta_posicion": delta,
+        })
+
     datos_local = evento.get("locales") or {}
-    return {
+
+    ruta_catalogo = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / "accesorios_personalizados.json"
+    catalogo_personalizados = {}
+    if ruta_catalogo.exists():
+        try:
+            items_cat = json.loads(ruta_catalogo.read_text(encoding="utf-8"))
+            if isinstance(items_cat, list):
+                for it in items_cat:
+                    if isinstance(it, dict) and it.get("id"):
+                        catalogo_personalizados[it["id"]] = it.get("url")
+        except Exception:
+            pass
+
+    resultado_proyector = {
         "ok": True,
         "modo_proyector": modo_proyector,
         "fase_trivia": fase,
@@ -3279,8 +4044,287 @@ def obtener_estado_proyector_en_vivo(
         "invitados_en_pista": invitados_en_pista,
         "total_invitados": len(invitados_en_pista),
         "podio": podio_top,
+        "ranking": ranking_con_delta,
         "pregunta_activa": datos_pregunta_proyector,
+        "catalogo_accesorios": catalogo_personalizados,
     }
+    guardar_cache_ram(clave_cache, resultado_proyector, evento_id=eid)
+    return resultado_proyector
+
+
+# ------------------------------------------------------------------------------
+# 13.5. MÓDULO CRM DE LEADS & CUPONES PROMOCIONALES (SEGALÚ MARKETING)
+# ------------------------------------------------------------------------------
+@app.post("/api/eventos/{evento_id}/leads")
+def registrar_lead_evento(evento_id: str, datos: RegistroLeadInput):
+    """
+    Guarda el lead en la tabla 'crm_leads' de Supabase (con fallback en estado_eventos)
+    y genera un código promocional único para el invitado. Invalida la caché del evento.
+    Valida estrictamente que el teléfono tenga exactamente 9 dígitos numéricos.
+    """
+    eid = evento_id.strip()
+    nombre_limpio = datos.nombre.strip()
+    telefono_limpio = re.sub(r"\s+", "", datos.telefono.strip())
+    fecha_nac = datos.fecha_nacimiento.strip()
+    genero_limpio = (datos.genero or "No especificado").strip()
+    if genero_limpio not in ["Femenino", "Masculino", "Otro", "No especificado"]:
+        genero_limpio = "No especificado"
+    correo_limpio = (datos.correo or "").strip() or None
+
+    # Resolución de UUID del evento si se proporcionó un código de acceso
+    eid_uuid = eid
+    if not re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", eid, re.I):
+        try:
+            ev_check = ejecutar_consulta_segura(
+                lambda db: db.table("eventos").select("id").eq("codigo_acceso", eid).limit(1).execute()
+            )
+            if ev_check and ev_check.data:
+                eid_uuid = ev_check.data[0]["id"]
+        except Exception:
+            pass
+
+    # Validación estricta de teléfono: exactamente 9 dígitos numéricos
+    if not re.fullmatch(r"^\d{9}$", telefono_limpio):
+        raise HTTPException(
+            status_code=400,
+            detail="El número de teléfono debe tener exactamente 9 dígitos",
+        )
+
+    sufijo_random = f"{random.randint(100, 999)}-{uuid.uuid4().hex[:4].upper()}"
+    codigo_promocional = f"SEGALU-PROMO-{sufijo_random}"
+    ahora_iso = datetime.now(timezone.utc).isoformat()
+    lead_id = str(uuid.uuid4())
+
+    lead_record = {
+        "id": lead_id,
+        "evento_id": eid_uuid,
+        "nombre": nombre_limpio,
+        "telefono": telefono_limpio,
+        "fecha_nacimiento": fecha_nac,
+        "genero": genero_limpio,
+        "codigo_promocional": codigo_promocional,
+        "creado_en": ahora_iso,
+    }
+    if correo_limpio:
+        lead_record["correo"] = correo_limpio
+
+    guardado_supabase = False
+    try:
+        def _insert_lead(db):
+            return db.table("crm_leads").insert(lead_record).execute()
+
+        res = ejecutar_consulta_segura(_insert_lead)
+        if res and res.data:
+            guardado_supabase = True
+    except Exception as err:
+        err_msg = str(err).lower()
+        record_fallback = dict(lead_record)
+        if "genero" in err_msg and "column" in err_msg:
+            record_fallback.pop("genero", None)
+        if "correo" in err_msg and "column" in err_msg:
+            record_fallback.pop("correo", None)
+        try:
+            res = ejecutar_consulta_segura(lambda db: db.table("crm_leads").insert(record_fallback).execute())
+            if res and res.data:
+                guardado_supabase = True
+        except Exception as e2:
+            print(f"Aviso al guardar lead en Supabase (se usará respaldo local): {e2}")
+
+    # Respaldo en estado_eventos local para garantizar cero pérdida de prospectos
+    estado_ev = obtener_estado_evento(eid_uuid)
+    leads_ev = estado_ev.setdefault("crm_leads", [])
+    leads_ev.append(lead_record)
+    if eid != eid_uuid:
+        estado_alias = obtener_estado_evento(eid)
+        leads_alias = estado_alias.setdefault("crm_leads", [])
+        leads_alias.append(lead_record)
+    _guardar_estado_eventos_disco()
+
+    invalidar_cache_evento(eid)
+    if eid != eid_uuid:
+        invalidar_cache_evento(eid_uuid)
+
+    return {
+        "ok": True,
+        "mensaje": "¡Pase VIP y Cupón Especial generados con éxito!",
+        "codigo_promocional": codigo_promocional,
+        "lead": lead_record,
+        "guardado_en_nube": guardado_supabase,
+    }
+
+
+@app.get("/api/eventos/{evento_id}/leads")
+def listar_leads_evento(evento_id: str, force_refresh: bool = False):
+    """
+    Lista todos los leads recolectados en el evento (Supabase + respaldo local).
+    Utiliza caché RAM con TTL de 2.0s para máxima rapidez a menos que force_refresh=True.
+    """
+    eid = evento_id.strip()
+    clave_cache = f"leads:{eid}"
+    if force_refresh:
+        invalidar_cache_evento(eid)
+    else:
+        cache_hit = obtener_cache_ram(clave_cache)
+        if cache_hit:
+            return cache_hit
+
+    # Resolver UUID si vino como código de acceso
+    eid_uuid = eid
+    codigo_acceso_ref = None
+    if not re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", eid, re.I):
+        try:
+            ev_check = ejecutar_consulta_segura(
+                lambda db: db.table("eventos").select("id, codigo_acceso").eq("codigo_acceso", eid).limit(1).execute()
+            )
+            if ev_check and ev_check.data:
+                eid_uuid = ev_check.data[0]["id"]
+                codigo_acceso_ref = ev_check.data[0].get("codigo_acceso")
+        except Exception:
+            pass
+    else:
+        try:
+            ev_check = ejecutar_consulta_segura(
+                lambda db: db.table("eventos").select("id, codigo_acceso").eq("id", eid_uuid).limit(1).execute()
+            )
+            if ev_check and ev_check.data:
+                codigo_acceso_ref = ev_check.data[0].get("codigo_acceso")
+        except Exception:
+            pass
+
+    # 1. Obtener leads del estado local (buscando por UUID y código para cero pérdidas)
+    leads_map: dict[str, dict] = {}
+    claves_a_revisar = [c for c in [eid, eid_uuid, codigo_acceso_ref] if c]
+    for c_id in claves_a_revisar:
+        if c_id in _ESTADO_EVENTOS:
+            for l in _ESTADO_EVENTOS[c_id].get("crm_leads") or []:
+                if isinstance(l, dict) and "id" in l:
+                    leads_map[l["id"]] = l
+
+    # 2. Consultar en Supabase para el evento_id exacto (UUID)
+    try:
+        res = ejecutar_consulta_segura(
+            lambda db: db.table("crm_leads")
+            .select("*")
+            .eq("evento_id", eid_uuid)
+            .order("creado_en", desc=True)
+            .execute()
+        )
+        if res and res.data:
+            for item in res.data:
+                leads_map[item["id"]] = item
+    except Exception as err:
+        print(f"Aviso al consultar leads de Supabase: {err}")
+
+    lista_final = list(leads_map.values())
+    lista_final.sort(key=lambda x: str(x.get("creado_en") or ""), reverse=True)
+
+    resultado = {
+        "ok": True,
+        "evento_id": eid,
+        "evento_uuid": eid_uuid,
+        "total": len(lista_final),
+        "leads": lista_final,
+    }
+    guardar_cache_ram(clave_cache, resultado, evento_id=eid)
+    if eid_uuid != eid:
+        guardar_cache_ram(f"leads:{eid_uuid}", resultado, evento_id=eid_uuid)
+    return resultado
+
+
+@app.delete("/api/admin/eventos/{evento_id}/leads")
+def vaciar_leads_evento_admin(
+    evento_id: str,
+    x_admin_password: str | None = Header(default=None),
+):
+    """
+    Vacía todos los leads y cupones de un evento en Supabase (tabla crm_leads),
+    limpia el respaldo local en _ESTADO_EVENTOS y purga la caché en RAM.
+    """
+    verificar_admin_password(x_admin_password)
+    eid = evento_id.strip()
+
+    # Resolver UUID si vino como código
+    eid_uuid = eid
+    if not re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", eid, re.I):
+        try:
+            ev_check = ejecutar_consulta_segura(
+                lambda db: db.table("eventos").select("id").eq("codigo_acceso", eid).limit(1).execute()
+            )
+            if ev_check and ev_check.data:
+                eid_uuid = ev_check.data[0]["id"]
+        except Exception:
+            pass
+
+    # 1. Eliminar en Supabase
+    try:
+        ejecutar_consulta_segura(
+            lambda db: db.table("crm_leads").delete().eq("evento_id", eid_uuid).execute()
+        )
+    except Exception as err:
+        print(f"Aviso al vaciar crm_leads en Supabase: {err}")
+
+    # 2. Eliminar en estado_eventos local
+    for clave in [eid, eid_uuid]:
+        if clave in _ESTADO_EVENTOS and isinstance(_ESTADO_EVENTOS[clave], dict):
+            _ESTADO_EVENTOS[clave]["crm_leads"] = []
+    _guardar_estado_eventos_disco()
+
+    # 3. Invalidar caché en RAM
+    invalidar_cache_evento(eid)
+    if eid != eid_uuid:
+        invalidar_cache_evento(eid_uuid)
+
+    return {"ok": True, "mensaje": "Todos los leads del evento fueron eliminados correctamente."}
+
+
+@app.get("/api/eventos/{evento_id}/leads/csv")
+def exportar_leads_evento_csv(evento_id: str):
+    """
+    Exporta la base de datos de leads del evento en formato CSV con codificación UTF-8 BOM
+    compatible directamente con Microsoft Excel y herramientas de remarketing.
+    """
+    import csv
+    eid = evento_id.strip()
+    datos_leads = listar_leads_evento(eid)
+    leads = datos_leads.get("leads") or []
+
+    nombre_archivo = f"leads_segalu_{eid[:8]}.csv"
+    output = io.StringIO()
+    output.write("\ufeff")  # UTF-8 BOM para soporte de caracteres en Excel
+
+    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL)
+    writer.writerow([
+        "ID",
+        "Nombre y Apellido",
+        "Teléfono / WhatsApp",
+        "Fecha de Nacimiento",
+        "Género",
+        "Correo Electrónico",
+        "Código Promocional",
+        "Fecha de Registro (UTC)",
+    ])
+
+    for l in leads:
+        writer.writerow([
+            l.get("id", ""),
+            l.get("nombre", ""),
+            l.get("telefono", ""),
+            l.get("fecha_nacimiento", ""),
+            l.get("genero", "") or "No especificado",
+            l.get("correo", "") or "No especificado",
+            l.get("codigo_promocional", ""),
+            l.get("creado_en", ""),
+        ])
+
+    csv_bytes = output.getvalue().encode("utf-8-sig")
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{nombre_archivo}"',
+            "Cache-Control": "no-cache",
+        },
+    )
 
 
 # ------------------------------------------------------------------------------

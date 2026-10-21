@@ -6,6 +6,7 @@
 // ==============================================================================
 
 const STORAGE_KEY_SESION = "segalu_sesion_invitado";
+const STORAGE_KEY_EN_TRIVIA = "segalu_invitado_en_trivia";
 const TELEFONO_WHATSAPP_SEGALU = "51907512340"; // Número oficial de Segalú (Carabayllo)
 
 // ==============================================================================
@@ -22,7 +23,7 @@ const CONFIG_SEDES_SEGALU = {
         capacidad: "Capacidad: 300 invitados",
         // 👇 EDITA AQUÍ LA DIRECCIÓN Y EL ENLACE DE GOOGLE MAPS DE LA SEDE 1:
         direccionTexto: "Av. Manuel Prado KM 22, Carabayllo — Sede 1 (El Colocho)",
-        googleMapsUrl: "https://maps.app.goo.gl/93WowYMPxvxbFkCD7",
+        googleMapsUrl: "https://maps.app.goo.gl/eNhM4PXQSV856TMK8",
         fotos: [
             {
                 id: "sede1_foto1",
@@ -160,7 +161,7 @@ const CATALOGO_PERSONAJES = [
 const PAQUETES_ACCESORIOS_TEMATICOS = {
     paquete_boda: {
         nombrePaquete: "Gala & Bodas",
-        carpeta: "/static/img/accesorios/paquete_boda",
+        carpeta: "/static/accessories/boda",
         accesorios: [
             {
                 id: "corona_imperial",
@@ -170,11 +171,71 @@ const PAQUETES_ACCESORIOS_TEMATICOS = {
                 archivo: "corona_imperial.png",
             },
             {
+                id: "corbatin_gala",
+                nombre: "Corbatín de Gala",
+                subtitulo: "Smoking VIP",
+                icono: "👔",
+                archivo: "corbatin_gala.png",
+            },
+            {
                 id: "sombrero_gala",
                 nombre: "Sombrero de Gala",
                 subtitulo: "Clásico",
                 icono: "🎩",
                 archivo: "sombrero_gala.png",
+            },
+        ],
+    },
+    paquete_graduacion: {
+        nombrePaquete: "Graduación",
+        carpeta: "/static/accessories/graduacion",
+        accesorios: [
+            {
+                id: "birrete",
+                nombre: "Birrete de Gala",
+                subtitulo: "Académico",
+                icono: "🎓",
+                archivo: "birrete.png",
+            },
+        ],
+    },
+    paquete_15_anos: {
+        nombrePaquete: "15 Años",
+        carpeta: "/static/accessories/quinceanero",
+        accesorios: [
+            {
+                id: "tiara_xv",
+                nombre: "Tiara XV Años",
+                subtitulo: "Princesa",
+                icono: "👑",
+                archivo: "tiara_xv.png",
+            },
+            {
+                id: "corona_flores",
+                nombre: "Corona de Flores",
+                subtitulo: "Primavera",
+                icono: "🌸",
+                archivo: "corona_flores.png",
+            },
+            {
+                id: "antifaz_15",
+                nombre: "Antifaz Veneciano",
+                subtitulo: "Gala XV",
+                icono: "🎭",
+                archivo: "antifaz_15.png",
+            },
+        ],
+    },
+    paquete_general: {
+        nombrePaquete: "Fiesta VIP",
+        carpeta: "/static/accessories/general",
+        accesorios: [
+            {
+                id: "lentes_vip",
+                nombre: "Lentes VIP",
+                subtitulo: "Glamour",
+                icono: "🕶️",
+                archivo: "lentes_vip.png",
             },
             {
                 id: "gorra_vip",
@@ -185,46 +246,6 @@ const PAQUETES_ACCESORIOS_TEMATICOS = {
             },
         ],
     },
-    paquete_15_anos: {
-        nombrePaquete: "15 Años",
-        carpeta: "/static/img/accesorios/paquete_15_anos",
-        accesorios: [
-            {
-                id: "corona_flores",
-                nombre: "Corona de Flores",
-                subtitulo: "Primavera",
-                icono: "🌸",
-                archivo: "corona_flores.png",
-            },
-            {
-                id: "antifaz_15",
-                nombre: "Antifaz de 15 Años",
-                subtitulo: "Veneciano",
-                icono: "🎭",
-                archivo: "antifaz_15.png",
-            },
-        ],
-    },
-    paquete_princesas_disney: {
-        nombrePaquete: "Princesas",
-        carpeta: "/static/img/accesorios/paquete_princesas_disney",
-        accesorios: [
-            {
-                id: "tiara_real",
-                nombre: "Tiara de Cristal",
-                subtitulo: "Realeza",
-                icono: "💎",
-                archivo: "tiara_real.png",
-            },
-            {
-                id: "diadema_magica",
-                nombre: "Diadema de Hadas",
-                subtitulo: "Encantada",
-                icono: "🌟",
-                archivo: "diadema_magica.png",
-            },
-        ],
-    },
 };
 
 // ------------------------------------------------------------------------------
@@ -232,6 +253,42 @@ const PAQUETES_ACCESORIOS_TEMATICOS = {
 // ------------------------------------------------------------------------------
 let eventoActual = null;
 let sesionInvitado = null;
+
+/**
+ * Persistencia de sesión del invitado en localStorage.
+ * Guarda: nombre, apellido, avatar, token firmado y el evento, para que al recargar
+ * la página (o si se cae la red del local) se reconecte sin volver al login.
+ */
+function guardarSesionInvitadoLocal(sesion) {
+    if (!sesion?.invitado?.id) return;
+    const nombreCompleto = String(sesion.invitado.nombre || "").trim();
+    const [nombre, ...restoApellido] = nombreCompleto.split(/\s+/);
+    const datos = {
+        ...sesion,
+        nombre: nombre || "",
+        apellido: restoApellido.join(" "),
+        avatar: sesion.invitado.avatar || "",
+        token_sesion: sesion.token_sesion || "",
+        guardado_en: Date.now(),
+    };
+    try {
+        localStorage.setItem(STORAGE_KEY_SESION, JSON.stringify(datos));
+    } catch (_) {
+        // Modo incógnito sin almacenamiento: la sesión vive solo en memoria
+    }
+}
+
+function leerSesionInvitadoLocal() {
+    try {
+        const texto = localStorage.getItem(STORAGE_KEY_SESION);
+        if (!texto) return null;
+        const sesion = JSON.parse(texto);
+        return sesion?.invitado?.id && sesion?.evento?.id ? sesion : null;
+    } catch (_) {
+        localStorage.removeItem(STORAGE_KEY_SESION);
+        return null;
+    }
+}
 
 // Selección temporal dentro del Creador de Muñequitos estilo Kahoot
 let personajeSeleccionadoId = "pug_real";
@@ -290,24 +347,71 @@ const btnCerrarGaleriaEl = document.getElementById("btn-cerrar-galeria");
 const btnGaleriaPrevEl = document.getElementById("btn-galeria-prev");
 const btnGaleriaNextEl = document.getElementById("btn-galeria-next");
 
+// Elementos del Módulo CRM (Pase VIP & Cupón Promocional)
+const btnAbrirModalLeadEl = document.getElementById("btn-abrir-modal-lead");
+const btnFlotanteVipLeadEl = document.getElementById("btn-flotante-vip-lead");
+const modalCrmLeadEl = document.getElementById("modal-crm-lead");
+const btnCerrarModalLeadEl = document.getElementById("btn-cerrar-modal-lead");
+const vistaLeadFormularioEl = document.getElementById("vista-lead-formulario");
+const vistaLeadExitoEl = document.getElementById("vista-lead-exito");
+const formCrmLeadEl = document.getElementById("form-crm-lead");
+const leadNombreEl = document.getElementById("lead-nombre");
+const leadTelefonoEl = document.getElementById("lead-telefono");
+const leadNacimientoEl = document.getElementById("lead-nacimiento");
+const leadGeneroEl = document.getElementById("lead-genero");
+const leadCorreoEl = document.getElementById("lead-correo");
+const btnEnviarLeadEl = document.getElementById("btn-enviar-lead");
+const btnCancelarModalLeadEl = document.getElementById("btn-cancelar-modal-lead");
+const voucherNombreInvitadoEl = document.getElementById("voucher-nombre-invitado");
+const voucherCodigoPromocionalEl = document.getElementById("voucher-codigo-promocional");
+const voucherQrImgEl = document.getElementById("voucher-qr-img");
+const btnCompartirCuponWaEl = document.getElementById("btn-compartir-cupon-wa");
+const btnCerrarCuponEl = document.getElementById("btn-cerrar-cupon");
+const STORAGE_LEAD_PREFIX = "segalu_lead_promo_";
+
 // ------------------------------------------------------------------------------
-// 4. FUNCIONES AUXILIARES PARA BUSCAR PERSONAJES Y ACCESORIOS
+// 4. FUNCIONES AUXILIARES PARA BUSCAR PERSONAJES Y ACCESORIOS CON FILTRO TEMÁTICO
 // ------------------------------------------------------------------------------
+let accesoriosPersonalizadosServidor = [];
+
+async function cargarAccesoriosPersonalizados() {
+    try {
+        const res = await fetch("/api/accesorios");
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.personalizados)) {
+            accesoriosPersonalizadosServidor = data.personalizados;
+            if (typeof renderizarCuadriculaAccesorios === "function") {
+                renderizarCuadriculaAccesorios();
+            }
+        }
+    } catch (_) {}
+}
+
+const MAPA_TEMATICA_A_PAQUETE = {
+    "15_anos": "paquete_15_anos",
+    "quinceanero": "paquete_15_anos",
+    "graduacion": "paquete_graduacion",
+    "gala_boda": "paquete_boda",
+    "boda": "paquete_boda",
+    "fiesta_vip": "paquete_general",
+    "general": "paquete_general",
+};
+
 function obtenerTodosLosAccesorios() {
-    const lista = [
-        {
-            id: "sin_accesorio",
-            nombre: "Sin Accesorio",
-            subtitulo: "Natural",
-            icono: "—",
-            rutaImagen: null,
-            paqueteKey: "todos",
-        },
-    ];
+    const mapa = new Map();
+
+    mapa.set("sin_accesorio", {
+        id: "sin_accesorio",
+        nombre: "Sin Accesorio",
+        subtitulo: "Natural",
+        icono: "—",
+        rutaImagen: null,
+        paqueteKey: "todos",
+    });
 
     Object.entries(PAQUETES_ACCESORIOS_TEMATICOS).forEach(([paqueteKey, paquete]) => {
         paquete.accesorios.forEach((acc) => {
-            lista.push({
+            mapa.set(acc.id, {
                 ...acc,
                 paqueteKey,
                 nombrePaquete: paquete.nombrePaquete,
@@ -316,7 +420,48 @@ function obtenerTodosLosAccesorios() {
         });
     });
 
-    return lista;
+    accesoriosPersonalizadosServidor.forEach((acc) => {
+        if (!acc || !acc.id) return;
+        const pKey = MAPA_TEMATICA_A_PAQUETE[acc.tematica] || "paquete_general";
+        const rutaImg = acc.url || acc.rutaImagen || `/static/accessories/${acc.tematica || "general"}/${acc.archivo || acc.id + ".png"}`;
+        const existente = mapa.get(acc.id);
+        if (existente) {
+            mapa.set(acc.id, {
+                ...existente,
+                rutaImagen: rutaImg || existente.rutaImagen,
+            });
+        } else {
+            mapa.set(acc.id, {
+                id: acc.id,
+                nombre: acc.nombre,
+                subtitulo: acc.subtitulo || "Personalizado",
+                icono: acc.icono || "✨",
+                rutaImagen: rutaImg,
+                paqueteKey: pKey,
+                nombrePaquete: PAQUETES_ACCESORIOS_TEMATICOS[pKey]?.nombrePaquete || "Personalizados",
+            });
+        }
+    });
+
+    return Array.from(mapa.values());
+}
+
+function obtenerAccesoriosPermitidosEvento() {
+    const todos = obtenerTodosLosAccesorios();
+    const tematica = (eventoActual?.tematica_accesorios || "todos").toLowerCase().trim();
+    if (tematica === "todos") return todos;
+
+    const paqueteRequerido = MAPA_TEMATICA_A_PAQUETE[tematica];
+    if (!paqueteRequerido) return todos;
+
+    return todos.filter((acc) => acc.id === "sin_accesorio" || acc.paqueteKey === paqueteRequerido);
+}
+
+function seleccionarAccesorioAleatorioSegunTematica() {
+    const permitidos = obtenerAccesoriosPermitidosEvento().filter((a) => a.id !== "sin_accesorio");
+    if (permitidos.length === 0) return "sin_accesorio";
+    const idx = Math.floor(Math.random() * permitidos.length);
+    return permitidos[idx].id;
 }
 
 function buscarPersonajePorId(id) {
@@ -325,43 +470,57 @@ function buscarPersonajePorId(id) {
 
 function buscarAccesorioPorId(id) {
     const todos = obtenerTodosLosAccesorios();
-    return todos.find((a) => a.id === id) || todos[1]; // Por defecto Corona Imperial
+    const encontrado = todos.find((a) => a.id === id);
+    if (encontrado) return encontrado;
+    if (id && (id.startsWith("acc_") || id.includes("_"))) {
+        return {
+            id: id,
+            nombre: "Accesorio Exclusivo",
+            subtitulo: "Personalizado",
+            icono: "✨",
+            rutaImagen: `/static/accessories/general/${id}.png`,
+            paqueteKey: "paquete_general",
+        };
+    }
+    return todos[1]; // Por defecto Corona Imperial
 }
 
 function descomponerCodigoAvatar(codigoAvatar) {
     if (!codigoAvatar || typeof codigoAvatar !== "string") {
-        return { personajeId: "pug_real", accesorioId: "corona_imperial" };
+        return { personajeId: "pug_real", accesorioId: seleccionarAccesorioAleatorioSegunTematica() };
     }
     const partes = codigoAvatar.split("|");
     const personajeId = buscarPersonajePorId(partes[0]).id;
-    const accesorioId = partes[1] ? buscarAccesorioPorId(partes[1]).id : "corona_imperial";
+    const accesorioId = partes[1] ? buscarAccesorioPorId(partes[1]).id : seleccionarAccesorioAleatorioSegunTematica();
     return { personajeId, accesorioId };
 }
 
 /**
  * Renderiza la superposición de capas (Personaje + Accesorio en la cabeza).
- * Intenta cargar la imagen PNG/SVG si el usuario la colocó en la carpeta;
- * si no existe, muestra inmediatamente el ícono de respaldo sin error visual.
+ * Lógica estrictamente excluyente: 1 solo accesorio activo por avatar.
  */
 function pintarCapasAvatar(contenedorChar, contenedorAcc, personajeObj, accesorioObj) {
+    if (!contenedorChar || !contenedorAcc) return;
+
     // Capa 1: Personaje
     contenedorChar.innerHTML = "";
-    if (personajeObj.imagen) {
+    if (personajeObj && personajeObj.imagen) {
         const imgChar = document.createElement("img");
         imgChar.src = personajeObj.imagen;
-        imgChar.alt = personajeObj.nombre;
+        imgChar.alt = personajeObj.nombre || "Personaje";
         imgChar.className = "avatar-custom-img";
         imgChar.onerror = () => {
-            contenedorChar.textContent = personajeObj.icono;
+            contenedorChar.innerHTML = "";
+            contenedorChar.textContent = personajeObj.icono || "🐶";
         };
         contenedorChar.appendChild(imgChar);
     } else {
-        contenedorChar.textContent = personajeObj.icono;
+        contenedorChar.textContent = (personajeObj && personajeObj.icono) || "🐶";
     }
 
-    // Capa 2: Accesorio superpuesto en la cabeza
+    // Capa 2: Accesorio superpuesto en la cabeza (EXCLUSIVO: Reemplaza cualquier accesorio anterior)
     contenedorAcc.innerHTML = "";
-    if (accesorioObj.id === "sin_accesorio") {
+    if (!accesorioObj || accesorioObj.id === "sin_accesorio") {
         contenedorAcc.textContent = "";
         return;
     }
@@ -369,24 +528,108 @@ function pintarCapasAvatar(contenedorChar, contenedorAcc, personajeObj, accesori
     if (accesorioObj.rutaImagen) {
         const imgAcc = document.createElement("img");
         imgAcc.src = accesorioObj.rutaImagen;
-        imgAcc.alt = accesorioObj.nombre;
+        imgAcc.alt = accesorioObj.nombre || "Accesorio";
         imgAcc.className = "accessory-custom-img";
+        if (accesorioObj.id.includes("lentes") || accesorioObj.id.includes("antifaz") || accesorioObj.id.includes("gafas")) {
+            imgAcc.classList.add("accessory-glasses");
+        }
         imgAcc.onerror = () => {
-            contenedorAcc.textContent = accesorioObj.icono;
+            contenedorAcc.innerHTML = "";
+            contenedorAcc.textContent = accesorioObj.icono || "✨";
+        };
+        imgAcc.onload = () => {
+            // Aseguramos que solo esta imagen exista dentro del contenedor de accesorio (cero duplicados)
+            while (contenedorAcc.childNodes.length > 1) {
+                if (contenedorAcc.firstChild !== imgAcc) {
+                    contenedorAcc.removeChild(contenedorAcc.firstChild);
+                } else {
+                    contenedorAcc.removeChild(contenedorAcc.lastChild);
+                }
+            }
         };
         contenedorAcc.appendChild(imgAcc);
     } else {
-        contenedorAcc.textContent = accesorioObj.icono;
+        contenedorAcc.textContent = accesorioObj.icono || "✨";
     }
 }
 
+let timerAlertaInvitado = null;
+
+function ocultarAlertaInvitado() {
+    if (timerAlertaInvitado) {
+        clearTimeout(timerAlertaInvitado);
+        timerAlertaInvitado = null;
+    }
+    if (alertaMensajeEl) {
+        alertaMensajeEl.classList.add("alert-hiding");
+        setTimeout(() => {
+            alertaMensajeEl.classList.add("hidden");
+            alertaMensajeEl.classList.remove("alert-hiding");
+        }, 220);
+    }
+}
+
+function formatearMensajeError(err) {
+    if (!err) return "Ocurrió un error inesperado.";
+    if (typeof err === "string") return err;
+    if (Array.isArray(err)) {
+        return err
+            .map((item) => {
+                if (typeof item === "string") return item;
+                if (item && item.msg) {
+                    const campo = item.loc ? item.loc[item.loc.length - 1] : "";
+                    return campo && campo !== "body" ? `${campo}: ${item.msg}` : item.msg;
+                }
+                return JSON.stringify(item);
+            })
+            .join("; ");
+    }
+    if (typeof err === "object") {
+        if (err.detail) return formatearMensajeError(err.detail);
+        if (err.message) return formatearMensajeError(err.message);
+        if (err.msg) return err.msg;
+        try {
+            return JSON.stringify(err);
+        } catch (_) {
+            return String(err);
+        }
+    }
+    return String(err);
+}
+
 function mostrarAlerta(texto, tipo = "error") {
-    alertaMensajeEl.textContent = texto;
-    alertaMensajeEl.className = `alert-box ${tipo === "exito" ? "alert-success" : "alert-error"}`;
+    if (!alertaMensajeEl) return;
+    if (timerAlertaInvitado) {
+        clearTimeout(timerAlertaInvitado);
+        timerAlertaInvitado = null;
+    }
+    alertaMensajeEl.classList.remove("alert-hiding");
+
+    const textoParseado = formatearMensajeError(texto);
+    const textoLimpio = textoParseado.replace(/^(?:✅|❌|⚠️|ℹ️|🗑️|📊|🎉)\s*/u, "");
+    const esExito = tipo === "exito";
+
+    const iconoSvg = esExito
+        ? `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`
+        : `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+
+    alertaMensajeEl.innerHTML = `
+        <span class="toast-icon">${iconoSvg}</span>
+        <div class="toast-message">${textoLimpio}</div>
+        <button type="button" class="toast-close-btn" aria-label="Cerrar notificación">&times;</button>
+    `;
+
+    alertaMensajeEl.className = `alert-box ${esExito ? "alert-success" : "alert-error"}`;
     alertaMensajeEl.classList.remove("hidden");
-    setTimeout(() => {
-        alertaMensajeEl.classList.add("hidden");
-    }, 4500);
+
+    const btnCerrar = alertaMensajeEl.querySelector(".toast-close-btn");
+    if (btnCerrar) {
+        btnCerrar.onclick = () => ocultarAlertaInvitado();
+    }
+
+    timerAlertaInvitado = setTimeout(() => {
+        ocultarAlertaInvitado();
+    }, 4600);
 }
 
 // ------------------------------------------------------------------------------
@@ -401,8 +644,8 @@ function actualizarCabeceraYWhatsApp(evento) {
     tituloEventoEl.innerHTML = `¡Bienvenido a <em class="gold-italic">${nombreEvento}</em>!`;
     subtituloLocalEl.textContent = nombreLocal.toUpperCase();
 
-    // Mensaje de rastreo dinámico para identificar clientes desde la aplicación
-    const mensajeRastreo = `¡Hola Segalú! Estoy en el evento "${nombreEvento}" en "${nombreLocal}" usando la app interactiva de la pantalla gigante y deseo información de sus paquetes de eventos.`;
+    // Mensaje de gancho comercial dinámico para identificar clientes desde la aplicación
+    const mensajeRastreo = `¡Hola Eventos Segalú! 🎉 Estoy participando en vivo en el evento ${nombreEvento} desde la app interactiva y me encantaría cotizar una fecha con mi beneficio especial de invitado.`;
     btnWhatsappSegaluEl.href = `https://wa.me/${TELEFONO_WHATSAPP_SEGALU}?text=${encodeURIComponent(mensajeRastreo)}`;
 }
 
@@ -484,9 +727,10 @@ formRegistroEl.addEventListener("submit", async (e) => {
         sesionInvitado = {
             invitado: resultado.invitado,
             evento: eventoActual,
+            token_sesion: resultado.token_sesion || "",
         };
 
-        localStorage.setItem(STORAGE_KEY_SESION, JSON.stringify(sesionInvitado));
+        guardarSesionInvitadoLocal(sesionInvitado);
         mostrarAlerta(resultado.mensaje, "exito");
         mostrarPantallaLobby(sesionInvitado);
     } catch (error) {
@@ -542,6 +786,7 @@ function mostrarPantallaLobby(sesion) {
 btnCorregirNombreEl.addEventListener("click", async () => {
     const invitadoId = sesionInvitado?.invitado?.id;
     const nombreActual = sesionInvitado?.invitado?.nombre || "";
+    const eventoId = eventoActual?.id || "";
 
     btnCorregirNombreEl.disabled = true;
     btnCorregirNombreEl.textContent = "Liberando tu registro...";
@@ -557,9 +802,30 @@ btnCorregirNombreEl.addEventListener("click", async () => {
             });
         }
     } catch (e) {
-        // Incluso si hubiera corte momentáneo de red, limpiamos la sesión local
+        // En caso de corte momentáneo de red, proceder a la limpieza local
     } finally {
+        // 1. Limpieza profunda de almacenamiento en el navegador (sesión y cupones CRM)
         localStorage.removeItem(STORAGE_KEY_SESION);
+        localStorage.removeItem(STORAGE_KEY_EN_TRIVIA);
+        if (eventoId) {
+            localStorage.removeItem(`${STORAGE_LEAD_PREFIX}${eventoId}`);
+        }
+        Object.keys(localStorage).forEach((k) => {
+            if (k.startsWith(STORAGE_LEAD_PREFIX) || k.startsWith("segalu_invitado") || k.startsWith("segalu_sesion")) {
+                localStorage.removeItem(k);
+            }
+        });
+        sessionStorage.clear();
+
+        // 2. Restablecer el formulario modal de Pase VIP / Cupón CRM para el nuevo nombre
+        if (leadNombreEl) leadNombreEl.value = "";
+        if (leadTelefonoEl) leadTelefonoEl.value = "";
+        if (leadNacimientoEl) leadNacimientoEl.value = "";
+        if (leadGeneroEl) leadGeneroEl.value = "Femenino";
+        if (leadCorreoEl) leadCorreoEl.value = "";
+        if (vistaLeadFormularioEl) vistaLeadFormularioEl.classList.remove("hidden");
+        if (vistaLeadExitoEl) vistaLeadExitoEl.classList.add("hidden");
+
         sesionInvitado = null;
         vistaLobbyEl.classList.add("hidden");
         vistaTriviaInvitadoEl.classList.add("hidden");
@@ -568,7 +834,7 @@ btnCorregirNombreEl.addEventListener("click", async () => {
         inputNombreEl.focus();
         btnCorregirNombreEl.disabled = false;
         btnCorregirNombreEl.textContent = "Salir / Corregir mi nombre";
-        mostrarAlerta("Tu registro anterior fue eliminado. Escribe tu nombre corregido.", "exito");
+        mostrarAlerta("Tu registro anterior y cupón fueron eliminados. Escribe tu nombre corregido.", "exito");
     }
 });
 
@@ -611,14 +877,25 @@ function renderizarCuadriculaPersonajes() {
 
 function renderizarFiltrosPaquetes() {
     filtroPaquetesEl.innerHTML = "";
+    const tematica = (eventoActual?.tematica_accesorios || "todos").toLowerCase().trim();
 
-    const opcionesFiltro = [
-        { key: "todos", label: "Todos" },
-        ...Object.entries(PAQUETES_ACCESORIOS_TEMATICOS).map(([key, datos]) => ({
-            key,
-            label: datos.nombrePaquete,
-        })),
-    ];
+    let opcionesFiltro = [];
+    if (tematica === "todos") {
+        opcionesFiltro = [
+            { key: "todos", label: "Todos" },
+            ...Object.entries(PAQUETES_ACCESORIOS_TEMATICOS).map(([key, datos]) => ({
+                key,
+                label: datos.nombrePaquete,
+            })),
+        ];
+    } else {
+        const paqueteClave = MAPA_TEMATICA_A_PAQUETE[tematica] || "paquete_general";
+        const nombrePaquete = PAQUETES_ACCESORIOS_TEMATICOS[paqueteClave]?.nombrePaquete || "Accesorios";
+        opcionesFiltro = [
+            { key: paqueteClave, label: `✨ ${nombrePaquete}` },
+        ];
+        paqueteFiltroActual = paqueteClave;
+    }
 
     opcionesFiltro.forEach((op) => {
         const pill = document.createElement("button");
@@ -637,8 +914,8 @@ function renderizarFiltrosPaquetes() {
 function renderizarCuadriculaAccesorios() {
     gridAccesoriosEl.innerHTML = "";
 
-    const todos = obtenerTodosLosAccesorios();
-    const filtrados = todos.filter(
+    const permitidos = obtenerAccesoriosPermitidosEvento();
+    const filtrados = permitidos.filter(
         (acc) =>
             paqueteFiltroActual === "todos" ||
             acc.id === "sin_accesorio" ||
@@ -649,9 +926,26 @@ function renderizarCuadriculaAccesorios() {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = `item-option-card ${accesorio.id === accesorioSeleccionadoId ? "selected" : ""}`;
+
+        // Miniatura visual: renderiza la imagen real del accesorio PNG o el emoji como respaldo
+        let visualAccesorioHtml = `<span class="item-option-icon">${accesorio.icono}</span>`;
+        if (accesorio.rutaImagen && accesorio.id !== "sin_accesorio") {
+            visualAccesorioHtml = `
+                <div class="accessory-thumb-wrapper">
+                    <img
+                        src="${accesorio.rutaImagen}"
+                        alt="${accesorio.nombre}"
+                        class="accessory-thumb-img"
+                        onerror="this.style.display='none'; if (this.nextElementSibling) this.nextElementSibling.style.display='inline-block';"
+                    />
+                    <span class="item-option-icon fallback" style="display: none;">${accesorio.icono}</span>
+                </div>
+            `;
+        }
+
         btn.innerHTML = `
             <span class="item-check-badge">✓</span>
-            <span class="item-option-icon">${accesorio.icono}</span>
+            ${visualAccesorioHtml}
             <span class="item-option-title">${accesorio.nombre}</span>
             <span class="item-option-sub">${accesorio.subtitulo}</span>
         `;
@@ -728,11 +1022,24 @@ btnGuardarAvatarEl.addEventListener("click", async () => {
         }
 
         sesionInvitado.invitado = resultado.invitado;
-        localStorage.setItem(STORAGE_KEY_SESION, JSON.stringify(sesionInvitado));
+        guardarSesionInvitadoLocal(sesionInvitado);
 
         mostrarPantallaLobby(sesionInvitado);
         cerrarModalPersonalizador();
         mostrarAlerta(resultado.mensaje, "exito");
+
+        // Notificación en tiempo real al proyector
+        if (typeof BroadcastChannel !== "undefined") {
+            try {
+                const canalSync = new BroadcastChannel("segalu_proyector_sync");
+                canalSync.postMessage({
+                    tipo: "AVATAR_ACTUALIZADO",
+                    invitado_id: invitadoId,
+                    avatar: nuevoCodigoAvatar,
+                    evento_id: sesionInvitado?.evento?.id || "",
+                });
+            } catch (_) {}
+        }
     } catch (error) {
         mostrarAlerta(error.message, "error");
     } finally {
@@ -766,8 +1073,25 @@ function renderizarSeccionUbicacionSedes() {
     contenedorEl.innerHTML = listaSedes
         .map((sede) => {
             const urlWaShare = generarUrlCompartirUbicacionWhatsApp(sede);
+            const esSede1 = sede.id === "sede1";
+            // Ubicación exacta por sede: Sede 1 apunta a Eventos Segalu y Sede 2 a Salón Florencia
+            const queryMapa = esSede1
+                ? encodeURIComponent("Eventos Segalu, Carabayllo")
+                : encodeURIComponent("Eventos Segalu - Salón Florencia, Carabayllo");
+            const srcIframe = `https://maps.google.com/maps?q=${queryMapa}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
+
             return `
                 <article class="sede-ubicacion-card">
+                    <div class="sede-map-embed-wrapper">
+                        <iframe
+                            class="sede-map-iframe"
+                            src="${srcIframe}"
+                            loading="lazy"
+                            allowfullscreen=""
+                            referrerpolicy="no-referrer-when-downgrade"
+                            title="Mapa de ubicación ${sede.nombre}"
+                        ></iframe>
+                    </div>
                     <div class="sede-ubicacion-top">
                         <div class="sede-pin-badge" aria-hidden="true">📍</div>
                         <div class="sede-ubicacion-info">
@@ -782,7 +1106,7 @@ function renderizarSeccionUbicacionSedes() {
                             rel="noopener noreferrer"
                             class="btn-sede-maps"
                         >
-                            <span>🗺️ Abrir en Google Maps</span>
+                            <span>🗺️ Google Maps</span>
                         </a>
                         <a
                             href="${urlWaShare}"
@@ -790,7 +1114,7 @@ function renderizarSeccionUbicacionSedes() {
                             rel="noopener noreferrer"
                             class="btn-sede-share-wa"
                         >
-                            <span>📲 Compartir dirección a un invitado</span>
+                            <span>📲 Compartir</span>
                         </a>
                     </div>
                 </article>
@@ -829,8 +1153,13 @@ function aplicarMapaFotosSedes(fotosServidor, fotosMapa) {
         const listaServidor = fotosServidor?.[sedeKey];
         if (Array.isArray(listaServidor)) {
             listaServidor.forEach((infoFoto, idx) => {
-                if (infoFoto.existe && infoFoto.url && CONFIG_SEDES_SEGALU[sedeKey]?.fotos?.[idx]) {
-                    CONFIG_SEDES_SEGALU[sedeKey].fotos[idx].archivo = infoFoto.url;
+                if (CONFIG_SEDES_SEGALU[sedeKey]?.fotos?.[idx]) {
+                    if (infoFoto.existe && infoFoto.url) {
+                        CONFIG_SEDES_SEGALU[sedeKey].fotos[idx].archivo = infoFoto.url;
+                    }
+                    if (infoFoto.titulo) {
+                        CONFIG_SEDES_SEGALU[sedeKey].fotos[idx].titulo = infoFoto.titulo;
+                    }
                 }
             });
         }
@@ -847,7 +1176,8 @@ function aplicarMapaFotosSedes(fotosServidor, fotosMapa) {
     });
 
     actualizarPortadasSedesLobby();
-    if (!modalGaleriaEl.classList.contains("hidden")) {
+    renderizarSeccionUbicacionSedes();
+    if (modalGaleriaEl && !modalGaleriaEl.classList.contains("hidden")) {
         mostrarSlideGaleria(indiceSlideGaleria);
     }
 }
@@ -866,12 +1196,14 @@ async function sincronizarFotosSedesDesdeServidor() {
         const res = await fetch("/api/sedes/fotos");
         if (!res.ok) {
             actualizarPortadasSedesLobby();
+            renderizarSeccionUbicacionSedes();
             return;
         }
         const data = await res.json();
         aplicarMapaFotosSedes(data.fotos || {}, data.fotos_sedes || {});
     } catch (_) {
         actualizarPortadasSedesLobby();
+        renderizarSeccionUbicacionSedes();
     }
 }
 
@@ -891,23 +1223,16 @@ function mostrarSlideGaleria(indice) {
     indiceSlideGaleria = (indice + total) % total;
     const slide = fotosSede[indiceSlideGaleria];
 
-    // Sincronizar pestañas Sede 1 / Sede 2 (compatible con data-sede y data-sede-tab)
-    document.querySelectorAll(".btn-sede-tab").forEach((btn) => {
-        const keyBtn = btn.dataset.sede || btn.dataset.sedeTab;
-        btn.classList.toggle("active", keyBtn === sedeGaleriaActiva);
-    });
-
+    const modalSedeTituloEl = document.getElementById("galeria-modal-sede-nombre");
     const badgeEl = document.getElementById("galeria-slide-badge");
     const iconoEl = document.getElementById("galeria-slide-icono");
     const imgSlideEl = document.getElementById("galeria-slide-img");
     const tituloEl = document.getElementById("galeria-slide-titulo");
-    const descEl = document.getElementById("galeria-slide-desc");
     const indicadorEl = document.getElementById("galeria-indicador");
 
-    if (badgeEl) badgeEl.textContent = `${sede.badge} • Foto ${indiceSlideGaleria + 1} de ${total}`;
-    if (iconoEl) iconoEl.innerHTML = slide.svgRespaldo;
-    if (tituloEl) tituloEl.textContent = slide.titulo;
-    if (descEl) descEl.textContent = slide.descripcion;
+    if (modalSedeTituloEl) modalSedeTituloEl.textContent = sede.nombre;
+    if (badgeEl) badgeEl.textContent = `Foto ${indiceSlideGaleria + 1} / ${total}`;
+    if (tituloEl) tituloEl.textContent = slide.titulo || `${sede.nombreCorto} • Foto ${indiceSlideGaleria + 1}`;
     if (indicadorEl) indicadorEl.textContent = `${indiceSlideGaleria + 1} / ${total}`;
 
     if (imgSlideEl) {
@@ -921,15 +1246,6 @@ function mostrarSlideGaleria(indice) {
         };
         imgSlideEl.src = slide.archivo;
     }
-
-    // Actualizar tarjeta de ubicación y botones del modal para la sede activa
-    const dirModalEl = document.getElementById("galeria-modal-direccion-texto");
-    const btnMapsModalEl = document.getElementById("btn-modal-abrir-maps");
-    const btnWaModalEl = document.getElementById("btn-modal-compartir-wa");
-
-    if (dirModalEl) dirModalEl.textContent = sede.direccionTexto;
-    if (btnMapsModalEl) btnMapsModalEl.href = sede.googleMapsUrl;
-    if (btnWaModalEl) btnWaModalEl.href = generarUrlCompartirUbicacionWhatsApp(sede);
 }
 
 function abrirGaleriaSegalu(sedeKey = "sede1", indiceInicial = 0) {
@@ -938,11 +1254,11 @@ function abrirGaleriaSegalu(sedeKey = "sede1", indiceInicial = 0) {
     modalGaleriaEl.classList.remove("hidden");
 }
 
-btnAbrirGaleriaEl.addEventListener("click", () => abrirGaleriaSegalu("sede1", 0));
-btnConoceSegaluEl.addEventListener("click", () => abrirGaleriaSegalu("sede1", 0));
-btnCerrarGaleriaEl.addEventListener("click", () => modalGaleriaEl.classList.add("hidden"));
-btnGaleriaPrevEl.addEventListener("click", () => mostrarSlideGaleria(indiceSlideGaleria - 1));
-btnGaleriaNextEl.addEventListener("click", () => mostrarSlideGaleria(indiceSlideGaleria + 1));
+if (btnAbrirGaleriaEl) btnAbrirGaleriaEl.addEventListener("click", () => abrirGaleriaSegalu("sede1", 0));
+if (btnConoceSegaluEl) btnConoceSegaluEl.addEventListener("click", () => abrirGaleriaSegalu("sede1", 0));
+if (btnCerrarGaleriaEl) btnCerrarGaleriaEl.addEventListener("click", () => modalGaleriaEl.classList.add("hidden"));
+if (btnGaleriaPrevEl) btnGaleriaPrevEl.addEventListener("click", () => mostrarSlideGaleria(indiceSlideGaleria - 1));
+if (btnGaleriaNextEl) btnGaleriaNextEl.addEventListener("click", () => mostrarSlideGaleria(indiceSlideGaleria + 1));
 
 document.querySelectorAll(".btn-sede-tab").forEach((tabBtn) => {
     tabBtn.addEventListener("click", (ev) => {
@@ -982,6 +1298,7 @@ const btnEnviarFotoEl = document.getElementById("btn-enviar-foto");
 const btnCerrarModalFotoEl = document.getElementById("btn-cerrar-modal-foto");
 
 let archivoFotoSeleccionado = null;
+let blobFotoComprimidaCliente = null;
 let puntajeIaCalculadoCliente = 95;
 
 const HTML_BTN_ENVIAR_FOTO_ORIGINAL = `
@@ -992,6 +1309,46 @@ const HTML_BTN_ENVIAR_FOTO_ORIGINAL = `
     </svg>
     <span>Enviar Foto a la Pantalla</span>
 `;
+
+/**
+ * Compresión de imagen directa en el cliente (Navegador)
+ * Reduce el peso a ~200-300 KB antes de transmitir para lograr subidas en <1 segundo.
+ */
+function comprimirImagenEnNavegador(elementoImg, calidad = 0.82) {
+    return new Promise((resolve) => {
+        try {
+            const canvas = document.createElement("canvas");
+            let ancho = elementoImg.naturalWidth || elementoImg.width;
+            let alto = elementoImg.naturalHeight || elementoImg.height;
+            const maxDim = 1280;
+
+            if (ancho > maxDim || alto > maxDim) {
+                if (ancho > alto) {
+                    alto = Math.round((alto * maxDim) / ancho);
+                    ancho = maxDim;
+                } else {
+                    ancho = Math.round((ancho * maxDim) / alto);
+                    alto = maxDim;
+                }
+            }
+
+            canvas.width = ancho;
+            canvas.height = alto;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(elementoImg, 0, 0, ancho, alto);
+
+            canvas.toBlob(
+                (blob) => {
+                    resolve(blob || null);
+                },
+                "image/jpeg",
+                calidad
+            );
+        } catch (e) {
+            resolve(null);
+        }
+    });
+}
 
 /**
  * DIDÁCTICA (Pre-Filtro de IA 100% Gratuito en el Navegador):
@@ -1057,6 +1414,7 @@ function calcularPuntajeIaEnCanvas(elementoImagen) {
 
 function reiniciarModalFoto() {
     archivoFotoSeleccionado = null;
+    blobFotoComprimidaCliente = null;
     inputArchivoFotoEl.value = "";
     imgPreviewFotoEl.src = "";
     const bgBlurEl = document.getElementById("bg-blur-preview-foto");
@@ -1097,15 +1455,16 @@ inputArchivoFotoEl.addEventListener("change", (eventoChange) => {
             bgBlurEl.style.backgroundImage = `url("${dataUrl}")`;
         }
 
-        imgPreviewFotoEl.onload = () => {
-            // Ejecutamos el Pre-Filtro de IA 100% gratuito en el navegador
+        imgPreviewFotoEl.onload = async () => {
+            // Ejecutamos el Pre-Filtro de IA local y comprimimos la foto en el cliente
             puntajeIaCalculadoCliente = calcularPuntajeIaEnCanvas(imgPreviewFotoEl);
+            blobFotoComprimidaCliente = await comprimirImagenEnNavegador(imgPreviewFotoEl, 0.82);
 
             barraEstadoIaEl.classList.remove("hidden");
             if (puntajeIaCalculadoCliente >= 70) {
                 barraEstadoIaEl.classList.remove("ia-warning");
                 iaPuntajeTextoEl.textContent = `Pre-Filtro IA: ${puntajeIaCalculadoCliente}% Segura (Aprobada)`;
-                iaDetalleTextoEl.textContent = "Se estampará el sello transparente de Segalú arriba a la izquierda.";
+                iaDetalleTextoEl.textContent = "Tu foto se mostrará con el marco oficial de Segalú en la pantalla.";
             } else {
                 barraEstadoIaEl.classList.add("ia-warning");
                 iaPuntajeTextoEl.textContent = `Pre-Filtro IA: ${puntajeIaCalculadoCliente}% (Revisión Especial)`;
@@ -1129,14 +1488,16 @@ btnEnviarFotoEl.addEventListener("click", async () => {
     }
 
     btnEnviarFotoEl.disabled = true;
-    btnEnviarFotoEl.innerHTML = `<span>Procesando sello Segalú y subiendo...</span>`;
+    btnEnviarFotoEl.innerHTML = `<span>Enviando foto a la pantalla...</span>`;
 
     try {
         const datosFormulario = new FormData();
         datosFormulario.append("evento_id", eventoActual.id);
         datosFormulario.append("invitado_id", sesionInvitado.invitado.id);
         datosFormulario.append("puntaje_ia_cliente", String(puntajeIaCalculadoCliente));
-        datosFormulario.append("archivo", archivoFotoSeleccionado);
+
+        const archivoParaSubir = blobFotoComprimidaCliente || archivoFotoSeleccionado;
+        datosFormulario.append("archivo", archivoParaSubir, "foto.jpg");
 
         const respuestaHttp = await fetch("/api/multimedia/subir", {
             method: "POST",
@@ -1150,7 +1511,7 @@ btnEnviarFotoEl.addEventListener("click", async () => {
 
         modalSubirFotoEl.classList.add("hidden");
         mostrarAlerta(
-            `${resultado.mensaje} (IA: ${resultado.analisis_ia.puntaje_ia_seguridad}% • ${resultado.analisis_ia.peso_kb} KB)`,
+            `${resultado.mensaje} (${resultado.analisis_ia?.peso_kb || 200} KB)`,
             "exito"
         );
     } catch (error) {
@@ -1287,14 +1648,19 @@ function detenerCronometroFluidoPregunta() {
     }
 }
 
+let ultimaPreguntaIdRenderizada = null;
+
 function iniciarCronometroFluidoPregunta(limiteSegundos, segundosRestantesServidor, preguntaId) {
     detenerCronometroFluidoPregunta();
 
-    const limiteTotalMs = Math.max(5, limiteSegundos) * 1000;
-    const restanteInicialMs = Math.max(
-        500,
-        Math.min(limiteTotalMs, segundosRestantesServidor * 1000)
-    );
+    const limiteTotalMs = Math.max(5, Number(limiteSegundos || 20)) * 1000;
+    // Al renderizarse la pregunta en el móvil, el contador arranca exactamente
+    // desde el segundo total configurado (ej: 20s) sin desfases por latencia de red.
+    let restanteInicialMs = limiteTotalMs;
+    if (preguntaId && ultimaPreguntaIdRenderizada === preguntaId && typeof segundosRestantesServidor === "number") {
+        restanteInicialMs = Math.max(500, Math.min(limiteTotalMs, segundosRestantesServidor * 1000));
+    }
+    ultimaPreguntaIdRenderizada = preguntaId;
     const tInicioLocal = performance.now();
 
     timerCronometroFluido = setInterval(() => {
@@ -1347,25 +1713,34 @@ function pintarPantallaResultadoDefinitivoKahoot(
     const puestoTexto = posicionRanking ? `#${posicionRanking}` : "#1";
 
     if (triviaResultadoPuestoEl) {
-        triviaResultadoPuestoEl.textContent = `Puesto actual: ${puestoTexto}`;
+        triviaResultadoPuestoEl.textContent = puestoTexto;
     }
     if (triviaResultadoTotalAcumuladoEl) {
-        triviaResultadoTotalAcumuladoEl.textContent = `Puntaje total: ${totalAcumulado} pts`;
+        triviaResultadoTotalAcumuladoEl.textContent = `${totalAcumulado} pts`;
     }
 
     if (acerto) {
         triviaPanelResultadoEl.className = "kahoot-result-card result-correct";
-        triviaResultadoIconoEl.textContent = "✅";
+        triviaResultadoIconoEl.innerHTML = `
+            <svg class="result-badge-svg" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        `;
         triviaResultadoTituloEl.textContent = "¡RESPUESTA CORRECTA!";
-        triviaResultadoPuntosEl.textContent = `+${puntosGanados} puntos en esta pregunta`;
+        triviaResultadoPuntosEl.textContent = `+${puntosGanados} pts`;
         triviaResultadoStageEl.classList.add("avatar-celebrating");
         triviaResultadoMensajeEl.textContent = `¡Excelente reflejo! Vas en el puesto ${puestoTexto} del ranking en vivo.`;
     } else {
         triviaPanelResultadoEl.className = "kahoot-result-card result-wrong";
-        triviaResultadoIconoEl.textContent = "❌";
+        const iconoSvg =
+            opcionElegida === "T"
+                ? `<svg class="result-badge-svg" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`
+                : `<svg class="result-badge-svg" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+
+        triviaResultadoIconoEl.innerHTML = iconoSvg;
         triviaResultadoTituloEl.textContent =
             opcionElegida === "T" ? "¡TIEMPO AGOTADO!" : "¡RESPUESTA INCORRECTA!";
-        triviaResultadoPuntosEl.textContent = "+0 puntos en esta pregunta";
+        triviaResultadoPuntosEl.textContent = "+0 pts";
         triviaResultadoStageEl.classList.remove("avatar-celebrating");
         triviaResultadoMensajeEl.textContent = `Vas en el puesto ${puestoTexto} con ${totalAcumulado} pts. ¡En la siguiente pregunta puedes remontar!`;
     }
@@ -1380,7 +1755,15 @@ function pintarPantallaResultadoDefinitivoKahoot(
             D: preguntaActual.opcion_d,
         };
         const textoSolucion = mapaTextoOpciones[letraCorrecta] || "";
-        triviaSolucionOficialEl.textContent = `Solución oficial: Alternativa ${letraCorrecta} (${textoSolucion})`;
+        triviaSolucionOficialEl.innerHTML = `
+            <div class="official-sol-badge">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span>Solución Oficial</span>
+            </div>
+            <div class="official-sol-text">
+                <strong>Alternativa ${letraCorrecta}:</strong> ${textoSolucion}
+            </div>
+        `;
         triviaSolucionOficialEl.classList.remove("hidden");
     } else {
         triviaSolucionOficialEl.classList.add("hidden");
@@ -1522,6 +1905,7 @@ botonesOpcionesKahoot.forEach((btn) => {
 });
 
 async function consultarEstadoTriviaEnVivo() {
+    if (document.hidden) return;
     if (!eventoActual?.id || peticionEstadoTriviaEnCurso) return;
     peticionEstadoTriviaEnCurso = true;
 
@@ -1553,6 +1937,7 @@ async function consultarEstadoTriviaEnVivo() {
         if (enVistaTrivia && triviaEstabaActivaEnServidor && !activaAhora) {
             triviaEstabaActivaEnServidor = false;
             enVistaTrivia = false;
+            localStorage.removeItem(STORAGE_KEY_EN_TRIVIA);
             detenerCronometroFluidoPregunta();
             detenerPollingTriviaMovil();
             vistaTriviaInvitadoEl.classList.add("hidden");
@@ -1570,7 +1955,7 @@ async function consultarEstadoTriviaEnVivo() {
             (rondaCerrada || data.fase !== "pregunta_activa")
         ) {
             sesionInvitado.invitado.puntaje_total = data.puntaje_invitado;
-            localStorage.setItem(STORAGE_KEY_SESION, JSON.stringify(sesionInvitado));
+            guardarSesionInvitadoLocal(sesionInvitado);
             triviaPlayerPuntajeEl.textContent = `${data.puntaje_invitado} pts`;
         }
 
@@ -1686,7 +2071,7 @@ async function consultarEstadoTriviaEnVivo() {
             mostrarSubpanelTrivia("pregunta");
             iniciarCronometroFluidoPregunta(
                 preg.tiempo_limite_segundos || 20,
-                preg.segundos_restantes ?? (preg.tiempo_limite_segundos || 20),
+                preg.tiempo_limite_segundos || 20,
                 preg.id
             );
         }
@@ -1732,6 +2117,7 @@ function detenerPollingTriviaMovil() {
 
 btnIrTriviaEl.addEventListener("click", () => {
     enVistaTrivia = true;
+    localStorage.setItem(STORAGE_KEY_EN_TRIVIA, "1");
     sincronizarBarraJugadorTrivia();
     vistaLobbyEl.classList.add("hidden");
     vistaTriviaInvitadoEl.classList.remove("hidden");
@@ -1740,6 +2126,7 @@ btnIrTriviaEl.addEventListener("click", () => {
 
 btnVolverLobbyTriviaEl.addEventListener("click", () => {
     enVistaTrivia = false;
+    localStorage.removeItem(STORAGE_KEY_EN_TRIVIA);
     detenerCronometroFluidoPregunta();
     detenerPollingTriviaMovil();
     vistaTriviaInvitadoEl.classList.add("hidden");
@@ -1747,46 +2134,279 @@ btnVolverLobbyTriviaEl.addEventListener("click", () => {
     consultarEstadoTriviaEnVivo();
 });
 
-// Eliminación inmediata de la sesión del invitado si cierra su pestaña o sale del navegador
+// ------------------------------------------------------------------------------
+// 13. DESCONEXIÓN SUAVE (NO BORRA AL INVITADO)
+// Al recargar, cambiar de app o bloquear el celular solo se pausa su presencia en la
+// sala de trivia. Su registro, avatar y puntaje se conservan para la reconexión automática.
+// El borrado definitivo ocurre únicamente con "Salir / Corregir mi nombre".
+// ------------------------------------------------------------------------------
 let desconexionEnviada = false;
-function notificarCierreSesionInvitado() {
+function notificarPausaPresenciaInvitado() {
     if (desconexionEnviada) return;
     const invitadoId = sesionInvitado?.invitado?.id;
     if (!invitadoId) return;
     desconexionEnviada = true;
 
-    const urlDesconectar = `/api/invitados/${encodeURIComponent(invitadoId)}/desconectar`;
-    const urlDelete = `/api/invitados/${encodeURIComponent(invitadoId)}`;
-
     try {
         if (navigator.sendBeacon) {
-            navigator.sendBeacon(urlDesconectar, "");
+            navigator.sendBeacon(`/api/invitados/${encodeURIComponent(invitadoId)}/desconectar`, "");
         }
     } catch (e) {
         // Ignorar errores de sendBeacon
     }
-
-    try {
-        fetch(urlDelete, { method: "DELETE", keepalive: true }).catch(() => {});
-    } catch (e) {
-        // Ignorar errores en descarga de pestaña
-    }
-
-    localStorage.removeItem(STORAGE_KEY_SESION);
 }
 
-window.addEventListener("pagehide", () => {
-    notificarCierreSesionInvitado();
+window.addEventListener("pagehide", notificarPausaPresenciaInvitado);
+
+// Si el navegador restaura la página desde caché (botón atrás / volver a la pestaña),
+// reactivamos la presencia sin pedirle nada al invitado.
+window.addEventListener("pageshow", (ev) => {
+    if (ev.persisted && sesionInvitado?.invitado?.id) {
+        desconexionEnviada = false;
+        consultarEstadoTriviaEnVivo();
+    }
 });
 
-window.addEventListener("beforeunload", () => {
-    notificarCierreSesionInvitado();
-});
+/**
+ * Reconexión automática: valida en segundo plano el token guardado y refresca nombre,
+ * avatar y puntaje. Si el registro ya no existe (p. ej. el Admin lo eliminó) se vuelve
+ * al login con el nombre pre-llenado. Si solo falla la red del local, se mantiene la sesión.
+ */
+async function reconectarSesionInvitado(sesionGuardada) {
+    if (!sesionGuardada?.token_sesion) return; // Sesiones antiguas sin token: se respetan tal cual
+
+    try {
+        const res = await fetch("/api/invitados/reconectar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                invitado_id: sesionGuardada.invitado.id,
+                evento_id: sesionGuardada.evento.id,
+                token_sesion: sesionGuardada.token_sesion,
+            }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.status === 401 || res.status === 404) {
+            const nombrePrevio = sesionGuardada.invitado?.nombre || "";
+            localStorage.removeItem(STORAGE_KEY_SESION);
+            localStorage.removeItem(STORAGE_KEY_EN_TRIVIA);
+            sesionInvitado = null;
+            detenerPulsoSincronizacionLobby();
+            detenerPollingTriviaMovil();
+            detenerCronometroFluidoPregunta();
+            vistaLobbyEl.classList.add("hidden");
+            vistaTriviaInvitadoEl.classList.add("hidden");
+            vistaRegistroEl.classList.remove("hidden");
+            inputNombreEl.value = nombrePrevio;
+            if (sesionGuardada.evento?.codigo_acceso) {
+                inputCodigoEventoEl.value = sesionGuardada.evento.codigo_acceso;
+                await cargarEventoPorCodigo(sesionGuardada.evento.codigo_acceso);
+            }
+            mostrarAlerta(data.detail || "Tu sesión expiró. Vuelve a ingresar tu nombre.", "error");
+            return;
+        }
+
+        if (!res.ok || !data.invitado) return; // Error temporal: conservamos la sesión local
+
+        const sesionActualizada = {
+            invitado: data.invitado,
+            evento: data.evento || sesionGuardada.evento,
+            token_sesion: data.token_sesion || sesionGuardada.token_sesion,
+            posicion_ranking: data.posicion_ranking ?? sesionGuardada.posicion_ranking,
+        };
+        guardarSesionInvitadoLocal(sesionActualizada);
+        mostrarPantallaLobby(sesionActualizada);
+        if (enVistaTrivia) sincronizarBarraJugadorTrivia();
+    } catch (_) {
+        // Red del local inestable: el invitado sigue dentro con su sesión guardada
+    }
+}
 
 // ------------------------------------------------------------------------------
 // 14. INICIO AUTOMÁTICO AL CARGAR LA PÁGINA
 // ------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
+// OPTIMIZACIÓN DE POLLING EN PESTAÑAS INACTIVAS (PAGE VISIBILITY API)
+// ------------------------------------------------------------------------------
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        detenerPulsoSincronizacionLobby();
+        detenerPollingTriviaMovil();
+    } else {
+        if (sesionInvitado?.invitado?.id && eventoActual?.id) {
+            consultarEstadoTriviaEnVivo();
+            if (enVistaTrivia) {
+                iniciarPollingTriviaMovil();
+            } else {
+                iniciarPulsoSincronizacionLobby();
+            }
+        }
+    }
+});
+
+// ------------------------------------------------------------------------------
+// MÓDULO CRM LEADS & CUPONES PROMOCIONALES (SEGALÚ VIP)
+// ------------------------------------------------------------------------------
+function abrirModalCrmLead() {
+    if (!modalCrmLeadEl) return;
+
+    if (leadNombreEl && sesionInvitado?.invitado?.nombre && !leadNombreEl.value) {
+        leadNombreEl.value = sesionInvitado.invitado.nombre;
+    }
+
+    const eventoId = eventoActual?.id || "global";
+    const cuponGuardado = localStorage.getItem(`${STORAGE_LEAD_PREFIX}${eventoId}`);
+    if (cuponGuardado) {
+        try {
+            const dataCupon = JSON.parse(cuponGuardado);
+            if (dataCupon && dataCupon.codigo_promocional) {
+                mostrarTarjetaCuponGenerado(dataCupon);
+                modalCrmLeadEl.classList.remove("hidden");
+                return;
+            }
+        } catch (_) {}
+    }
+
+    if (vistaLeadFormularioEl) vistaLeadFormularioEl.classList.remove("hidden");
+    if (vistaLeadExitoEl) vistaLeadExitoEl.classList.add("hidden");
+    modalCrmLeadEl.classList.remove("hidden");
+}
+
+function cerrarModalCrmLead() {
+    if (modalCrmLeadEl) {
+        modalCrmLeadEl.classList.add("hidden");
+    }
+}
+
+function mostrarTarjetaCuponGenerado(leadData) {
+    if (!leadData) return;
+    const codigoPromo = leadData.codigo_promocional || "SEGALU-PROMO-VIP";
+    const nombre = leadData.nombre || sesionInvitado?.invitado?.nombre || "Invitado VIP";
+
+    if (voucherNombreInvitadoEl) {
+        voucherNombreInvitadoEl.textContent = `Invitado VIP: ${nombre}`;
+    }
+    if (voucherCodigoPromocionalEl) {
+        voucherCodigoPromocionalEl.textContent = codigoPromo;
+    }
+    if (voucherQrImgEl) {
+        voucherQrImgEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(codigoPromo)}`;
+    }
+
+    if (btnCompartirCuponWaEl) {
+        const nombreEvento = eventoActual?.nombre || "Gala Segalú";
+        const msgWa = `¡Hola Eventos Segalú! 🎁 Tengo mi Pase VIP con código promocional "${codigoPromo}" generado en el evento "${nombreEvento}" y deseo cotizar mi fecha con mi beneficio exclusivo.`;
+        btnCompartirCuponWaEl.href = `https://wa.me/${TELEFONO_WHATSAPP_SEGALU}?text=${encodeURIComponent(msgWa)}`;
+    }
+
+    if (vistaLeadFormularioEl) vistaLeadFormularioEl.classList.add("hidden");
+    if (vistaLeadExitoEl) vistaLeadExitoEl.classList.remove("hidden");
+}
+
+async function enviarFormularioLead(e) {
+    if (e) e.preventDefault();
+    if (!eventoActual?.id) {
+        mostrarAlerta("Ingresa primero a un evento activo para reclamar tu beneficio.", "error");
+        return;
+    }
+
+    const nombre = (leadNombreEl?.value || "").trim();
+    const telefono = (leadTelefonoEl?.value || "").trim();
+    const nacimiento = (leadNacimientoEl?.value || "").trim();
+    const genero = (leadGeneroEl?.value || "No especificado").trim();
+    const correo = (leadCorreoEl?.value || "").trim();
+
+    if (!nombre || !telefono || !nacimiento) {
+        mostrarAlerta("Por favor completa tu Nombre, Teléfono y Fecha de Nacimiento.", "error");
+        return;
+    }
+
+    // Validación estricta de teléfono: exactamente 9 dígitos numéricos
+    const telefonoSoloDigitos = telefono.replace(/\s+/g, "");
+    if (!/^\d{9}$/.test(telefonoSoloDigitos)) {
+        mostrarAlerta("El número de teléfono debe tener exactamente 9 dígitos", "error");
+        if (leadTelefonoEl) {
+            leadTelefonoEl.focus();
+        }
+        return;
+    }
+
+    if (btnEnviarLeadEl) {
+        btnEnviarLeadEl.disabled = true;
+        btnEnviarLeadEl.innerHTML = `<span>⏳ Generando tu Pase VIP...</span>`;
+    }
+
+    try {
+        const res = await fetch(`/api/eventos/${encodeURIComponent(eventoActual.id)}/leads`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                evento_id: eventoActual.id,
+                nombre,
+                telefono: telefonoSoloDigitos,
+                fecha_nacimiento: nacimiento,
+                genero,
+                correo: correo || null,
+            }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.detail || "No se pudo generar el cupón.");
+        }
+
+        const leadInfo = data.lead || {
+            nombre,
+            telefono,
+            fecha_nacimiento: nacimiento,
+            codigo_promocional: data.codigo_promocional,
+        };
+
+        localStorage.setItem(`${STORAGE_LEAD_PREFIX}${eventoActual.id}`, JSON.stringify(leadInfo));
+        mostrarTarjetaCuponGenerado(leadInfo);
+        mostrarAlerta("¡Felicitaciones! Tu Pase VIP y Cupón están listos.", "exito");
+    } catch (err) {
+        mostrarAlerta(err.message, "error");
+    } finally {
+        if (btnEnviarLeadEl) {
+            btnEnviarLeadEl.disabled = false;
+            btnEnviarLeadEl.innerHTML = `<span>✨ Obtener Mi Pase VIP y Descuento</span>`;
+        }
+    }
+}
+
+if (btnAbrirModalLeadEl) {
+    btnAbrirModalLeadEl.addEventListener("click", abrirModalCrmLead);
+}
+if (btnFlotanteVipLeadEl) {
+    btnFlotanteVipLeadEl.addEventListener("click", abrirModalCrmLead);
+}
+if (btnCerrarModalLeadEl) {
+    btnCerrarModalLeadEl.addEventListener("click", cerrarModalCrmLead);
+}
+if (btnCancelarModalLeadEl) {
+    btnCancelarModalLeadEl.addEventListener("click", cerrarModalCrmLead);
+}
+if (btnCerrarCuponEl) {
+    btnCerrarCuponEl.addEventListener("click", cerrarModalCrmLead);
+}
+if (formCrmLeadEl) {
+    formCrmLeadEl.addEventListener("submit", enviarFormularioLead);
+}
+if (leadTelefonoEl) {
+    leadTelefonoEl.addEventListener("input", (e) => {
+        e.target.value = e.target.value.replace(/\D/g, "").slice(0, 9);
+    });
+}
+if (modalCrmLeadEl) {
+    modalCrmLeadEl.addEventListener("click", (e) => {
+        if (e.target === modalCrmLeadEl) cerrarModalCrmLead();
+    });
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
+    cargarAccesoriosPersonalizados();
     renderizarSeccionUbicacionSedes();
     sincronizarFotosSedesDesdeServidor();
 
@@ -1797,20 +2417,22 @@ window.addEventListener("DOMContentLoaded", async () => {
         inputCodigoEventoEl.value = codigoDesdeQR.toUpperCase();
     }
 
-    const sesionGuardadaTexto = localStorage.getItem(STORAGE_KEY_SESION);
-    if (sesionGuardadaTexto) {
-        try {
-            const sesionGuardada = JSON.parse(sesionGuardadaTexto);
-            if (
-                !codigoDesdeQR ||
-                sesionGuardada.evento?.codigo_acceso === codigoDesdeQR.toUpperCase()
-            ) {
-                mostrarPantallaLobby(sesionGuardada);
-                return;
-            }
-        } catch (e) {
-            localStorage.removeItem(STORAGE_KEY_SESION);
+    const sesionGuardada = leerSesionInvitadoLocal();
+    if (
+        sesionGuardada &&
+        (!codigoDesdeQR || sesionGuardada.evento?.codigo_acceso === codigoDesdeQR.toUpperCase())
+    ) {
+        // 1. Restauración instantánea (sin esperar a la red) para no mostrar el login
+        mostrarPantallaLobby(sesionGuardada);
+
+        // 2. Si estaba dentro de la Ronda de Preguntas, lo devolvemos directamente a ella
+        if (localStorage.getItem(STORAGE_KEY_EN_TRIVIA) === "1") {
+            btnIrTriviaEl.click();
         }
+
+        // 3. Validación silenciosa con el servidor (puntaje, avatar y posición actualizados)
+        reconectarSesionInvitado(sesionGuardada);
+        return;
     }
 
     await cargarEventoPorCodigo(inputCodigoEventoEl.value);

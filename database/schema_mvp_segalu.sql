@@ -166,6 +166,25 @@ CREATE TABLE respuestas_trivia (
 COMMENT ON TABLE respuestas_trivia IS 'Respuestas emitidas por los invitados con medición de tiempo para scoring Kahoot.';
 
 -- ------------------------------------------------------------------------------
+-- 6.5. TABLA: CRM_LEADS (Prospectos, Cupones Promocionales & Remarketing VIP)
+-- DIDÁCTICA: Captura de prospectos que solicitan su Pase VIP durante el evento.
+-- ON DELETE CASCADE: Al eliminar un evento, se eliminan todos sus leads asociados.
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.crm_leads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    evento_id UUID NOT NULL REFERENCES public.eventos(id) ON DELETE CASCADE,
+    nombre VARCHAR(150) NOT NULL,
+    telefono VARCHAR(15) NOT NULL,
+    fecha_nacimiento DATE NOT NULL,
+    genero VARCHAR(20) DEFAULT 'No especificado',
+    correo VARCHAR(150),
+    codigo_promocional VARCHAR(50) NOT NULL UNIQUE,
+    creado_en TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+COMMENT ON TABLE public.crm_leads IS 'Leads y prospectos comerciales capturados con eliminación en cascada por evento.';
+
+-- ------------------------------------------------------------------------------
 -- 7. ÍNDICES DE RENDIMIENTO (DISPONIBILIDAD & OPTIMIZACIÓN)
 -- DIDÁCTICA: Los índices aceleran las búsquedas de llaves foráneas y consultas en vivo
 -- ------------------------------------------------------------------------------
@@ -175,6 +194,9 @@ CREATE INDEX idx_invitados_ranking ON invitados(evento_id, puntaje_total DESC);
 CREATE INDEX idx_multimedia_moderacion ON multimedia(evento_id, estado_moderacion);
 CREATE INDEX idx_preguntas_evento ON preguntas(evento_id, orden);
 CREATE INDEX idx_respuestas_pregunta ON respuestas_trivia(pregunta_id);
+CREATE INDEX IF NOT EXISTS idx_crm_leads_evento ON public.crm_leads(evento_id);
+CREATE INDEX IF NOT EXISTS idx_crm_leads_codigo ON public.crm_leads(codigo_promocional);
+CREATE INDEX IF NOT EXISTS idx_crm_leads_cumple ON public.crm_leads(fecha_nacimiento);
 
 -- ------------------------------------------------------------------------------
 -- 8. POLÍTICAS DE SEGURIDAD (ROW LEVEL SECURITY - RLS) EN SUPABASE
@@ -186,6 +208,16 @@ ALTER TABLE invitados ENABLE ROW LEVEL SECURITY;
 ALTER TABLE multimedia ENABLE ROW LEVEL SECURITY;
 ALTER TABLE preguntas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE respuestas_trivia ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.crm_leads ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Permitir insercion de leads" ON public.crm_leads
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+CREATE POLICY "Permitir lectura de leads" ON public.crm_leads
+    FOR SELECT TO anon, authenticated USING (true);
+
+CREATE POLICY "Permitir eliminacion de leads" ON public.crm_leads
+    FOR DELETE TO anon, authenticated USING (true);
 
 -- Regla 1: Lectura pública de locales (para que la app o admin liste las sedes)
 CREATE POLICY "Lectura publica de locales" 

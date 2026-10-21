@@ -28,9 +28,19 @@ const MAPA_ACCESORIOS = {
     diadema_magica: { nombre: "Diadema de Hadas", icono: "🌟" },
 };
 
+function escaparHtml(texto) {
+    return String(texto ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 // Estado en memoria y semáforos de concurrencia para evitar peticiones solapadas
 let adminPasswordActiva = sessionStorage.getItem(SESSION_ADMIN_KEY) || "";
 let eventoSeleccionadoId = null;
+let filtroSedeAdminActivo = localStorage.getItem("segalu_admin_sede_filtro") || "todos";
 let filtroEstadoFoto = "pendiente";
 let autoAprobarFotosActivo = false;
 
@@ -59,6 +69,7 @@ const inputAdminPassEl = document.getElementById("input-admin-pass");
 const btnRefrescarPanelEl = document.getElementById("btn-refrescar-panel");
 const btnCerrarAdminEl = document.getElementById("btn-cerrar-admin");
 
+const selectFiltroSedeAdminEl = document.getElementById("select-filtro-sede-admin");
 const selectEventoActivoEl = document.getElementById("select-evento-activo");
 const badgeVelocidadEventoEl = document.getElementById("badge-velocidad-evento");
 const indicadorCargaEventoEl = document.getElementById("indicador-carga-evento");
@@ -89,9 +100,13 @@ const contadorVotosRondaEl = document.getElementById("contador-votos-ronda");
 const btnTriviaAbrirLobbyEl = document.getElementById("btn-trivia-abrir-lobby");
 const btnTriviaLanzarPreguntaEl = document.getElementById("btn-trivia-lanzar-pregunta");
 const btnTriviaRevelarRespuestaEl = document.getElementById("btn-trivia-revelar-respuesta");
+const btnTriviaMostrarRankingEl = document.getElementById("btn-trivia-mostrar-ranking");
 const btnTriviaMostrarPodioEl = document.getElementById("btn-trivia-mostrar-podio");
 const btnTriviaReiniciarPuntajesEl = document.getElementById("btn-trivia-reiniciar-puntajes");
 const btnTriviaCerrarEl = document.getElementById("btn-trivia-cerrar");
+const btnTriviaLanzarTextoEl = document.getElementById("btn-trivia-lanzar-texto");
+const btnTriviaLanzarSubtextoEl = document.getElementById("btn-trivia-lanzar-subtexto");
+let idProximaPreguntaTrivia = null;
 
 // Generador PDF con IA Gratuita y Creador de Preguntas (en Ventana Modal Flotante)
 const inputPdfTriviaIaEl = document.getElementById("input-pdf-trivia-ia");
@@ -102,9 +117,43 @@ const textoEstadoPdfIaEl = document.getElementById("texto-estado-pdf-ia");
 const formCrearPreguntaEl = document.getElementById("form-crear-pregunta");
 const listaPreguntasAdminEl = document.getElementById("lista-preguntas-admin");
 const countPreguntasEventoEl = document.getElementById("count-preguntas-evento");
+const btnVaciarPreguntasEventoEl = document.getElementById("btn-vaciar-preguntas-evento");
 
 const listaInvitadosAdminEl = document.getElementById("lista-invitados-admin");
 const btnLimpiarTodosInvitadosEl = document.getElementById("btn-limpiar-todos-invitados");
+
+// Ventana Modal de Crear Nuevo Evento en Segalú
+const modalCrearEventoAdminEl = document.getElementById("modal-crear-evento-admin");
+const btnAbrirModalCrearEventoEl = document.getElementById("btn-abrir-modal-crear-evento");
+const btnCerrarModalCrearEventoXEl = document.getElementById("btn-cerrar-modal-crear-evento-x");
+const btnCancelarModalCrearEventoEl = document.getElementById("btn-cancelar-modal-crear-evento");
+
+// Navegación por Pestañas (Tabs) en la Columna Principal
+const tabBadgePendientesEl = document.getElementById("tab-badge-pendientes");
+const tabBadgeTriviaFaseEl = document.getElementById("tab-badge-trivia-fase");
+const tabBadgeInvitadosEl = document.getElementById("tab-badge-invitados");
+const SESSION_ADMIN_TAB_KEY = "segalu_admin_active_tab";
+
+// Paginación Corta de Bandeja de Fotos (6 en 6)
+const LIMITE_FOTOS_PASO = 6;
+let limiteFotosVisible = 6;
+let mostrarTodasLasFotos = false;
+const paginacionFotosAdminEl = document.getElementById("paginacion-fotos-admin");
+const textoPaginacionFotosEl = document.getElementById("texto-paginacion-fotos");
+const btnFotosMostrarMasEl = document.getElementById("btn-fotos-mostrar-mas");
+const btnFotosToggleTodasEl = document.getElementById("btn-fotos-toggle-todas");
+
+// Búsqueda Rápida y Paginación de Invitados (8 en 8)
+const LIMITE_INVITADOS_PASO = 8;
+let limiteInvitadosVisible = 8;
+let mostrarTodosLosInvitados = false;
+let filtroTextoInvitado = "";
+const inputBuscarInvitadoEl = document.getElementById("input-buscar-invitado");
+const btnLimpiarBusquedaInvitadoEl = document.getElementById("btn-limpiar-busqueda-invitado");
+const conteoFiltradoInvitadosEl = document.getElementById("conteo-filtrado-invitados");
+const paginacionInvitadosAdminEl = document.getElementById("paginacion-invitados-admin");
+const btnInvitadosMostrarMasEl = document.getElementById("btn-invitados-mostrar-mas");
+const btnInvitadosToggleTodosEl = document.getElementById("btn-invitados-toggle-todos");
 
 // Elementos de las Ventanas Modales Flotantes (Galería de Sedes y Creador de Preguntas)
 const modalGestorSedesAdminEl = document.getElementById("modal-gestor-sedes-admin");
@@ -118,6 +167,32 @@ const bloqueModalSede2El = document.getElementById("bloque-modal-sede2");
 const modalCrearPreguntasAdminEl = document.getElementById("modal-crear-preguntas-admin");
 const btnAceptarModalPreguntasEl = document.getElementById("btn-aceptar-modal-preguntas");
 const btnAbrirModalPreguntasInlineEl = document.getElementById("btn-abrir-modal-preguntas-inline");
+
+// Elementos de la Ventana Modal de Edición de Pregunta
+const modalEditarPreguntaAdminEl = document.getElementById("modal-editar-pregunta-admin");
+const formEditarPreguntaEl = document.getElementById("form-editar-pregunta");
+const editPreguntaIdEl = document.getElementById("edit-pregunta-id");
+const editEnunciadoPreguntaEl = document.getElementById("edit-enunciado-pregunta");
+const editOpcionAEl = document.getElementById("edit-opcion-a");
+const editOpcionBEl = document.getElementById("edit-opcion-b");
+const editOpcionCEl = document.getElementById("edit-opcion-c");
+const editOpcionDEl = document.getElementById("edit-opcion-d");
+const editSelectRespuestaCorrectaEl = document.getElementById("edit-select-respuesta-correcta");
+const editSelectTiempoLimiteEl = document.getElementById("edit-select-tiempo-limite");
+const btnCerrarModalEditarPreguntaXEl = document.getElementById("btn-cerrar-modal-editar-pregunta-x");
+const btnCerrarModalEditarPreguntaEl = document.getElementById("btn-cerrar-modal-editar-pregunta");
+
+// Elementos de la Ventana Modal de Subir Accesorio Personalizado PNG
+const modalSubirAccesorioAdminEl = document.getElementById("modal-subir-accesorio-admin");
+const btnAbrirModalSubirAccesorioEl = document.getElementById("btn-abrir-modal-subir-accesorio");
+const btnCerrarModalAccesorioXEl = document.getElementById("btn-cerrar-modal-accesorio-x");
+const btnCancelarModalAccesorioEl = document.getElementById("btn-cancelar-modal-accesorio");
+const formSubirAccesorioEl = document.getElementById("form-subir-accesorio");
+const inputNombreAccesorioEl = document.getElementById("input-nombre-accesorio");
+const selectTematicaAccesorioEl = document.getElementById("select-tematica-accesorio");
+const inputArchivoAccesorioEl = document.getElementById("input-archivo-accesorio");
+const previewAccesorioWrapEl = document.getElementById("preview-accesorio-wrap");
+const imgPreviewAccesorioEl = document.getElementById("img-preview-accesorio");
 
 // Elementos del Visor Lightbox con Ambient Blur
 const modalVisorFotoAdminEl = document.getElementById("modal-visor-foto-admin");
@@ -222,13 +297,176 @@ if (modalCrearPreguntasAdminEl) {
     });
 }
 
+// Controles de Ventana Modal "Crear Nuevo Evento en Segalú"
+function abrirModalCrearEventoAdmin() {
+    if (modalCrearEventoAdminEl) {
+        modalCrearEventoAdminEl.classList.remove("hidden");
+        const inputNombre = document.getElementById("input-nombre-evento");
+        if (inputNombre) setTimeout(() => inputNombre.focus(), 80);
+    }
+}
+
+function cerrarModalCrearEventoAdmin() {
+    if (modalCrearEventoAdminEl) {
+        modalCrearEventoAdminEl.classList.add("hidden");
+    }
+}
+
+if (btnAbrirModalCrearEventoEl) {
+    btnAbrirModalCrearEventoEl.addEventListener("click", abrirModalCrearEventoAdmin);
+}
+if (btnCerrarModalCrearEventoXEl) {
+    btnCerrarModalCrearEventoXEl.addEventListener("click", cerrarModalCrearEventoAdmin);
+}
+if (btnCancelarModalCrearEventoEl) {
+    btnCancelarModalCrearEventoEl.addEventListener("click", cerrarModalCrearEventoAdmin);
+}
+if (modalCrearEventoAdminEl) {
+    modalCrearEventoAdminEl.addEventListener("click", (ev) => {
+        if (ev.target === modalCrearEventoAdminEl) {
+            cerrarModalCrearEventoAdmin();
+        }
+    });
+}
+
+// Navegación por Pestañas (Tabs) en la Columna Principal
+function cambiarPestanaPrincipalAdmin(targetPaneId) {
+    const botones = document.querySelectorAll(".admin-main-tab");
+    const paneles = document.querySelectorAll(".admin-tab-pane");
+
+    paneles.forEach((pane) => {
+        const esActivo = pane.id === targetPaneId;
+        pane.classList.toggle("hidden", !esActivo);
+        pane.classList.toggle("active", esActivo);
+    });
+
+    botones.forEach((btn) => {
+        const esActivo = btn.dataset.tabTarget === targetPaneId;
+        btn.classList.toggle("active", esActivo);
+    });
+
+    sessionStorage.setItem(SESSION_ADMIN_TAB_KEY, targetPaneId);
+
+    if (targetPaneId === "tab-contenido-leads" && eventoSeleccionadoId) {
+        cargarLeadsEvento(eventoSeleccionadoId);
+    }
+}
+
+document.querySelectorAll(".admin-main-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        const target = btn.dataset.tabTarget;
+        if (target) cambiarPestanaPrincipalAdmin(target);
+    });
+});
+
+let timerAlertaAdmin = null;
+
+function ocultarAlertaAdmin() {
+    if (timerAlertaAdmin) {
+        clearTimeout(timerAlertaAdmin);
+        timerAlertaAdmin = null;
+    }
+    if (adminAlertaEl) {
+        adminAlertaEl.classList.add("alert-hiding");
+        setTimeout(() => {
+            adminAlertaEl.classList.add("hidden");
+            adminAlertaEl.classList.remove("alert-hiding");
+        }, 220);
+    }
+}
+
+/**
+ * Convierte cualquier error, detalle de validación o estructura de FastAPI
+ * en un mensaje legible y amigable, evitando terminantemente "[object Object]".
+ */
+function formatearMensajeError(err, fallback = "Ocurrió un error inesperado.") {
+    if (!err) return fallback;
+    if (typeof err === "string") {
+        if (err.includes("[object Object]")) {
+            return "Datos inválidos en el formulario o error de validación en el servidor.";
+        }
+        return err;
+    }
+    if (Array.isArray(err)) {
+        return err
+            .map((item) => formatearMensajeError(item))
+            .filter(Boolean)
+            .join(" | ") || fallback;
+    }
+    if (typeof err === "object") {
+        if (typeof err.message === "string" && err.message && !err.message.includes("[object Object]")) {
+            return err.message;
+        }
+        if (typeof err.detail === "string" && err.detail) {
+            return err.detail;
+        }
+        if (Array.isArray(err.detail)) {
+            return err.detail
+                .map((d) => {
+                    if (d && typeof d === "object") {
+                        const loc = Array.isArray(d.loc) ? d.loc.slice(-1)[0] : "";
+                        const msg = d.msg || d.message || JSON.stringify(d);
+                        return loc ? `${loc}: ${msg}` : msg;
+                    }
+                    return String(d);
+                })
+                .join(" | ");
+        }
+        if (err.msg && typeof err.msg === "string") {
+            return err.msg;
+        }
+        try {
+            return JSON.stringify(err);
+        } catch (_) {
+            return fallback;
+        }
+    }
+    return String(err);
+}
+
+function escapeHtml(texto) {
+    if (texto === null || texto === undefined) return "";
+    return String(texto)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function mostrarAlertaAdmin(texto, tipo = "exito") {
-    adminAlertaEl.textContent = texto;
-    adminAlertaEl.className = `alert-box ${tipo === "exito" ? "alert-success" : "alert-error"}`;
+    if (!adminAlertaEl) return;
+    if (timerAlertaAdmin) {
+        clearTimeout(timerAlertaAdmin);
+        timerAlertaAdmin = null;
+    }
+    adminAlertaEl.classList.remove("alert-hiding");
+
+    const textoFormateado = formatearMensajeError(texto, "Operación realizada.");
+    const textoLimpio = String(textoFormateado || "").replace(/^(?:✅|❌|⚠️|ℹ️|🗑️|📊|🎉)\s*/u, "");
+    const esExito = tipo === "exito";
+
+    const iconoSvg = esExito
+        ? `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`
+        : `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+
+    adminAlertaEl.innerHTML = `
+        <span class="toast-icon">${iconoSvg}</span>
+        <div class="toast-message">${textoLimpio}</div>
+        <button type="button" class="toast-close-btn" aria-label="Cerrar notificación">&times;</button>
+    `;
+
+    adminAlertaEl.className = `alert-box ${esExito ? "alert-success" : "alert-error"}`;
     adminAlertaEl.classList.remove("hidden");
-    setTimeout(() => {
-        adminAlertaEl.classList.add("hidden");
-    }, 4800);
+
+    const btnCerrar = adminAlertaEl.querySelector(".toast-close-btn");
+    if (btnCerrar) {
+        btnCerrar.onclick = () => ocultarAlertaAdmin();
+    }
+
+    timerAlertaAdmin = setTimeout(() => {
+        ocultarAlertaAdmin();
+    }, 4600);
 }
 
 function decodificarAvatarInvitado(codigoAvatar) {
@@ -263,7 +501,7 @@ formLoginAdminEl.addEventListener("submit", async (e) => {
 
         adminPasswordActiva = pass;
         sessionStorage.setItem(SESSION_ADMIN_KEY, pass);
-        adminAlertaEl.classList.add("hidden");
+        ocultarAlertaAdmin();
         await cargarResumenPanel({ silencioso: false });
         cargarFotosSedesAdmin();
         iniciarCicloRefrescoSecuencial();
@@ -295,29 +533,65 @@ function aplicarDatosDashboardEnDOM(data, tiempoClienteMs) {
         badgeVelocidadEventoEl.textContent = `⚡ ${msMostrados} ms`;
     }
 
-    // 1. Llenar selector de Sedes solo si estaba vacío
-    if (selectSedeLocalEl.options.length === 0 && data.locales) {
-        data.locales.forEach((loc) => {
-            const opt = document.createElement("option");
-            opt.value = loc.id;
-            opt.textContent = `${loc.nombre} (${loc.direccion})`;
-            selectSedeLocalEl.appendChild(opt);
-        });
+    // 1. Llenar selectores de Sedes (Filtro superior y Creador de Eventos)
+    if (data.locales) {
+        if (selectSedeLocalEl.options.length === 0) {
+            data.locales.forEach((loc) => {
+                const opt = document.createElement("option");
+                opt.value = loc.id;
+                opt.textContent = `${loc.nombre} (${loc.direccion})`;
+                selectSedeLocalEl.appendChild(opt);
+            });
+        }
+
+        if (selectFiltroSedeAdminEl && selectFiltroSedeAdminEl.options.length <= 1) {
+            selectFiltroSedeAdminEl.innerHTML = '<option value="todos">🌐 Todas las Sedes</option>';
+            data.locales.forEach((loc) => {
+                const opt = document.createElement("option");
+                opt.value = loc.id;
+                opt.textContent = `📍 ${loc.nombre}`;
+                if (loc.id === filtroSedeAdminActivo) opt.selected = true;
+                selectFiltroSedeAdminEl.appendChild(opt);
+            });
+            selectFiltroSedeAdminEl.value = filtroSedeAdminActivo;
+        }
     }
 
-    // 2. Actualizar selector de Eventos conservando la selección actual
+    // 2. Actualizar selector de Eventos respetando el filtro de sede seleccionado
     if (Array.isArray(data.eventos)) {
         cacheEventos = data.eventos;
-        eventoSeleccionadoId = data.evento_seleccionado_id || (cacheEventos[0]?.id ?? null);
+        const eventosFiltrados = filtroSedeAdminActivo === "todos"
+            ? cacheEventos
+            : cacheEventos.filter((ev) => ev.local_id === filtroSedeAdminActivo);
+
         selectEventoActivoEl.innerHTML = "";
 
-        cacheEventos.forEach((ev) => {
+        if (eventosFiltrados.length === 0) {
             const opt = document.createElement("option");
-            opt.value = ev.id;
-            opt.textContent = `${ev.nombre} [${ev.codigo_acceso}]`;
-            if (ev.id === eventoSeleccionadoId) opt.selected = true;
+            opt.value = "";
+            opt.textContent = "No hay eventos para esta sede";
             selectEventoActivoEl.appendChild(opt);
-        });
+            eventoSeleccionadoId = null;
+        } else {
+            const existeEnFiltrados = eventosFiltrados.some(
+                (ev) => ev.id === (eventoSeleccionadoId || data.evento_seleccionado_id)
+            );
+
+            if (existeEnFiltrados) {
+                eventoSeleccionadoId = eventoSeleccionadoId || data.evento_seleccionado_id;
+            } else {
+                eventoSeleccionadoId = eventosFiltrados[0].id;
+            }
+
+            eventosFiltrados.forEach((ev) => {
+                const opt = document.createElement("option");
+                opt.value = ev.id;
+                opt.textContent = `${ev.nombre} [${ev.codigo_acceso}]`;
+                if (ev.id === eventoSeleccionadoId) opt.selected = true;
+                selectEventoActivoEl.appendChild(opt);
+            });
+            selectEventoActivoEl.value = eventoSeleccionadoId;
+        }
     } else if (data.evento_seleccionado_id) {
         eventoSeleccionadoId = data.evento_seleccionado_id;
     }
@@ -347,6 +621,7 @@ function aplicarDatosDashboardEnDOM(data, tiempoClienteMs) {
     renderizarBandejaFotos();
     renderizarSeccionTrivia();
     renderizarListaInvitados(cacheInvitados);
+    cargarLeadsEvento(eventoSeleccionadoId);
 }
 
 async function cargarResumenPanel(opciones = { silencioso: true }) {
@@ -360,9 +635,11 @@ async function cargarResumenPanel(opciones = { silencioso: true }) {
     peticionResumenEnCurso = true;
     const t0 = performance.now();
 
-    const url = eventoSeleccionadoId
-        ? `/api/admin/resumen?evento_id=${encodeURIComponent(eventoSeleccionadoId)}`
-        : `/api/admin/resumen`;
+    const params = new URLSearchParams();
+    if (eventoSeleccionadoId) params.set("evento_id", eventoSeleccionadoId);
+    if (opciones?.force_refresh) params.set("force_refresh", "true");
+    const qs = params.toString();
+    const url = qs ? `/api/admin/resumen?${qs}` : `/api/admin/resumen`;
 
     try {
         const res = await fetch(url, {
@@ -385,6 +662,9 @@ async function cargarResumenPanel(opciones = { silencioso: true }) {
 
         const tTotal = performance.now() - t0;
         aplicarDatosDashboardEnDOM(data, tTotal);
+        if (eventoSeleccionadoId) {
+            cargarLeadsEvento(eventoSeleccionadoId, { force_refresh: Boolean(opciones?.force_refresh) });
+        }
     } catch (err) {
         if (!opciones.silencioso) {
             mostrarAlertaAdmin(err.message, "error");
@@ -407,6 +687,22 @@ async function cambiarEventoInstantaneo(nuevoEventoId) {
     if (!nuevoEventoId || !adminPasswordActiva) return;
     eventoSeleccionadoId = nuevoEventoId;
 
+    // Reiniciar paginación y buscador para el nuevo evento activo
+    limiteFotosVisible = LIMITE_FOTOS_PASO;
+    mostrarTodasLasFotos = false;
+    limiteInvitadosVisible = LIMITE_INVITADOS_PASO;
+    mostrarTodosLosInvitados = false;
+    filtroTextoInvitado = "";
+    if (inputBuscarInvitadoEl) inputBuscarInvitadoEl.value = "";
+
+    // Reiniciar filtros de CRM & Leads para no mezclar eventos ajenos
+    cacheLeads = [];
+    filtroActivoGrafico = null;
+    if (inputBuscarLeadsEl) inputBuscarLeadsEl.value = "";
+    if (btnLimpiarBusquedaLeadsEl) btnLimpiarBusquedaLeadsEl.classList.add("hidden");
+    const bannerCrm = document.getElementById("crm-active-filter-banner");
+    if (bannerCrm) bannerCrm.classList.add("hidden");
+
     // Actualizamos al instante la tarjeta informativa del evento seleccionado
     pintarResumenEventoActual();
     if (indicadorCargaEventoEl) {
@@ -428,6 +724,7 @@ async function cambiarEventoInstantaneo(nuevoEventoId) {
 
         const tTotal = performance.now() - t0;
         aplicarDatosDashboardEnDOM(data, tTotal);
+        cargarLeadsEvento(nuevoEventoId);
     } catch (err) {
         mostrarAlertaAdmin(err.message, "error");
     } finally {
@@ -441,7 +738,12 @@ function iniciarCicloRefrescoSecuencial() {
     detenerCicloRefrescoSecuencial();
     temporizadorAutoRefresco = setTimeout(async function ciclo() {
         if (!adminPasswordActiva) return;
-        await cargarResumenPanel({ silencioso: true });
+        if (!document.hidden) {
+            await cargarResumenPanel({ silencioso: true });
+            if (eventoSeleccionadoId) {
+                cargarLeadsEvento(eventoSeleccionadoId);
+            }
+        }
         temporizadorAutoRefresco = setTimeout(ciclo, 3500);
     }, 3500);
 }
@@ -453,10 +755,26 @@ function detenerCicloRefrescoSecuencial() {
     }
 }
 
+// [PAGE VISIBILITY API] Pausa inteligente de peticiones cuando la pestaña está en segundo plano
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        detenerCicloRefrescoSecuencial();
+    } else {
+        if (adminPasswordActiva && eventoSeleccionadoId) {
+            cargarResumenPanel({ silencioso: true });
+            iniciarCicloRefrescoSecuencial();
+        }
+    }
+});
+
 function obtenerUrlProyectorEventoActual() {
     const ev = cacheEventos.find((e) => e.id === eventoSeleccionadoId);
     if (!ev) return `${window.location.origin}/proyector`;
-    return `${window.location.origin}/proyector?codigo=${encodeURIComponent(ev.codigo_acceso)}`;
+    const params = new URLSearchParams({
+        codigo: ev.codigo_acceso,
+        sede: ev.local_id || "",
+    });
+    return `${window.location.origin}/proyector?${params.toString()}`;
 }
 
 function pintarResumenEventoActual() {
@@ -466,7 +784,7 @@ function pintarResumenEventoActual() {
             <div>Aún no hay eventos creados.</div>
             <div class="sidebar-event-actions">
                 <button type="button" id="btn-abrir-modal-sedes" class="btn-sidebar-action btn-sidebar-modal-sedes">
-                    🖼️ Administrar Galería de Fotos por Sede
+                    🖼️ Galería
                 </button>
             </div>
         `;
@@ -478,21 +796,31 @@ function pintarResumenEventoActual() {
     }
     const enlaceQR = `${window.location.origin}/?codigo=${encodeURIComponent(ev.codigo_acceso)}`;
     const enlaceProyector = obtenerUrlProyectorEventoActual();
+    const etiquetasTematica = {
+        todos: "✨ Todos los Paquetes",
+        "15anos": "👑 15 Años",
+        graduacion: "🎓 Graduación",
+        gala_bodas: "🎩 Gala y Bodas",
+        fiesta_vip: "🕶️ Fiesta VIP",
+    };
+    const tematicaLabel = etiquetasTematica[ev.tematica_accesorios || "todos"] || "✨ Todos los Paquetes";
+
     infoEventoSeleccionadoEl.innerHTML = `
         <div><strong>Sede:</strong> ${ev.locales?.nombre || "Segalú"}</div>
         <div><strong>Código QR:</strong> <code>${ev.codigo_acceso}</code></div>
+        <div><strong>Temática:</strong> ${tematicaLabel}</div>
         <div class="sidebar-event-actions">
             <a href="${enlaceProyector}" target="_blank" rel="noopener" class="btn-sidebar-action btn-sidebar-proyector">
-                🖥️ Abrir Proyector en Vivo
+                🖥️ Proyector
             </a>
             <a href="${enlaceQR}" target="_blank" rel="noopener" class="btn-sidebar-action btn-sidebar-qr">
-                📱 Abrir Enlace de Invitados
+                📱 Enlace Invitados
             </a>
             <button type="button" id="btn-abrir-modal-sedes" class="btn-sidebar-action btn-sidebar-modal-sedes">
-                🖼️ Administrar Galería de Fotos por Sede
+                🖼️ Galería
             </button>
             <button type="button" id="btn-abrir-modal-preguntas" class="btn-sidebar-action btn-sidebar-modal-preguntas">
-                ➕ Crear Preguntas (Manual o PDF con IA)
+                ➕ Crear Preguntas
             </button>
         </div>
     `;
@@ -515,34 +843,91 @@ if (btnAbrirProyectorTopbarEl) {
     });
 }
 
+if (selectFiltroSedeAdminEl) {
+    selectFiltroSedeAdminEl.addEventListener("change", () => {
+        filtroSedeAdminActivo = selectFiltroSedeAdminEl.value;
+        localStorage.setItem("segalu_admin_sede_filtro", filtroSedeAdminActivo);
+
+        // Si se seleccionó una sede específica, auto-sincronizar el selector del creador de eventos
+        if (filtroSedeAdminActivo !== "todos" && selectSedeLocalEl) {
+            selectSedeLocalEl.value = filtroSedeAdminActivo;
+        }
+
+        const eventosFiltrados = filtroSedeAdminActivo === "todos"
+            ? cacheEventos
+            : cacheEventos.filter((ev) => ev.local_id === filtroSedeAdminActivo);
+
+        selectEventoActivoEl.innerHTML = "";
+        if (eventosFiltrados.length === 0) {
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "No hay eventos para esta sede";
+            selectEventoActivoEl.appendChild(opt);
+            eventoSeleccionadoId = null;
+            pintarResumenEventoActual();
+            cacheMultimedia = [];
+            cacheInvitados = [];
+            cachePreguntas = [];
+            renderizarBandejaFotos();
+            renderizarSeccionTrivia();
+            renderizarListaInvitados([]);
+            return;
+        }
+
+        eventosFiltrados.forEach((ev) => {
+            const opt = document.createElement("option");
+            opt.value = ev.id;
+            opt.textContent = `${ev.nombre} [${ev.codigo_acceso}]`;
+            selectEventoActivoEl.appendChild(opt);
+        });
+
+        const sigueExiste = eventosFiltrados.some((e) => e.id === eventoSeleccionadoId);
+        if (!sigueExiste) {
+            eventoSeleccionadoId = eventosFiltrados[0].id;
+            selectEventoActivoEl.value = eventoSeleccionadoId;
+            cambiarEventoInstantaneo(eventoSeleccionadoId);
+        } else {
+            selectEventoActivoEl.value = eventoSeleccionadoId;
+        }
+    });
+}
+
 selectEventoActivoEl.addEventListener("change", () => {
     cambiarEventoInstantaneo(selectEventoActivoEl.value);
 });
 
-btnRefrescarPanelEl.addEventListener("click", () => {
-    cargarResumenPanel({ silencioso: false });
+btnRefrescarPanelEl.addEventListener("click", async () => {
+    btnRefrescarPanelEl.disabled = true;
+    btnRefrescarPanelEl.classList.add("loading");
+    await cargarResumenPanel({ silencioso: false, force_refresh: true });
+    if (eventoSeleccionadoId) {
+        await cargarLeadsEvento(eventoSeleccionadoId, { force_refresh: true });
+    }
+    btnRefrescarPanelEl.classList.remove("loading");
+    btnRefrescarPanelEl.disabled = false;
+    mostrarAlertaAdmin("🔄 Datos frescos recargados desde Supabase y caché purgada.", "exito");
 });
 
 // ------------------------------------------------------------------------------
 // 2.5 GESTIÓN EJECUTIVA DE BASE DE DATOS Y DESCARGA ZIP DEL EVENTO ACTIVO
 // ------------------------------------------------------------------------------
-async function descargarZipFotosEvento(conMarcaAgua = true) {
+async function descargarZipFotosEvento() {
     if (!eventoSeleccionadoId) {
         mostrarAlertaAdmin("Selecciona primero un evento activo.", "error");
         return;
     }
 
-    const boton = conMarcaAgua ? btnDescargarZipConMarcoEl : btnDescargarZipOriginalesEl;
+    const boton = btnDescargarZipOriginalesEl || btnDescargarZipConMarcoEl;
     const textoOriginal = boton ? boton.innerHTML : "";
     if (boton) {
         boton.disabled = true;
-        boton.innerHTML = `<span>⏳ Empaquetando archivo ZIP...</span>`;
+        boton.innerHTML = `<span>⏳ Empaquetando archivo ZIP limpio...</span>`;
     }
 
     try {
         const urlZip = `/api/admin/eventos/${encodeURIComponent(
             eventoSeleccionadoId
-        )}/descargar-zip?con_marca_agua=${conMarcaAgua ? "true" : "false"}`;
+        )}/descargar-zip`;
 
         const res = await fetch(urlZip, {
             headers: {
@@ -562,8 +947,7 @@ async function descargarZipFotosEvento(conMarcaAgua = true) {
         const blob = await res.blob();
         const ev = cacheEventos.find((e) => e.id === eventoSeleccionadoId);
         const cod = ev?.codigo_acceso || "EVENTO";
-        const sufijo = conMarcaAgua ? "Con_Marco_Segalu" : "Originales_Sin_Marco";
-        const nombreDescarga = `Fotos_${cod}_${sufijo}.zip`;
+        const nombreDescarga = `Fotos_${cod}_Originales.zip`;
 
         const urlBlob = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -588,12 +972,12 @@ async function descargarZipFotosEvento(conMarcaAgua = true) {
     }
 }
 
-if (btnDescargarZipConMarcoEl) {
-    btnDescargarZipConMarcoEl.addEventListener("click", () => descargarZipFotosEvento(true));
+if (btnDescargarZipOriginalesEl) {
+    btnDescargarZipOriginalesEl.addEventListener("click", () => descargarZipFotosEvento());
 }
 
-if (btnDescargarZipOriginalesEl) {
-    btnDescargarZipOriginalesEl.addEventListener("click", () => descargarZipFotosEvento(false));
+if (btnDescargarZipConMarcoEl) {
+    btnDescargarZipConMarcoEl.addEventListener("click", () => descargarZipFotosEvento());
 }
 
 if (btnPurgarFotosStorageEl) {
@@ -690,6 +1074,7 @@ formCrearEventoEl.addEventListener("submit", async (e) => {
         nombre: document.getElementById("input-nombre-evento").value.trim(),
         codigo_acceso: document.getElementById("input-codigo-qr").value.trim().toUpperCase(),
         fecha_evento: inputFechaEventoEl.value,
+        tematica_accesorios: document.getElementById("select-tematica-evento")?.value || "todos",
     };
 
     try {
@@ -709,6 +1094,7 @@ formCrearEventoEl.addEventListener("submit", async (e) => {
         mostrarAlertaAdmin(data.mensaje, "exito");
         eventoSeleccionadoId = data.evento.id;
         formCrearEventoEl.reset();
+        cerrarModalCrearEventoAdmin();
         inputFechaEventoEl.value = new Date().toISOString().split("T")[0];
         await cargarResumenPanel({ silencioso: true });
     } catch (err) {
@@ -821,6 +1207,10 @@ function renderizarBandejaFotos() {
     document.getElementById("count-aprobadas").textContent = aprobadas.length;
     document.getElementById("count-rechazadas").textContent = rechazadas.length;
 
+    if (tabBadgePendientesEl) {
+        tabBadgePendientesEl.textContent = pendientes.length;
+    }
+
     countAprobarTodasEl.textContent = pendientes.length;
     btnAprobarTodasBandejaEl.disabled = pendientes.length === 0;
 
@@ -833,10 +1223,18 @@ function renderizarBandejaFotos() {
                 No hay fotografías en estado "${filtroEstadoFoto.toUpperCase()}" para este evento.
             </div>
         `;
+        if (paginacionFotosAdminEl) {
+            paginacionFotosAdminEl.classList.add("hidden");
+        }
         return;
     }
 
-    listaMostrar.forEach((foto) => {
+    const totalFotos = listaMostrar.length;
+    const fotosPaginadas = mostrarTodasLasFotos
+        ? listaMostrar
+        : listaMostrar.slice(0, limiteFotosVisible);
+
+    fotosPaginadas.forEach((foto) => {
         const autorNombre = foto.invitados?.nombre || "Invitado";
         const avatarInfo = decodificarAvatarInvitado(foto.invitados?.avatar);
         const puntajeIa = foto.puntaje_ia_seguridad ?? 95;
@@ -898,6 +1296,31 @@ function renderizarBandejaFotos() {
 
         gridModeracionFotosEl.appendChild(card);
     });
+
+    if (paginacionFotosAdminEl) {
+        if (totalFotos <= LIMITE_FOTOS_PASO) {
+            paginacionFotosAdminEl.classList.add("hidden");
+        } else {
+            paginacionFotosAdminEl.classList.remove("hidden");
+            if (textoPaginacionFotosEl) {
+                textoPaginacionFotosEl.textContent = `Mostrando ${fotosPaginadas.length} de ${totalFotos} fotos (${filtroEstadoFoto})`;
+            }
+            if (btnFotosMostrarMasEl) {
+                const restantes = totalFotos - fotosPaginadas.length;
+                if (restantes > 0 && !mostrarTodasLasFotos) {
+                    btnFotosMostrarMasEl.classList.remove("hidden");
+                    btnFotosMostrarMasEl.textContent = `Mostrar más fotos (+${Math.min(LIMITE_FOTOS_PASO, restantes)})`;
+                } else {
+                    btnFotosMostrarMasEl.classList.add("hidden");
+                }
+            }
+            if (btnFotosToggleTodasEl) {
+                btnFotosToggleTodasEl.textContent = mostrarTodasLasFotos
+                    ? "Contraer (Ver 6)"
+                    : `Mostrar todas (${totalFotos})`;
+            }
+        }
+    }
 }
 
 function abrirVisorFotoAdmin(urlFoto, textoAutor) {
@@ -978,11 +1401,30 @@ async function eliminarFotoDefinitivamente(foto) {
     }
 }
 
+if (btnFotosMostrarMasEl) {
+    btnFotosMostrarMasEl.addEventListener("click", () => {
+        limiteFotosVisible += LIMITE_FOTOS_PASO;
+        renderizarBandejaFotos();
+    });
+}
+
+if (btnFotosToggleTodasEl) {
+    btnFotosToggleTodasEl.addEventListener("click", () => {
+        mostrarTodasLasFotos = !mostrarTodasLasFotos;
+        if (!mostrarTodasLasFotos) {
+            limiteFotosVisible = LIMITE_FOTOS_PASO;
+        }
+        renderizarBandejaFotos();
+    });
+}
+
 document.querySelectorAll(".filter-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
         document.querySelectorAll(".filter-tab").forEach((t) => t.classList.remove("active"));
         tab.classList.add("active");
         filtroEstadoFoto = tab.dataset.estado;
+        limiteFotosVisible = LIMITE_FOTOS_PASO;
+        mostrarTodasLasFotos = false;
         renderizarBandejaFotos();
     });
 });
@@ -997,6 +1439,7 @@ function renderizarSeccionTrivia() {
         lobby: "LOBBY DE TRIVIA ABIERTO",
         pregunta_activa: "PREGUNTA EN VIVO AHORA",
         respuesta_revelada: "RESPUESTA CORRECTA REVELADA",
+        ranking: "TABLA DE POSICIONES EN VIVO",
         podio: "PODIO EN PANTALLA",
     };
 
@@ -1007,6 +1450,16 @@ function renderizarSeccionTrivia() {
         badgeEstadoTriviaAdminEl.classList.add("is-live");
     }
 
+    if (tabBadgeTriviaFaseEl) {
+        if (fase === "inactiva") {
+            tabBadgeTriviaFaseEl.classList.remove("is-live");
+            tabBadgeTriviaFaseEl.title = "Trivia Inactiva";
+        } else {
+            tabBadgeTriviaFaseEl.classList.add("is-live");
+            tabBadgeTriviaFaseEl.title = mapaEtiquetasFase[fase] || "Trivia en Vivo";
+        }
+    }
+
     contadorVotosRondaEl.textContent = `Respuestas recibidas en pregunta activa: ${
         estadoTriviaActual.total_respuestas_activa || 0
     }`;
@@ -1014,7 +1467,80 @@ function renderizarSeccionTrivia() {
     btnTriviaAbrirLobbyEl.classList.toggle("active-phase", fase === "lobby");
     btnTriviaLanzarPreguntaEl.classList.toggle("active-phase", fase === "pregunta_activa");
     btnTriviaRevelarRespuestaEl.classList.toggle("active-phase", fase === "respuesta_revelada");
+    if (btnTriviaMostrarRankingEl) btnTriviaMostrarRankingEl.classList.toggle("active-phase", fase === "ranking");
     btnTriviaMostrarPodioEl.classList.toggle("active-phase", fase === "podio");
+
+    // Lógica dinámica del Botón #2 ("Lanzar Pregunta") y resaltado guiado de pasos (1 -> 2 -> 3 -> 4 -> 2)
+    const totalPreg = cachePreguntas.length;
+    let proximaPreguntaId = null;
+    let siguientePasoSugerido = 1; // 1: lobby, 2: lanzar, 3: revelar, 4: ranking, 5: podio
+
+    if (totalPreg === 0) {
+        if (btnTriviaLanzarTextoEl) btnTriviaLanzarTextoEl.textContent = "Lanzar Pregunta";
+        if (btnTriviaLanzarSubtextoEl) btnTriviaLanzarSubtextoEl.textContent = "Crea preguntas primero";
+        siguientePasoSugerido = 1;
+    } else {
+        const idActiva = estadoTriviaActual.pregunta_activa_id;
+        const idxActiva = cachePreguntas.findIndex((p) => p.id === idActiva);
+
+        if (fase === "inactiva") {
+            proximaPreguntaId = cachePreguntas[0].id;
+            if (btnTriviaLanzarTextoEl) btnTriviaLanzarTextoEl.textContent = "Lanzar Pregunta #1";
+            if (btnTriviaLanzarSubtextoEl) btnTriviaLanzarSubtextoEl.textContent = "4 opciones y reloj";
+            siguientePasoSugerido = 1;
+        } else if (fase === "lobby") {
+            proximaPreguntaId = cachePreguntas[0].id;
+            if (btnTriviaLanzarTextoEl) btnTriviaLanzarTextoEl.textContent = "Lanzar Pregunta #1";
+            if (btnTriviaLanzarSubtextoEl) btnTriviaLanzarSubtextoEl.textContent = "4 opciones y reloj";
+            siguientePasoSugerido = 2;
+        } else if (fase === "pregunta_activa") {
+            const numPreg = idxActiva >= 0 ? idxActiva + 1 : 1;
+            if (btnTriviaLanzarTextoEl) btnTriviaLanzarTextoEl.textContent = `Pregunta Activa (#${numPreg} de ${totalPreg})`;
+            if (btnTriviaLanzarSubtextoEl) btnTriviaLanzarSubtextoEl.textContent = "Reloj en vivo";
+            proximaPreguntaId = idxActiva + 1 < totalPreg ? cachePreguntas[idxActiva + 1].id : null;
+            siguientePasoSugerido = 3;
+        } else if (fase === "respuesta_revelada") {
+            const nextIdx = idxActiva >= 0 ? idxActiva + 1 : 0;
+            if (nextIdx < totalPreg) {
+                proximaPreguntaId = cachePreguntas[nextIdx].id;
+                if (btnTriviaLanzarTextoEl) btnTriviaLanzarTextoEl.textContent = `Lanzar Siguiente (#${nextIdx + 1} de ${totalPreg}) ➡️`;
+                if (btnTriviaLanzarSubtextoEl) btnTriviaLanzarSubtextoEl.textContent = "4 opciones y reloj";
+            } else {
+                proximaPreguntaId = null;
+                if (btnTriviaLanzarTextoEl) btnTriviaLanzarTextoEl.textContent = `Todas Lanzadas (${totalPreg}/${totalPreg})`;
+                if (btnTriviaLanzarSubtextoEl) btnTriviaLanzarSubtextoEl.textContent = "Fin de preguntas";
+            }
+            siguientePasoSugerido = 4;
+        } else if (fase === "ranking") {
+            const nextIdx = idxActiva >= 0 ? idxActiva + 1 : 0;
+            if (nextIdx < totalPreg) {
+                proximaPreguntaId = cachePreguntas[nextIdx].id;
+                if (btnTriviaLanzarTextoEl) btnTriviaLanzarTextoEl.textContent = `Lanzar Siguiente (#${nextIdx + 1} de ${totalPreg}) ➡️`;
+                if (btnTriviaLanzarSubtextoEl) btnTriviaLanzarSubtextoEl.textContent = "4 opciones y reloj";
+                siguientePasoSugerido = 2;
+            } else {
+                proximaPreguntaId = null;
+                if (btnTriviaLanzarTextoEl) btnTriviaLanzarTextoEl.textContent = `Todas Lanzadas (${totalPreg}/${totalPreg})`;
+                if (btnTriviaLanzarSubtextoEl) btnTriviaLanzarSubtextoEl.textContent = "Fin de preguntas";
+                siguientePasoSugerido = 5;
+            }
+        } else if (fase === "podio") {
+            if (btnTriviaLanzarTextoEl) btnTriviaLanzarTextoEl.textContent = "Podio en Pantalla";
+            if (btnTriviaLanzarSubtextoEl) btnTriviaLanzarSubtextoEl.textContent = "Fin del juego";
+            siguientePasoSugerido = null;
+        }
+    }
+    idProximaPreguntaTrivia = proximaPreguntaId;
+
+    // Resaltado visual con borde dorado del siguiente paso sugerido
+    [btnTriviaAbrirLobbyEl, btnTriviaLanzarPreguntaEl, btnTriviaRevelarRespuestaEl, btnTriviaMostrarRankingEl, btnTriviaMostrarPodioEl].forEach(
+        (btn) => btn && btn.classList.remove("next-suggested-step")
+    );
+    if (siguientePasoSugerido === 1 && btnTriviaAbrirLobbyEl) btnTriviaAbrirLobbyEl.classList.add("next-suggested-step");
+    if (siguientePasoSugerido === 2 && btnTriviaLanzarPreguntaEl) btnTriviaLanzarPreguntaEl.classList.add("next-suggested-step");
+    if (siguientePasoSugerido === 3 && btnTriviaRevelarRespuestaEl) btnTriviaRevelarRespuestaEl.classList.add("next-suggested-step");
+    if (siguientePasoSugerido === 4 && btnTriviaMostrarRankingEl) btnTriviaMostrarRankingEl.classList.add("next-suggested-step");
+    if (siguientePasoSugerido === 5 && btnTriviaMostrarPodioEl) btnTriviaMostrarPodioEl.classList.add("next-suggested-step");
 
     // Renderizar banco de preguntas
     countPreguntasEventoEl.textContent = cachePreguntas.length;
@@ -1071,6 +1597,9 @@ function renderizarSeccionTrivia() {
                 <button type="button" class="btn-launch-this" data-id="${preg.id}">
                     🚀 Lanzar esta pregunta en vivo
                 </button>
+                <button type="button" class="btn-edit-pregunta" data-id="${preg.id}">
+                    ✏️ Editar
+                </button>
                 <button type="button" class="btn-delete-guest btn-del-pregunta" data-id="${preg.id}">
                     Eliminar
                 </button>
@@ -1079,6 +1608,10 @@ function renderizarSeccionTrivia() {
 
         card.querySelector(".btn-launch-this").addEventListener("click", () => {
             ejecutarControlTrivia("lanzar_pregunta", preg.id);
+        });
+
+        card.querySelector(".btn-edit-pregunta").addEventListener("click", () => {
+            abrirModalEditarPreguntaAdmin(preg);
         });
 
         card.querySelector(".btn-del-pregunta").addEventListener("click", async () => {
@@ -1235,15 +1768,63 @@ async function ejecutarControlTrivia(accion, preguntaId = null) {
 }
 
 btnTriviaAbrirLobbyEl.addEventListener("click", () => ejecutarControlTrivia("abrir_lobby"));
-btnTriviaLanzarPreguntaEl.addEventListener("click", () => ejecutarControlTrivia("lanzar_pregunta"));
+btnTriviaLanzarPreguntaEl.addEventListener("click", () =>
+    ejecutarControlTrivia("lanzar_pregunta", idProximaPreguntaTrivia)
+);
 btnTriviaRevelarRespuestaEl.addEventListener("click", () =>
     ejecutarControlTrivia("revelar_respuesta")
 );
+if (btnTriviaMostrarRankingEl) {
+    btnTriviaMostrarRankingEl.addEventListener("click", () =>
+        ejecutarControlTrivia("mostrar_ranking")
+    );
+}
 btnTriviaMostrarPodioEl.addEventListener("click", () => ejecutarControlTrivia("mostrar_podio"));
 btnTriviaReiniciarPuntajesEl.addEventListener("click", () =>
     ejecutarControlTrivia("reiniciar_puntajes")
 );
 btnTriviaCerrarEl.addEventListener("click", () => ejecutarControlTrivia("cerrar_trivia"));
+
+if (btnVaciarPreguntasEventoEl) {
+    btnVaciarPreguntasEventoEl.addEventListener("click", async () => {
+        if (!eventoSeleccionadoId) {
+            mostrarAlertaAdmin("Selecciona primero un evento activo.", "error");
+            return;
+        }
+        const ev = cacheEventos.find((e) => e.id === eventoSeleccionadoId);
+        const nombreEv = ev?.nombre || "este evento";
+
+        const confirmar = window.confirm(
+            `⚠️ ¿Estás seguro de que deseas ELIMINAR TODAS las preguntas de la trivia para "${nombreEv}"?\n\n` +
+            `• Se vaciará por completo el banco de preguntas de este evento.\n` +
+            `• Los invitados conectados y sus puntajes NO se verán afectados.`
+        );
+        if (!confirmar) return;
+
+        btnVaciarPreguntasEventoEl.disabled = true;
+        try {
+            const res = await fetch(
+                `/api/admin/eventos/${encodeURIComponent(eventoSeleccionadoId)}/preguntas`,
+                {
+                    method: "DELETE",
+                    headers: { "X-Admin-Password": adminPasswordActiva },
+                }
+            );
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.detail || "No se pudieron eliminar las preguntas.");
+            }
+
+            cachePreguntas = [];
+            renderizarSeccionTrivia();
+            mostrarAlertaAdmin(data.mensaje || "Banco de preguntas vaciado con éxito.", "exito");
+        } catch (err) {
+            mostrarAlertaAdmin(err.message, "error");
+        } finally {
+            btnVaciarPreguntasEventoEl.disabled = false;
+        }
+    });
+}
 
 // ------------------------------------------------------------------------------
 // 7. [FASE 4.5 - REQUERIMIENTO F] SUBIR PDF PARA GENERAR 10 PREGUNTAS CON IA
@@ -1268,7 +1849,9 @@ if (btnSubirPdfIaEl && inputPdfTriviaIaEl) {
         }
 
         const tiempoSeleccionado =
-            document.getElementById("select-tiempo-limite")?.value || "20";
+            document.getElementById("select-tiempo-ia")?.value ||
+            document.getElementById("select-tiempo-limite")?.value ||
+            "20";
 
         btnSubirPdfIaEl.disabled = true;
         if (estadoGeneracionPdfIaEl) {
@@ -1366,46 +1949,113 @@ formCrearPreguntaEl.addEventListener("submit", async (e) => {
 // 8. GESTIÓN, RANKING Y ELIMINACIÓN DE INVITADOS ACTIVOS
 // ------------------------------------------------------------------------------
 function renderizarListaInvitados(invitados) {
-    document.getElementById("count-invitados").textContent = invitados.length;
+    const totalInvitados = (invitados || []).length;
+    document.getElementById("count-invitados").textContent = totalInvitados;
+    if (tabBadgeInvitadosEl) {
+        tabBadgeInvitadosEl.textContent = totalInvitados;
+    }
+
+    const busqueda = (filtroTextoInvitado || "").trim().toLowerCase();
+    const invitadosFiltrados = busqueda
+        ? (invitados || []).filter((inv) => (inv.nombre || "").toLowerCase().includes(busqueda))
+        : (invitados || []);
+
+    if (conteoFiltradoInvitadosEl) {
+        if (busqueda) {
+            conteoFiltradoInvitadosEl.classList.remove("hidden");
+            conteoFiltradoInvitadosEl.textContent = `${invitadosFiltrados.length} encontrados`;
+        } else {
+            conteoFiltradoInvitadosEl.classList.add("hidden");
+            conteoFiltradoInvitadosEl.textContent = "";
+        }
+    }
+    if (btnLimpiarBusquedaInvitadoEl) {
+        btnLimpiarBusquedaInvitadoEl.classList.toggle("hidden", !busqueda);
+    }
+
     listaInvitadosAdminEl.innerHTML = "";
 
-    if (invitados.length === 0) {
+    if (!invitados || invitados.length === 0) {
         listaInvitadosAdminEl.innerHTML = `
             <div class="empty-state">Aún no hay invitados conectados en este evento.</div>
         `;
+        if (paginacionInvitadosAdminEl) paginacionInvitadosAdminEl.classList.add("hidden");
         return;
     }
 
-    invitados.forEach((inv, idx) => {
-        const avatarInfo = decodificarAvatarInvitado(inv.avatar);
+    if (invitadosFiltrados.length === 0) {
+        listaInvitadosAdminEl.innerHTML = `
+            <div class="empty-state">No se encontraron invitados que coincidan con "${filtroTextoInvitado}".</div>
+        `;
+        if (paginacionInvitadosAdminEl) paginacionInvitadosAdminEl.classList.add("hidden");
+        return;
+    }
+
+    const totalFiltrados = invitadosFiltrados.length;
+    const invitadosPaginados = mostrarTodosLosInvitados
+        ? invitadosFiltrados
+        : invitadosFiltrados.slice(0, limiteInvitadosVisible);
+
+    invitadosPaginados.forEach((inv, idx) => {
+        const indiceReal = invitados.findIndex((g) => g.id === inv.id);
+        const rankIdx = indiceReal !== -1 ? indiceReal : idx;
         const puntos = inv.puntaje_total || 0;
-        const medalla =
-            idx === 0 && puntos > 0
-                ? "🥇 "
-                : idx === 1 && puntos > 0
-                  ? "🥈 "
-                  : idx === 2 && puntos > 0
-                    ? "🥉 "
-                    : `#${idx + 1} `;
+        const rankBadgeClass =
+            rankIdx === 0 && puntos > 0
+                ? "rank-top-1"
+                : rankIdx === 1 && puntos > 0
+                  ? "rank-top-2"
+                  : rankIdx === 2 && puntos > 0
+                    ? "rank-top-3"
+                    : "";
+        const rankBadgeText =
+            rankIdx === 0 && puntos > 0
+                ? "🥇"
+                : rankIdx === 1 && puntos > 0
+                  ? "🥈"
+                  : rankIdx === 2 && puntos > 0
+                    ? "🥉"
+                    : `#${rankIdx + 1}`;
 
         const item = document.createElement("div");
-        item.className = "guest-admin-item";
+        item.className = "guest-clean-row";
         item.innerHTML = `
-            <div class="author-row">
-                <div class="mini-avatar-stage">
-                    <span class="mini-char">${avatarInfo.iconoPersonaje}</span>
-                    <span class="mini-acc">${avatarInfo.iconoAccesorio}</span>
-                </div>
-                <div class="author-meta">
-                    <strong>${medalla}${inv.nombre}</strong>
-                    <span>${avatarInfo.descripcion}</span>
-                    <span class="guest-score-pill">🏆 ${puntos} pts</span>
-                </div>
+            <div class="guest-clean-left">
+                <span class="guest-clean-rank ${rankBadgeClass}">${rankBadgeText}</span>
+                <strong class="guest-clean-name" title="${inv.nombre}">${inv.nombre}</strong>
             </div>
-            <button type="button" class="btn-delete-guest" data-id="${inv.id}">
-                Eliminar
-            </button>
+            <div class="guest-clean-right">
+                <span class="guest-clean-score">🏆 ${puntos} pts</span>
+                <button type="button" class="btn-rename-guest" data-id="${inv.id}" title="Corregir nombre">
+                    ✏️ Renombrar
+                </button>
+                <button type="button" class="btn-delete-guest" data-id="${inv.id}" title="Eliminar del evento">
+                    🗑️ Eliminar
+                </button>
+            </div>
         `;
+
+        item.querySelector(".btn-rename-guest").addEventListener("click", async () => {
+            const nuevoNombre = window.prompt("Corregir nombre del invitado:", inv.nombre);
+            if (!nuevoNombre || !nuevoNombre.trim() || nuevoNombre.trim() === inv.nombre) return;
+            try {
+                const res = await fetch(`/api/admin/invitados/${encodeURIComponent(inv.id)}/renombrar`, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Admin-Password": adminPasswordActiva,
+                    },
+                    body: JSON.stringify({ nuevo_nombre: nuevoNombre.trim() }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || "Error al renombrar invitado.");
+                inv.nombre = nuevoNombre.trim();
+                renderizarListaInvitados(cacheInvitados);
+                mostrarAlertaAdmin(`✅ Invitado renombrado a "${inv.nombre}".`, "exito");
+            } catch (err) {
+                mostrarAlertaAdmin(err.message, "error");
+            }
+        });
 
         item.querySelector(".btn-delete-guest").addEventListener("click", async () => {
             cacheInvitados = cacheInvitados.filter((g) => g.id !== inv.id);
@@ -1416,6 +2066,64 @@ function renderizarListaInvitados(invitados) {
         });
 
         listaInvitadosAdminEl.appendChild(item);
+    });
+
+    if (paginacionInvitadosAdminEl) {
+        if (totalFiltrados <= LIMITE_INVITADOS_PASO) {
+            paginacionInvitadosAdminEl.classList.add("hidden");
+        } else {
+            paginacionInvitadosAdminEl.classList.remove("hidden");
+            if (btnInvitadosMostrarMasEl) {
+                const restantes = totalFiltrados - invitadosPaginados.length;
+                if (restantes > 0 && !mostrarTodosLosInvitados) {
+                    btnInvitadosMostrarMasEl.classList.remove("hidden");
+                    btnInvitadosMostrarMasEl.textContent = `Ver más invitados (+${Math.min(LIMITE_INVITADOS_PASO, restantes)})`;
+                } else {
+                    btnInvitadosMostrarMasEl.classList.add("hidden");
+                }
+            }
+            if (btnInvitadosToggleTodosEl) {
+                btnInvitadosToggleTodosEl.textContent = mostrarTodosLosInvitados
+                    ? "Contraer (Ver 8)"
+                    : `Ver todos (${totalFiltrados})`;
+            }
+        }
+    }
+}
+
+if (inputBuscarInvitadoEl) {
+    inputBuscarInvitadoEl.addEventListener("input", (e) => {
+        filtroTextoInvitado = e.target.value;
+        limiteInvitadosVisible = LIMITE_INVITADOS_PASO;
+        mostrarTodosLosInvitados = false;
+        renderizarListaInvitados(cacheInvitados);
+    });
+}
+
+if (btnLimpiarBusquedaInvitadoEl) {
+    btnLimpiarBusquedaInvitadoEl.addEventListener("click", () => {
+        if (inputBuscarInvitadoEl) inputBuscarInvitadoEl.value = "";
+        filtroTextoInvitado = "";
+        limiteInvitadosVisible = LIMITE_INVITADOS_PASO;
+        mostrarTodosLosInvitados = false;
+        renderizarListaInvitados(cacheInvitados);
+    });
+}
+
+if (btnInvitadosMostrarMasEl) {
+    btnInvitadosMostrarMasEl.addEventListener("click", () => {
+        limiteInvitadosVisible += LIMITE_INVITADOS_PASO;
+        renderizarListaInvitados(cacheInvitados);
+    });
+}
+
+if (btnInvitadosToggleTodosEl) {
+    btnInvitadosToggleTodosEl.addEventListener("click", () => {
+        mostrarTodosLosInvitados = !mostrarTodosLosInvitados;
+        if (!mostrarTodosLosInvitados) {
+            limiteInvitadosVisible = LIMITE_INVITADOS_PASO;
+        }
+        renderizarListaInvitados(cacheInvitados);
     });
 }
 
@@ -1465,7 +2173,10 @@ function renderizarSlotsSedeAdmin(sedeKey, contenedorEl, listaFotos) {
             archivo: `${sedeKey}_foto${num}.jpg`,
             url: `/static/img/sedes/${sedeKey}_foto${num}.jpg`,
             existe: false,
+            titulo: "",
         };
+
+        const tituloInicial = info.titulo || "";
 
         const card = document.createElement("div");
         card.className = "sede-slot-card";
@@ -1478,7 +2189,19 @@ function renderizarSlotsSedeAdmin(sedeKey, contenedorEl, listaFotos) {
                 }
             </div>
             <div class="sede-slot-footer">
-                <strong>Foto ${num} / 4</strong>
+                <div class="sede-slot-footer-header">
+                    <strong>Foto ${num} / 4 (Vertical 4:5)</strong>
+                </div>
+                <div class="sede-slot-title-row">
+                    <input
+                        type="text"
+                        class="input-titulo-sede-slot"
+                        placeholder="Título corto (ej. Salón Principal)"
+                        value="${escapeHtml(tituloInicial)}"
+                        maxlength="45"
+                    />
+                    <button type="button" class="btn-guardar-titulo-slot" title="Guardar título">💾</button>
+                </div>
                 <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/*"
@@ -1487,13 +2210,15 @@ function renderizarSlotsSedeAdmin(sedeKey, contenedorEl, listaFotos) {
                     data-num="${num}"
                 />
                 <button type="button" class="btn-upload-sede-slot">
-                    📷 Subir / Cambiar
+                    📷 Subir Foto Vertical
                 </button>
             </div>
         `;
 
         const inputEl = card.querySelector(".input-file-sede");
         const btnSubirSlotEl = card.querySelector(".btn-upload-sede-slot");
+        const inputTituloEl = card.querySelector(".input-titulo-sede-slot");
+        const btnGuardarTituloEl = card.querySelector(".btn-guardar-titulo-slot");
 
         btnSubirSlotEl.addEventListener("click", () => {
             inputEl.value = "";
@@ -1503,14 +2228,79 @@ function renderizarSlotsSedeAdmin(sedeKey, contenedorEl, listaFotos) {
         inputEl.addEventListener("change", async (e) => {
             const archivo = e.target.files?.[0];
             if (!archivo) return;
-            await subirFotoSedeSlot(sedeKey, num, archivo, btnSubirSlotEl);
+            const tituloActual = inputTituloEl ? inputTituloEl.value.trim() : "";
+            await subirFotoSedeSlot(sedeKey, num, archivo, btnSubirSlotEl, tituloActual);
         });
+
+        const guardarTituloFn = async () => {
+            const nuevoTitulo = inputTituloEl ? inputTituloEl.value.trim() : "";
+            await guardarTituloFotoSede(sedeKey, num, nuevoTitulo, btnGuardarTituloEl);
+        };
+
+        if (btnGuardarTituloEl) {
+            btnGuardarTituloEl.addEventListener("click", guardarTituloFn);
+        }
+        if (inputTituloEl) {
+            inputTituloEl.addEventListener("keydown", (ev) => {
+                if (ev.key === "Enter") {
+                    ev.preventDefault();
+                    guardarTituloFn();
+                }
+            });
+        }
 
         contenedorEl.appendChild(card);
     }
 }
 
-async function subirFotoSedeSlot(sedeKey, numeroFoto, archivo, botonEl = null) {
+async function guardarTituloFotoSede(sedeKey, numeroFoto, nuevoTitulo, botonEl = null) {
+    const claveAuth = adminPasswordActiva || sessionStorage.getItem(SESSION_ADMIN_KEY) || "";
+    if (botonEl) {
+        botonEl.disabled = true;
+        botonEl.textContent = "⏳";
+    }
+    try {
+        const res = await fetch("/api/admin/sedes/galeria/titulo", {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Admin-Password": claveAuth,
+            },
+            body: JSON.stringify({
+                sede: sedeKey,
+                numero_foto: numeroFoto,
+                titulo: nuevoTitulo,
+            }),
+        });
+        let data = {};
+        try {
+            data = await res.json();
+        } catch (_) {
+            data = { detail: "Respuesta no válida del servidor." };
+        }
+        if (!res.ok) {
+            throw new Error(formatearMensajeError(data.detail || "No se pudo actualizar el título de la foto."));
+        }
+        if (canalSyncSedes) {
+            canalSyncSedes.postMessage({
+                tipo: "TITULO_SEDE_ACTUALIZADO",
+                sede: sedeKey,
+                numero_foto: numeroFoto,
+                titulo: nuevoTitulo,
+            });
+        }
+        mostrarAlertaAdmin("✅ Título de foto guardado con éxito.", "exito");
+    } catch (err) {
+        mostrarAlertaAdmin(err, "error");
+    } finally {
+        if (botonEl) {
+            botonEl.disabled = false;
+            botonEl.textContent = "💾";
+        }
+    }
+}
+
+async function subirFotoSedeSlot(sedeKey, numeroFoto, archivo, botonEl = null, tituloFoto = "") {
     const claveAuth = adminPasswordActiva || sessionStorage.getItem(SESSION_ADMIN_KEY) || "";
     const formData = new FormData();
     formData.append("sede", sedeKey);
@@ -1518,8 +2308,11 @@ async function subirFotoSedeSlot(sedeKey, numeroFoto, archivo, botonEl = null) {
     formData.append("numero_foto", String(numeroFoto));
     formData.append("indice_foto", String(numeroFoto));
     formData.append("archivo", archivo);
+    if (tituloFoto) {
+        formData.append("titulo", tituloFoto);
+    }
 
-    const textoOriginal = botonEl ? botonEl.textContent : "📷 Subir / Cambiar";
+    const textoOriginal = botonEl ? botonEl.textContent : "📷 Subir Foto Vertical";
     if (botonEl) {
         botonEl.disabled = true;
         botonEl.textContent = "⏳ Subiendo...";
@@ -1533,9 +2326,14 @@ async function subirFotoSedeSlot(sedeKey, numeroFoto, archivo, botonEl = null) {
             },
             body: formData,
         });
-        const data = await res.json();
+        let data = {};
+        try {
+            data = await res.json();
+        } catch (_) {
+            data = { detail: "Respuesta no válida del servidor." };
+        }
         if (!res.ok) {
-            throw new Error(data.detail || "No se pudo subir la foto de la sede.");
+            throw new Error(formatearMensajeError(data.detail || "No se pudo subir la foto de la sede."));
         }
 
         if (data.fotos_sedes) {
@@ -1551,10 +2349,10 @@ async function subirFotoSedeSlot(sedeKey, numeroFoto, archivo, botonEl = null) {
             });
         }
 
-        mostrarAlertaAdmin(data.mensaje, "exito");
+        mostrarAlertaAdmin(data.mensaje || "Foto vertical guardada con éxito.", "exito");
         await cargarFotosSedesAdmin();
     } catch (err) {
-        mostrarAlertaAdmin(err.message, "error");
+        mostrarAlertaAdmin(err, "error");
     } finally {
         if (botonEl) {
             botonEl.disabled = false;
@@ -1563,9 +2361,627 @@ async function subirFotoSedeSlot(sedeKey, numeroFoto, archivo, botonEl = null) {
     }
 }
 
+// ==============================================================================
+// 10. MODAL PARA EDITAR PREGUNTA EXISTENTE DEL BANCO
+// ==============================================================================
+function abrirModalEditarPreguntaAdmin(preg) {
+    if (!preg) return;
+    if (editPreguntaIdEl) editPreguntaIdEl.value = preg.id;
+    if (editEnunciadoPreguntaEl) editEnunciadoPreguntaEl.value = preg.enunciado || "";
+    if (editOpcionAEl) editOpcionAEl.value = preg.opcion_a || "";
+    if (editOpcionBEl) editOpcionBEl.value = preg.opcion_b || "";
+    if (editOpcionCEl) editOpcionCEl.value = preg.opcion_c || "";
+    if (editOpcionDEl) editOpcionDEl.value = preg.opcion_d || "";
+    if (editSelectRespuestaCorrectaEl) {
+        editSelectRespuestaCorrectaEl.value = (preg.respuesta_correcta || "A").toUpperCase();
+    }
+    if (editSelectTiempoLimiteEl) {
+        editSelectTiempoLimiteEl.value = String(preg.tiempo_limite_segundos || 20);
+    }
+    if (modalEditarPreguntaAdminEl) modalEditarPreguntaAdminEl.classList.remove("hidden");
+}
+
+function cerrarModalEditarPreguntaAdmin() {
+    if (modalEditarPreguntaAdminEl) modalEditarPreguntaAdminEl.classList.add("hidden");
+}
+
+if (btnCerrarModalEditarPreguntaXEl) {
+    btnCerrarModalEditarPreguntaXEl.addEventListener("click", cerrarModalEditarPreguntaAdmin);
+}
+if (btnCerrarModalEditarPreguntaEl) {
+    btnCerrarModalEditarPreguntaEl.addEventListener("click", cerrarModalEditarPreguntaAdmin);
+}
+if (modalEditarPreguntaAdminEl) {
+    modalEditarPreguntaAdminEl.addEventListener("click", (e) => {
+        if (e.target === modalEditarPreguntaAdminEl) cerrarModalEditarPreguntaAdmin();
+    });
+}
+
+if (formEditarPreguntaEl) {
+    formEditarPreguntaEl.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const pregId = editPreguntaIdEl.value;
+        if (!pregId) return;
+
+        const payload = {
+            enunciado: editEnunciadoPreguntaEl.value.trim(),
+            opcion_a: editOpcionAEl.value.trim(),
+            opcion_b: editOpcionBEl.value.trim(),
+            opcion_c: editOpcionCEl.value.trim(),
+            opcion_d: editOpcionDEl.value.trim(),
+            respuesta_correcta: editSelectRespuestaCorrectaEl.value,
+            tiempo_limite_segundos: parseInt(editSelectTiempoLimiteEl.value, 10) || 20,
+        };
+
+        try {
+            const res = await fetch(`/api/admin/preguntas/${encodeURIComponent(pregId)}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Admin-Password": adminPasswordActiva,
+                },
+                body: JSON.stringify(payload),
+            });
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (_) {
+                data = { detail: "Error inesperado en el servidor al editar la pregunta." };
+            }
+            if (!res.ok) {
+                throw new Error(formatearMensajeError(data.detail || "Error al actualizar la pregunta."));
+            }
+
+            const idx = cachePreguntas.findIndex((p) => p.id === pregId);
+            if (idx !== -1) {
+                cachePreguntas[idx] = { ...cachePreguntas[idx], ...payload };
+            }
+
+            cerrarModalEditarPreguntaAdmin();
+            renderizarSeccionTrivia();
+            mostrarAlertaAdmin("✅ Pregunta actualizada con éxito en la base de datos.", "exito");
+        } catch (err) {
+            mostrarAlertaAdmin(err, "error");
+        }
+    });
+}
+
+// ==============================================================================
+// 11. MODAL PARA SUBIR ACCESORIOS PERSONALIZADOS EN PNG (256x256)
+// ==============================================================================
+function abrirModalSubirAccesorioAdmin() {
+    if (modalSubirAccesorioAdminEl) modalSubirAccesorioAdminEl.classList.remove("hidden");
+}
+
+function cerrarModalSubirAccesorioAdmin() {
+    if (modalSubirAccesorioAdminEl) modalSubirAccesorioAdminEl.classList.add("hidden");
+    if (formSubirAccesorioEl) formSubirAccesorioEl.reset();
+    if (previewAccesorioWrapEl) previewAccesorioWrapEl.classList.add("hidden");
+}
+
+if (btnAbrirModalSubirAccesorioEl) {
+    btnAbrirModalSubirAccesorioEl.addEventListener("click", abrirModalSubirAccesorioAdmin);
+}
+if (btnCerrarModalAccesorioXEl) {
+    btnCerrarModalAccesorioXEl.addEventListener("click", cerrarModalSubirAccesorioAdmin);
+}
+if (btnCancelarModalAccesorioEl) {
+    btnCancelarModalAccesorioEl.addEventListener("click", cerrarModalSubirAccesorioAdmin);
+}
+if (modalSubirAccesorioAdminEl) {
+    modalSubirAccesorioAdminEl.addEventListener("click", (e) => {
+        if (e.target === modalSubirAccesorioAdminEl) cerrarModalSubirAccesorioAdmin();
+    });
+}
+
+if (inputArchivoAccesorioEl) {
+    inputArchivoAccesorioEl.addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        if (file && (file.type === "image/png" || file.name.toLowerCase().endsWith(".png"))) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                if (imgPreviewAccesorioEl) imgPreviewAccesorioEl.src = ev.target.result;
+                if (previewAccesorioWrapEl) previewAccesorioWrapEl.classList.remove("hidden");
+            };
+            reader.readAsDataURL(file);
+        } else {
+            if (previewAccesorioWrapEl) previewAccesorioWrapEl.classList.add("hidden");
+        }
+    });
+}
+
+if (formSubirAccesorioEl) {
+    formSubirAccesorioEl.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const archivo = inputArchivoAccesorioEl?.files?.[0];
+        if (!archivo) {
+            mostrarAlertaAdmin("Por favor selecciona un archivo PNG.", "error");
+            return;
+        }
+        const nombre = inputNombreAccesorioEl.value.trim();
+        const tematica = selectTematicaAccesorioEl.value;
+
+        const formData = new FormData();
+        formData.append("nombre", nombre);
+        formData.append("tematica", tematica);
+        formData.append("archivo", archivo);
+        formData.append("archivo_png", archivo);
+        const idGenerado = "acc_" + (nombre.toLowerCase().replace(/[^a-z0-9]+/g, "_") || Date.now());
+        formData.append("id_accesorio", idGenerado);
+
+        const btnSubmit = document.getElementById("btn-guardar-accesorio");
+        if (btnSubmit) btnSubmit.disabled = true;
+
+        try {
+            const res = await fetch("/api/admin/accesorios/subir", {
+                method: "POST",
+                headers: {
+                    "X-Admin-Password": adminPasswordActiva,
+                },
+                body: formData,
+            });
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (_) {
+                data = { detail: "Respuesta inesperada al subir accesorio." };
+            }
+            if (!res.ok) {
+                throw new Error(formatearMensajeError(data.detail || "Error al subir accesorio."));
+            }
+
+            cerrarModalSubirAccesorioAdmin();
+
+            if (typeof BroadcastChannel !== "undefined") {
+                try {
+                    const canalSync = new BroadcastChannel("segalu_proyector_sync");
+                    canalSync.postMessage({ tipo: "ACCESORIOS_ACTUALIZADOS" });
+                } catch (_) {}
+            }
+
+            mostrarAlertaAdmin(
+                `✅ Accesorio "${nombre}" subido con éxito a temática ${tematica} (256x256 px).`,
+                "exito"
+            );
+        } catch (err) {
+            mostrarAlertaAdmin(err, "error");
+        } finally {
+            if (btnSubmit) btnSubmit.disabled = false;
+        }
+    });
+}
+
+// ==============================================================================
+// 14. MÓDULO CRM & LEADS DE MARKETING
+// ==============================================================================
+let cacheLeads = [];
+let peticionLeadsEnCurso = false;
+
+const tabBadgeLeadsEl = document.getElementById("tab-badge-leads");
+const countLeadsTotalEl = document.getElementById("count-leads-total");
+const crmMetricTotalEl = document.getElementById("crm-metric-total");
+const crmMetricCuponesEl = document.getElementById("crm-metric-cupones");
+const crmMetricTasaEl = document.getElementById("crm-metric-tasa");
+const inputBuscarLeadsEl = document.getElementById("input-buscar-leads");
+const btnLimpiarBusquedaLeadsEl = document.getElementById("btn-limpiar-busqueda-leads");
+const conteoFiltradoLeadsEl = document.getElementById("conteo-filtrado-leads");
+const tbodyLeadsAdminEl = document.getElementById("tbody-leads-admin");
+const btnExportarLeadsCsvEl = document.getElementById("btn-exportar-leads-csv");
+const btnRemoverFiltroGraficoEl = document.getElementById("btn-remover-filtro-grafico");
+
+let chartEdadesInstance = null;
+let chartCumplesInstance = null;
+let filtroActivoGrafico = null; // { tipo: 'edad' | 'cumple', valor: string }
+
+function calcularEdadLead(fechaNacStr) {
+    if (!fechaNacStr) return null;
+    const partes = String(fechaNacStr).trim().split("-");
+    if (partes.length !== 3) return null;
+    const anio = parseInt(partes[0], 10);
+    const mes = parseInt(partes[1], 10) - 1;
+    const dia = parseInt(partes[2], 10);
+    if (isNaN(anio) || isNaN(mes) || isNaN(dia)) return null;
+
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - anio;
+    const m = hoy.getMonth() - mes;
+    if (m < 0 || (m === 0 && hoy.getDate() < dia)) {
+        edad--;
+    }
+    return edad >= 0 ? edad : null;
+}
+
+function calcularDiasHastaCumple(fechaNacStr) {
+    if (!fechaNacStr) return null;
+    const partes = String(fechaNacStr).trim().split("-");
+    if (partes.length !== 3) return null;
+    const mes = parseInt(partes[1], 10) - 1;
+    const dia = parseInt(partes[2], 10);
+    if (isNaN(mes) || isNaN(dia)) return null;
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    let cumpleEsteAnio = new Date(hoy.getFullYear(), mes, dia);
+    if (cumpleEsteAnio < hoy) {
+        cumpleEsteAnio = new Date(hoy.getFullYear() + 1, mes, dia);
+    }
+
+    const diffTiempo = cumpleEsteAnio.getTime() - hoy.getTime();
+    return Math.ceil(diffTiempo / (1000 * 60 * 60 * 24));
+}
+
+function obtenerRangoEdadLead(edad) {
+    if (edad === null || isNaN(edad)) return "Sin fecha";
+    if (edad < 13) return "Menores de 12";
+    if (edad <= 16) return "13 a 16 (Quinceañeras)";
+    if (edad <= 25) return "17 a 25 años";
+    return "26+ años";
+}
+
+function obtenerRangoCumpleLead(dias) {
+    if (dias === null || isNaN(dias)) return "Sin fecha";
+    if (dias <= 30) return "En < 30 días";
+    if (dias <= 60) return "En 31 a 60 días";
+    return "Más de 60 días";
+}
+
+async function cargarLeadsEvento(eventoId, opciones = {}) {
+    if (!eventoId || !adminPasswordActiva || peticionLeadsEnCurso) return;
+    peticionLeadsEnCurso = true;
+
+    try {
+        const url = `/api/eventos/${encodeURIComponent(eventoId)}/leads${opciones?.force_refresh ? "?force_refresh=true" : ""}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.leads)) {
+            cacheLeads = data.leads;
+            actualizarGraficosCrm(cacheLeads);
+            filtrarLeadsGeneral();
+        }
+    } catch (err) {
+        console.warn("Aviso al cargar leads del evento:", err);
+    } finally {
+        peticionLeadsEnCurso = false;
+    }
+}
+
+function actualizarGraficosCrm(listaLeads) {
+    if (typeof Chart === "undefined") return;
+
+    const canvasEdades = document.getElementById("chart-crm-edades");
+    const canvasCumples = document.getElementById("chart-crm-cumples");
+    if (!canvasEdades || !canvasCumples) return;
+
+    const bucketsEdad = {
+        "Menores de 12": 0,
+        "13 a 16 (Quinceañeras)": 0,
+        "17 a 25 años": 0,
+        "26+ años": 0,
+    };
+
+    const bucketsCumple = {
+        "En < 30 días": 0,
+        "En 31 a 60 días": 0,
+        "Más de 60 días": 0,
+    };
+
+    (listaLeads || []).forEach((l) => {
+        const edad = calcularEdadLead(l.fecha_nacimiento);
+        const rEdad = obtenerRangoEdadLead(edad);
+        if (rEdad in bucketsEdad) bucketsEdad[rEdad]++;
+
+        const dias = calcularDiasHastaCumple(l.fecha_nacimiento);
+        const rCumple = obtenerRangoCumpleLead(dias);
+        if (rCumple in bucketsCumple) bucketsCumple[rCumple]++;
+    });
+
+    // 1. Gráfico Doughnut: Rangos de Edad
+    const labelsEdad = Object.keys(bucketsEdad);
+    const dataEdad = Object.values(bucketsEdad);
+
+    if (chartEdadesInstance) {
+        chartEdadesInstance.data.labels = labelsEdad;
+        chartEdadesInstance.data.datasets[0].data = dataEdad;
+        chartEdadesInstance.update();
+    } else {
+        const ctxEdades = canvasEdades.getContext("2d");
+        chartEdadesInstance = new Chart(ctxEdades, {
+            type: "doughnut",
+            data: {
+                labels: labelsEdad,
+                datasets: [{
+                    data: dataEdad,
+                    backgroundColor: [
+                        "#F59E0B", // Menores 12
+                        "#EC4899", // Quinceañeras
+                        "#8B5CF6", // 17 a 25
+                        "#3B82F6", // 26+
+                    ],
+                    borderWidth: 2,
+                    borderColor: "#FFFFFF",
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: "bottom",
+                        labels: { boxWidth: 10, font: { size: 10, family: "Outfit" } },
+                    },
+                },
+                onClick: (evt, activeElements) => {
+                    if (activeElements && activeElements.length > 0) {
+                        const index = activeElements[0].index;
+                        const label = labelsEdad[index];
+                        aplicarFiltroGrafico("edad", label);
+                    }
+                },
+            },
+        });
+    }
+
+    // 2. Gráfico de Barras: Próximos Cumpleaños
+    const labelsCumple = Object.keys(bucketsCumple);
+    const dataCumple = Object.values(bucketsCumple);
+
+    if (chartCumplesInstance) {
+        chartCumplesInstance.data.labels = labelsCumple;
+        chartCumplesInstance.data.datasets[0].data = dataCumple;
+        chartCumplesInstance.update();
+    } else {
+        const ctxCumples = canvasCumples.getContext("2d");
+        chartCumplesInstance = new Chart(ctxCumples, {
+            type: "bar",
+            data: {
+                labels: labelsCumple,
+                datasets: [{
+                    label: "Prospectos",
+                    data: dataCumple,
+                    backgroundColor: [
+                        "#10B981", // < 30 días
+                        "#F59E0B", // 31 a 60 días
+                        "#94A3B8", // > 60 días
+                    ],
+                    borderRadius: 6,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } },
+                    x: { ticks: { font: { size: 10, family: "Outfit" } } },
+                },
+                onClick: (evt, activeElements) => {
+                    if (activeElements && activeElements.length > 0) {
+                        const index = activeElements[0].index;
+                        const label = labelsCumple[index];
+                        aplicarFiltroGrafico("cumple", label);
+                    }
+                },
+            },
+        });
+    }
+}
+
+function aplicarFiltroGrafico(tipo, valor) {
+    if (filtroActivoGrafico && filtroActivoGrafico.tipo === tipo && filtroActivoGrafico.valor === valor) {
+        removerFiltroGrafico();
+        return;
+    }
+    filtroActivoGrafico = { tipo, valor };
+    const banner = document.getElementById("crm-active-filter-banner");
+    const labelEl = document.getElementById("crm-filter-label");
+    if (banner && labelEl) {
+        labelEl.textContent = `${tipo === "edad" ? "Rango de Edad" : "Cumpleaños"}: ${valor}`;
+        banner.classList.remove("hidden");
+    }
+    filtrarLeadsGeneral();
+}
+
+function removerFiltroGrafico() {
+    filtroActivoGrafico = null;
+    const banner = document.getElementById("crm-active-filter-banner");
+    if (banner) banner.classList.add("hidden");
+    filtrarLeadsGeneral();
+}
+
+function renderizarTablaLeads(listaLeads) {
+    if (!tbodyLeadsAdminEl) return;
+    const leads = listaLeads || [];
+    const totalLeads = cacheLeads.length;
+    const totalInvitados = cacheInvitados.length || 1;
+
+    // Actualizar badges y métricas
+    if (tabBadgeLeadsEl) tabBadgeLeadsEl.textContent = String(totalLeads);
+    if (countLeadsTotalEl) countLeadsTotalEl.textContent = String(totalLeads);
+    if (crmMetricTotalEl) crmMetricTotalEl.textContent = String(totalLeads);
+    if (crmMetricCuponesEl) crmMetricCuponesEl.textContent = String(totalLeads);
+
+    const conversion = Math.min(100, Math.round((totalLeads / totalInvitados) * 100));
+    if (crmMetricTasaEl) crmMetricTasaEl.textContent = `${conversion}%`;
+
+    if (conteoFiltradoLeadsEl) {
+        const hayFiltro = Boolean(filtroActivoGrafico || (inputBuscarLeadsEl?.value || "").trim());
+        conteoFiltradoLeadsEl.textContent = hayFiltro
+            ? `Mostrando ${leads.length} de ${totalLeads} interesados`
+            : `${totalLeads} interesados`;
+    }
+
+    if (leads.length === 0) {
+        tbodyLeadsAdminEl.innerHTML = `
+            <tr>
+                <td colspan="8" class="crm-empty-state">
+                    ${(inputBuscarLeadsEl?.value || "").trim() || filtroActivoGrafico
+                        ? "No se encontraron prospectos que coincidan con los filtros aplicados."
+                        : "Aún no hay leads capturados en este evento. Los invitados podrán solicitarlos tocando '🎁 Pase VIP & Descuento'."}
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    try {
+        tbodyLeadsAdminEl.innerHTML = leads.map((l) => {
+            const nombre = escaparHtml(l.nombre || "Interesado VIP");
+            const tel = escaparHtml(l.telefono || "");
+            const nac = escaparHtml(l.fecha_nacimiento || "—");
+            const generoStr = escaparHtml(l.genero || "No especificado");
+            const generoLower = generoStr.toLowerCase();
+            const generoClase = generoLower === "femenino" ? "gender-femenino" : (generoLower === "masculino" ? "gender-masculino" : (generoLower === "otro" ? "gender-otro" : ""));
+            const correo = escaparHtml(l.correo || "No especificado");
+            const codigo = escaparHtml(l.codigo_promocional || "—");
+            const fechaIso = l.creado_en || "";
+            const fechaFmt = fechaIso ? new Date(fechaIso).toLocaleDateString("es-PE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+            const telSoloDigitos = (l.telefono || "").replace(/\D/g, "");
+            const urlWa = telSoloDigitos ? `https://wa.me/51${telSoloDigitos}?text=${encodeURIComponent(`¡Hola ${l.nombre || ''}! Te saludamos de Eventos Segalú. Vemos que solicitaste tu Pase VIP (${l.codigo_promocional || ''}) y nos encantaría brindarte información de nuestros paquetes.`)}` : "#";
+
+            const diasHastaCumple = calcularDiasHastaCumple(l.fecha_nacimiento);
+            const esCumplePronto = diasHastaCumple !== null && diasHastaCumple <= 30;
+            const badgeCumple = esCumplePronto ? `<div class="crm-badge-bday-soon" title="¡Cumpleaños en los próximos 30 días!">🎂 ¡En ${diasHastaCumple}d!</div>` : "";
+            const rowClass = esCumplePronto ? "lead-row-bday-highlight" : "";
+
+            return `
+                <tr class="${rowClass}">
+                    <td>
+                        <strong>${nombre}</strong>
+                        ${badgeCumple}
+                    </td>
+                    <td>
+                        ${tel ? `<a href="${urlWa}" target="_blank" rel="noopener noreferrer" class="crm-wa-link" title="Abrir chat en WhatsApp">📲 ${tel}</a>` : "—"}
+                    </td>
+                    <td><span>${nac}</span></td>
+                    <td><span class="crm-badge-gender ${generoClase}">${generoStr}</span></td>
+                    <td><span style="color:var(--text-warm-gray);">${correo}</span></td>
+                    <td><span class="crm-lead-code-pill">${codigo}</span></td>
+                    <td><small style="color:var(--text-warm-gray);">${fechaFmt}</small></td>
+                    <td>
+                        ${tel ? `<a href="${urlWa}" target="_blank" rel="noopener noreferrer" class="btn-edit-pregunta" style="text-decoration:none;">Contactar</a>` : "—"}
+                    </td>
+                </tr>
+            `;
+        }).join("");
+    } catch (eRender) {
+        console.error("Error al renderizar filas de leads:", eRender);
+    }
+}
+
+function filtrarLeadsGeneral() {
+    const query = (inputBuscarLeadsEl?.value || "").trim().toLowerCase();
+    if (btnLimpiarBusquedaLeadsEl) {
+        btnLimpiarBusquedaLeadsEl.classList.toggle("hidden", !query);
+    }
+
+    let filtrados = cacheLeads;
+
+    // 1. Filtrar por gráfico interactivo si está activo
+    if (filtroActivoGrafico) {
+        if (filtroActivoGrafico.tipo === "edad") {
+            filtrados = filtrados.filter((l) => {
+                const edad = calcularEdadLead(l.fecha_nacimiento);
+                return obtenerRangoEdadLead(edad) === filtroActivoGrafico.valor;
+            });
+        } else if (filtroActivoGrafico.tipo === "cumple") {
+            filtrados = filtrados.filter((l) => {
+                const dias = calcularDiasHastaCumple(l.fecha_nacimiento);
+                return obtenerRangoCumpleLead(dias) === filtroActivoGrafico.valor;
+            });
+        }
+    }
+
+    // 2. Filtrar por término de búsqueda en texto
+    if (query) {
+        filtrados = filtrados.filter((l) => {
+            const n = (l.nombre || "").toLowerCase();
+            const t = (l.telefono || "").toLowerCase();
+            const c = (l.codigo_promocional || "").toLowerCase();
+            const em = (l.correo || "").toLowerCase();
+            const gen = (l.genero || "").toLowerCase();
+            return n.includes(query) || t.includes(query) || c.includes(query) || em.includes(query) || gen.includes(query);
+        });
+    }
+
+    renderizarTablaLeads(filtrados);
+}
+
+if (inputBuscarLeadsEl) {
+    inputBuscarLeadsEl.addEventListener("input", filtrarLeadsGeneral);
+}
+if (btnLimpiarBusquedaLeadsEl) {
+    btnLimpiarBusquedaLeadsEl.addEventListener("click", () => {
+        inputBuscarLeadsEl.value = "";
+        btnLimpiarBusquedaLeadsEl.classList.add("hidden");
+        filtrarLeadsGeneral();
+    });
+}
+if (btnRemoverFiltroGraficoEl) {
+    btnRemoverFiltroGraficoEl.addEventListener("click", removerFiltroGrafico);
+}
+
+const btnVaciarLeadsAdminEl = document.getElementById("btn-vaciar-leads-admin");
+if (btnVaciarLeadsAdminEl) {
+    btnVaciarLeadsAdminEl.addEventListener("click", async () => {
+        if (!eventoSeleccionadoId) {
+            mostrarAlertaAdmin("Selecciona primero un evento activo.", "error");
+            return;
+        }
+        if (!confirm("¿Estás seguro de que deseas vaciar todos los leads y cupones de este evento? Esta acción no se puede deshacer.")) {
+            return;
+        }
+
+        btnVaciarLeadsAdminEl.disabled = true;
+        try {
+            const res = await fetch(
+                `/api/admin/eventos/${encodeURIComponent(eventoSeleccionadoId)}/leads`,
+                {
+                    method: "DELETE",
+                    headers: { "X-Admin-Password": adminPasswordActiva },
+                }
+            );
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.detail || "Error al vaciar los leads.");
+            }
+
+            cacheLeads = [];
+            filtroActivoGrafico = null;
+            if (inputBuscarLeadsEl) inputBuscarLeadsEl.value = "";
+            if (btnLimpiarBusquedaLeadsEl) btnLimpiarBusquedaLeadsEl.classList.add("hidden");
+            const bannerCrm = document.getElementById("crm-active-filter-banner");
+            if (bannerCrm) bannerCrm.classList.add("hidden");
+
+            actualizarGraficosCrm([]);
+            renderizarTablaLeads([]);
+            mostrarAlertaAdmin("🗑️ Se vaciaron todos los leads y cupones del evento.", "exito");
+        } catch (err) {
+            mostrarAlertaAdmin(err.message, "error");
+        } finally {
+            btnVaciarLeadsAdminEl.disabled = false;
+        }
+    });
+}
+
+if (btnExportarLeadsCsvEl) {
+    btnExportarLeadsCsvEl.addEventListener("click", () => {
+        if (!eventoSeleccionadoId) {
+            mostrarAlertaAdmin("Selecciona un evento para exportar sus leads.", "error");
+            return;
+        }
+        window.location.href = `/api/eventos/${encodeURIComponent(eventoSeleccionadoId)}/leads/csv`;
+    });
+}
+
 // Inicialización al abrir /admin
 window.addEventListener("DOMContentLoaded", async () => {
     inputFechaEventoEl.value = new Date().toISOString().split("T")[0];
+    const tabGuardado = sessionStorage.getItem(SESSION_ADMIN_TAB_KEY) || "tab-contenido-fotos";
+    const tabInicial = document.getElementById(tabGuardado) ? tabGuardado : "tab-contenido-fotos";
+    cambiarPestanaPrincipalAdmin(tabInicial);
     cargarFotosSedesAdmin();
     if (adminPasswordActiva) {
         await cargarResumenPanel({ silencioso: true });

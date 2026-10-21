@@ -17,7 +17,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;0,800;1,700&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="/admin/admin.css?v=20261018b" />
+    <link rel="stylesheet" href="/admin/admin.css?v=20261019a" />
+    <!-- CDN Ligero de Chart.js para Visualización Dinámica de Leads y Cumpleaños -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -34,8 +36,8 @@
         </div>
 
         <div id="admin-header-controls" class="topbar-actions hidden">
-            <button type="button" id="btn-abrir-proyector-topbar" class="btn-projector-gold-dark" title="Abrir Pantalla Gigante del Evento en nueva pestaña">
-                <span>🖥️ Abrir Proyector en Vivo</span>
+            <button type="button" id="btn-abrir-proyector-topbar" class="btn-projector-gold" title="Abrir Pantalla Gigante del Evento en nueva pestaña">
+                <span>🖥️ Proyector</span>
             </button>
             <button type="button" id="btn-refrescar-panel" class="btn-outline-gold">
                 <svg class="svg-icon svg-xs" viewBox="0 0 24 24" aria-hidden="true">
@@ -97,12 +99,29 @@
                     </div>
                     <h3>Seleccionar Evento</h3>
                     <p class="card-helper">Elige qué evento deseas supervisar en vivo:</p>
+
+                    <div class="venue-filter-block">
+                        <label for="select-filtro-sede-admin" class="field-label venue-filter-label">📍 Filtrar por Sede</label>
+                        <select id="select-filtro-sede-admin" class="gala-select gala-select-venue">
+                            <option value="todos">🌐 Todas las Sedes</option>
+                        </select>
+                    </div>
+
+                    <label for="select-evento-activo" class="field-label" style="margin-top: 10px; display: block;">Evento Activo:</label>
                     <select id="select-evento-activo" class="gala-select"></select>
                     <div id="indicador-carga-evento" class="event-switching-banner hidden">
                         <span class="spinner-mini"></span>
                         <span>Sincronizando evento en paralelo...</span>
                     </div>
                     <div id="info-evento-seleccionado" class="event-summary-box"></div>
+
+                    <!-- BOTÓN PARA CREAR NUEVO EVENTO (ABRE VENTANA MODAL) -->
+                    <div class="create-event-cta-wrap">
+                        <button type="button" id="btn-abrir-modal-crear-evento" class="btn-create-event-modal">
+                            <span class="plus-icon">➕</span>
+                            <span>Crear Nuevo Evento</span>
+                        </button>
+                    </div>
 
                     <!-- =======================================================
                          PANEL EJECUTIVO DE GESTIÓN DE BASE DE DATOS Y DESCARGA ZIP
@@ -115,18 +134,11 @@
                         <div class="executive-actions-grid">
                             <button
                                 type="button"
-                                id="btn-descargar-zip-con-marco"
-                                class="btn-exec-action btn-exec-zip-gold"
-                            >
-                                <span>📦 Descargar Fotos (Con Marco Segalú - ZIP)</span>
-                            </button>
-
-                            <button
-                                type="button"
                                 id="btn-descargar-zip-originales"
                                 class="btn-exec-action btn-exec-zip-clean"
+                                style="grid-column: 1 / -1;"
                             >
-                                <span>📦 Descargar Fotos Originales (Sin Marco - ZIP)</span>
+                                <span>📦 Descargar Fotos</span>
                             </button>
 
                             <button
@@ -134,7 +146,7 @@
                                 id="btn-purgar-fotos-storage"
                                 class="btn-exec-action btn-exec-purge-storage"
                             >
-                                <span>🧹 Vaciar / Purgar Fotos del Storage</span>
+                                <span>🧹 Vaciar Fotos</span>
                             </button>
 
                             <button
@@ -142,246 +154,406 @@
                                 id="btn-eliminar-evento-completo"
                                 class="btn-exec-action btn-exec-delete-event"
                             >
-                                <span>🗑️ Eliminar Evento por Completo</span>
+                                <span>🗑️ Eliminar Evento</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                id="btn-abrir-modal-subir-accesorio"
+                                class="btn-exec-action btn-exec-accessories"
+                                style="grid-column: 1 / -1; margin-top: 4px;"
+                            >
+                                <span>🎨 Subir Accesorios PNG</span>
                             </button>
                         </div>
                     </div>
-                </div>
-
-                <div class="panel-card">
-                    <span class="section-pill">NUEVA CELEBRACIÓN</span>
-                    <h3>Crear Evento en Segalú</h3>
-                    <form id="form-crear-evento" novalidate>
-                        <div class="form-group">
-                            <label for="select-sede-local" class="field-label">Sede de Segalú</label>
-                            <select id="select-sede-local" class="gala-select" required></select>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="input-nombre-evento" class="field-label">Nombre del Evento</label>
-                            <input
-                                type="text"
-                                id="input-nombre-evento"
-                                class="gala-input"
-                                placeholder="Ej: XV Años de Fernanda"
-                                required
-                            />
-                        </div>
-
-                        <div class="form-group">
-                            <label for="input-codigo-qr" class="field-label">Código corto para el QR</label>
-                            <input
-                                type="text"
-                                id="input-codigo-qr"
-                                class="gala-input uppercase-input"
-                                placeholder="Ej: XV-FERNANDA"
-                                maxlength="20"
-                                required
-                            />
-                        </div>
-
-                        <div class="form-group">
-                            <label for="input-fecha-evento" class="field-label">Fecha del Evento</label>
-                            <input
-                                type="date"
-                                id="input-fecha-evento"
-                                class="gala-input"
-                                required
-                            />
-                        </div>
-
-                        <button type="submit" id="btn-crear-evento" class="btn-gold-primary">
-                            <span>Crear Evento Activo</span>
-                        </button>
-                    </form>
                 </div>
             </aside>
 
-            <!-- COLUMNA DERECHA: BANDEJA DE FOTOS, TRIVIA KAHOOT E INVITADOS -->
+            <!-- COLUMNA DERECHA: BARRA FIJA DE PESTAÑAS (TABS) Y VISTAS INDEPENDIENTES -->
             <div class="content-column">
 
-                <!-- ===========================================================
-                     1. BANDEJA DE MODERACIÓN DE FOTOS (CON APROBAR, RECHAZAR Y
-                        ELIMINAR DEFINITIVAMENTE DEL BUCKET + TABLA SQL)
-                     =========================================================== -->
-                <div class="panel-card">
-                    <div class="card-header-flex">
-                        <div>
-                            <span class="section-pill">FILTRO DE CONTENIDO EN VIVO</span>
-                            <h3>Bandeja de Moderación de Fotos</h3>
-                        </div>
-                        <div class="filter-tabs">
-                            <button type="button" class="filter-tab active" data-estado="pendiente">
-                                Pendientes (<span id="count-pendientes">0</span>)
-                            </button>
-                            <button type="button" class="filter-tab" data-estado="aprobado">
-                                Aprobadas (<span id="count-aprobadas">0</span>)
-                            </button>
-                            <button type="button" class="filter-tab" data-estado="rechazado">
-                                Rechazadas (<span id="count-rechazadas">0</span>)
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- CONTROLES DE AUTO-APROBAR Y APROBACIÓN MASIVA -->
-                    <div class="moderation-automation-bar">
-                        <!-- Control 1: Interruptor Activable de Auto-Aprobar -->
-                        <button
-                            type="button"
-                            id="btn-toggle-auto-aprobar"
-                            class="btn-auto-approve-toggle"
-                            aria-pressed="false"
-                        >
-                            <span class="toggle-status-dot"></span>
-                            <div class="toggle-text-wrap">
-                                <strong id="titulo-auto-aprobar">⚡ Auto-Aprobar Fotos Automáticamente</strong>
-                                <span id="subtitulo-auto-aprobar">Inactivo • Las fotos nuevas requieren tu aprobación manual</span>
-                            </div>
-                            <span id="badge-auto-aprobar" class="toggle-pill-state">OFF</span>
-                        </button>
-
-                        <!-- Control 2: Botón de Acción Rápida para Aprobar Todas las Pendientes -->
-                        <button
-                            type="button"
-                            id="btn-aprobar-todas-bandeja"
-                            class="btn-bulk-approve"
-                        >
-                            <span>✅ Aprobar Todas las de la Bandeja (<strong id="count-aprobar-todas">0</strong>)</span>
-                        </button>
-                    </div>
-
-                    <!-- CONTROLES DE VISUALIZACIÓN DE GALERÍA EN EL PROYECTOR -->
-                    <div class="projector-gallery-controls-bar" id="panel-controles-galeria-proyector">
-                        <div class="gallery-mode-group">
-                            <span class="gallery-control-label">🖥️ Modo de Galería en Proyector:</span>
-                            <div class="gallery-mode-pills" role="group" aria-label="Modo de visualización de galería">
-                                <button type="button" class="btn-gallery-mode active" data-modo-galeria="ciclo_auto">
-                                    🔄 Modo Ciclo Automático (1x1 + Mosaico)
-                                </button>
-                                <button type="button" class="btn-gallery-mode" data-modo-galeria="individual">
-                                    🖼️ Solo Foto Individual (Carrusel 1x1)
-                                </button>
-                                <button type="button" class="btn-gallery-mode" data-modo-galeria="mosaico">
-                                    🧱 Solo Mosaico (6 a 8 fotos)
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="gallery-duration-group">
-                            <span class="gallery-control-label">⏱️ Duración por Foto:</span>
-                            <div class="gallery-duration-pills" role="group" aria-label="Duración de cada foto">
-                                <button type="button" class="btn-gallery-duration" data-duracion-foto="5">5s</button>
-                                <button type="button" class="btn-gallery-duration active" data-duracion-foto="8">8s</button>
-                                <button type="button" class="btn-gallery-duration" data-duracion-foto="12">12s</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="grid-moderacion-fotos" class="photos-moderation-grid">
-                        <!-- Se llena dinámicamente desde admin.js con Aprobar, Rechazar y 🗑️ Eliminar Definitivamente -->
-                    </div>
-                </div>
+                <!-- BARRA FIJA SUPERIOR DE PESTAÑAS (TABS) PARA ALTERNAR VISTAS -->
+                <nav class="admin-main-tabs-nav" aria-label="Secciones del panel de administración">
+                    <button type="button" id="tab-btn-fotos" class="admin-main-tab active" data-tab-target="tab-contenido-fotos">
+                        <span class="tab-icon">📸</span>
+                        <span class="tab-label">Moderación de Fotos</span>
+                        <span id="tab-badge-pendientes" class="tab-badge">0</span>
+                    </button>
+                    <button type="button" id="tab-btn-trivia" class="admin-main-tab" data-tab-target="tab-contenido-trivia">
+                        <span class="tab-icon">🎮</span>
+                        <span class="tab-label">Trivia en Vivo</span>
+                        <span id="tab-badge-trivia-fase" class="tab-badge-dot" title="Estado de la Trivia"></span>
+                    </button>
+                    <button type="button" id="tab-btn-invitados" class="admin-main-tab" data-tab-target="tab-contenido-invitados">
+                        <span class="tab-icon">👥</span>
+                        <span class="tab-label">Invitados Conectados</span>
+                        <span id="tab-badge-invitados" class="tab-badge">0</span>
+                    </button>
+                    <button type="button" id="tab-btn-leads" class="admin-main-tab" data-tab-target="tab-contenido-leads">
+                        <span class="tab-icon">📊</span>
+                        <span class="tab-label">CRM & Leads</span>
+                        <span id="tab-badge-leads" class="tab-badge">0</span>
+                    </button>
+                </nav>
 
                 <!-- ===========================================================
-                     2. LISTA DE INVITADOS CONECTADOS Y RANKING DE PUNTAJES
-                        (Ubicada arriba de la Trivia para supervisión constante)
+                     PESTAÑA 1: BANDEJA DE MODERACIÓN DE FOTOS (CON PAGINACIÓN 6 EN 6)
                      =========================================================== -->
-                <div class="panel-card">
-                    <div class="card-header-flex">
-                        <div>
-                            <span class="section-pill">CONTROL DE AFORO DIGITAL & RANKING</span>
-                            <h3>Invitados Conectados (<span id="count-invitados">0</span>)</h3>
-                        </div>
-                        <button type="button" id="btn-limpiar-todos-invitados" class="btn-danger-outline">
-                            Vaciar Invitados del Evento
-                        </button>
-                    </div>
-
-                    <div id="lista-invitados-admin" class="guests-admin-list"></div>
-                </div>
-
-                <!-- ===========================================================
-                     3. RONDA DE PREGUNTAS ESTILO KAHOOT EN VIVO + PODIO DE 3 TARIMAS
-                        ESCALONADAS + GENERADOR DE 10 PREGUNTAS DESDE PDF CON IA
-                     =========================================================== -->
-                <div class="panel-card">
-                    <div class="card-header-flex">
-                        <div>
-                            <span class="section-pill">DINÁMICA INTERACTIVA EN TIEMPO REAL</span>
-                            <h3>Ronda de Preguntas Estilo Kahoot</h3>
-                        </div>
-                        <div class="trivia-live-status-badge" id="badge-estado-trivia-admin">
-                            <span class="live-pulse-dot"></span>
-                            <span id="texto-estado-trivia-admin">TRIVIA INACTIVA</span>
-                        </div>
-                    </div>
-
-                    <!-- CONSOLA DE 4 BOTONES DE DIRECCIÓN EN VIVO -->
-                    <div class="trivia-director-console">
-                        <div class="console-header-row">
-                            <strong>Controles en Vivo para Celulares y Pantalla:</strong>
-                            <span id="contador-votos-ronda" class="votes-counter-pill">
-                                Respuestas recibidas en pregunta activa: 0
-                            </span>
-                        </div>
-
-                        <div class="trivia-controls-grid">
-                            <button type="button" id="btn-trivia-abrir-lobby" class="btn-trivia-control control-lobby">
-                                <span class="control-step">1</span>
-                                <div>
-                                    <strong>Abrir Lobby de Trivia</strong>
-                                    <small>Sala de espera en celulares</small>
-                                </div>
-                            </button>
-
-                            <button type="button" id="btn-trivia-lanzar-pregunta" class="btn-trivia-control control-launch">
-                                <span class="control-step">2</span>
-                                <div>
-                                    <strong>Lanzar Pregunta en Vivo</strong>
-                                    <small>Activa las 4 opciones y el reloj</small>
-                                </div>
-                            </button>
-
-                            <button type="button" id="btn-trivia-revelar-respuesta" class="btn-trivia-control control-reveal">
-                                <span class="control-step">3</span>
-                                <div>
-                                    <strong>Revelar Respuesta Correcta</strong>
-                                    <small>Muestra la solución oficial</small>
-                                </div>
-                            </button>
-
-                            <button type="button" id="btn-trivia-mostrar-podio" class="btn-trivia-control control-podium">
-                                <span class="control-step">4</span>
-                                <div>
-                                    <strong>Mostrar Podio</strong>
-                                    <small>3 Tarimas escalonadas + Confeti</small>
-                                </div>
-                            </button>
-                        </div>
-
-                        <div class="console-secondary-actions">
-                            <button type="button" id="btn-trivia-reiniciar-puntajes" class="btn-subtle">
-                                ↺ Reiniciar Puntajes a 0
-                            </button>
-                            <button type="button" id="btn-trivia-cerrar" class="btn-close-trivia-solid">
-                                <span>⏹️ Finalizar / Cerrar Trivia (Volver a Galería en Proyector)</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- BANCO DE PREGUNTAS DEL EVENTO -->
-                    <div class="questions-bank-section">
-                        <div class="bank-header-row">
+                <div id="tab-contenido-fotos" class="admin-tab-pane active">
+                    <div class="panel-card">
+                        <div class="card-header-flex">
                             <div>
-                                <h4>Banco de Preguntas del Evento (<span id="count-preguntas-evento">0</span>)</h4>
-                                <span class="card-helper">Puedes lanzar cualquier pregunta directamente con el botón "🚀 Lanzar en Vivo"</span>
+                                <span class="section-pill">FILTRO DE CONTENIDO EN VIVO</span>
+                                <h3>Bandeja de Moderación de Fotos</h3>
                             </div>
-                            <button type="button" id="btn-abrir-modal-preguntas-inline" class="btn-outline-gold">
-                                ➕ Crear Preguntas (Manual o PDF con IA)
+                            <div class="filter-tabs">
+                                <button type="button" class="filter-tab active" data-estado="pendiente">
+                                    Pendientes (<span id="count-pendientes">0</span>)
+                                </button>
+                                <button type="button" class="filter-tab" data-estado="aprobado">
+                                    Aprobadas (<span id="count-aprobadas">0</span>)
+                                </button>
+                                <button type="button" class="filter-tab" data-estado="rechazado">
+                                    Rechazadas (<span id="count-rechazadas">0</span>)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- CONTROLES DE AUTO-APROBAR Y APROBACIÓN MASIVA -->
+                        <div class="moderation-automation-bar">
+                            <!-- Control 1: Interruptor Activable de Auto-Aprobar -->
+                            <button
+                                type="button"
+                                id="btn-toggle-auto-aprobar"
+                                class="btn-auto-approve-toggle"
+                                aria-pressed="false"
+                            >
+                                <span class="toggle-status-dot"></span>
+                                <div class="toggle-text-wrap">
+                                    <strong id="titulo-auto-aprobar">⚡ Auto-Aprobar Fotos Automáticamente</strong>
+                                    <span id="subtitulo-auto-aprobar">Inactivo • Las fotos nuevas requieren tu aprobación manual</span>
+                                </div>
+                                <span id="badge-auto-aprobar" class="toggle-pill-state">OFF</span>
+                            </button>
+
+                            <!-- Control 2: Botón de Acción Rápida para Aprobar Todas las Pendientes -->
+                            <button
+                                type="button"
+                                id="btn-aprobar-todas-bandeja"
+                                class="btn-bulk-approve"
+                            >
+                                <span>✅ Aprobar Todas las de la Bandeja (<strong id="count-aprobar-todas">0</strong>)</span>
                             </button>
                         </div>
-                        <div id="lista-preguntas-admin" class="questions-admin-list">
-                            <!-- Se llena dinámicamente desde admin.js -->
+
+                        <!-- CONTROLES DE VISUALIZACIÓN DE GALERÍA EN EL PROYECTOR -->
+                        <div class="projector-gallery-controls-bar" id="panel-controles-galeria-proyector">
+                            <div class="gallery-mode-group">
+                                <span class="gallery-control-label">🖥️ Modo de Galería en Proyector:</span>
+                                <div class="gallery-mode-pills" role="group" aria-label="Modo de visualización de galería">
+                                    <button type="button" class="btn-gallery-mode active" data-modo-galeria="ciclo_auto">
+                                        🔄 Modo Ciclo Automático (1x1 + Mosaico)
+                                    </button>
+                                    <button type="button" class="btn-gallery-mode" data-modo-galeria="individual">
+                                        🖼️ Solo Foto Individual (Carrusel 1x1)
+                                    </button>
+                                    <button type="button" class="btn-gallery-mode" data-modo-galeria="mosaico">
+                                        🧱 Solo Mosaico (6 a 8 fotos)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="gallery-duration-group">
+                                <span class="gallery-control-label">⏱️ Duración por Foto:</span>
+                                <div class="gallery-duration-pills" role="group" aria-label="Duración de cada foto">
+                                    <button type="button" class="btn-gallery-duration" data-duracion-foto="5">5s</button>
+                                    <button type="button" class="btn-gallery-duration active" data-duracion-foto="8">8s</button>
+                                    <button type="button" class="btn-gallery-duration" data-duracion-foto="12">12s</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="grid-moderacion-fotos" class="photos-moderation-grid">
+                            <!-- Se llena dinámicamente desde admin.js con Aprobar, Rechazar y 🗑️ Eliminar Definitivamente -->
+                        </div>
+
+                        <!-- CONTROLES DE PAGINACIÓN CORTO (6 EN 6) -->
+                        <div id="paginacion-fotos-admin" class="pagination-controls-bar hidden">
+                            <span id="texto-paginacion-fotos" class="pagination-info-text">Mostrando 6 fotos</span>
+                            <div class="pagination-actions-row">
+                                <button type="button" id="btn-fotos-mostrar-mas" class="btn-pagination-action">
+                                    Mostrar más fotos (+6)
+                                </button>
+                                <button type="button" id="btn-fotos-toggle-todas" class="btn-pagination-toggle">
+                                    Mostrar todas
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===========================================================
+                     PESTAÑA 2: RONDA DE PREGUNTAS ESTILO KAHOOT EN VIVO
+                     =========================================================== -->
+                <div id="tab-contenido-trivia" class="admin-tab-pane hidden">
+                    <div class="panel-card">
+                        <div class="card-header-flex">
+                            <div>
+                                <span class="section-pill">DINÁMICA INTERACTIVA EN TIEMPO REAL</span>
+                                <h3>Ronda de Preguntas Estilo Kahoot</h3>
+                            </div>
+                            <div class="trivia-live-status-badge" id="badge-estado-trivia-admin">
+                                <span class="live-pulse-dot"></span>
+                                <span id="texto-estado-trivia-admin">TRIVIA INACTIVA</span>
+                            </div>
+                        </div>
+
+                        <!-- CONSOLA DE 5 BOTONES DE DIRECCIÓN EN VIVO -->
+                        <div class="trivia-director-console">
+                            <div class="console-header-row">
+                                <strong>Controles en Vivo para Celulares y Pantalla:</strong>
+                                <span id="contador-votos-ronda" class="votes-counter-pill">
+                                    Respuestas recibidas en pregunta activa: 0
+                                </span>
+                            </div>
+
+                            <div class="trivia-controls-grid">
+                                <button type="button" id="btn-trivia-abrir-lobby" class="btn-trivia-control control-lobby">
+                                    <span class="control-step">1</span>
+                                    <div>
+                                        <strong>Abrir Lobby</strong>
+                                        <small>Sala de espera</small>
+                                    </div>
+                                </button>
+
+                                <button type="button" id="btn-trivia-lanzar-pregunta" class="btn-trivia-control control-launch">
+                                    <span class="control-step">2</span>
+                                    <div>
+                                        <strong id="btn-trivia-lanzar-texto">Lanzar Pregunta</strong>
+                                        <small id="btn-trivia-lanzar-subtexto">4 opciones y reloj</small>
+                                    </div>
+                                </button>
+
+                                <button type="button" id="btn-trivia-revelar-respuesta" class="btn-trivia-control control-reveal">
+                                    <span class="control-step">3</span>
+                                    <div>
+                                        <strong>Revelar Solución</strong>
+                                        <small>Muestra respuesta</small>
+                                    </div>
+                                </button>
+
+                                <button type="button" id="btn-trivia-mostrar-ranking" class="btn-trivia-control control-ranking">
+                                    <span class="control-step">4</span>
+                                    <div>
+                                        <strong>Tabla de Posiciones</strong>
+                                        <small>Ranking en vivo</small>
+                                    </div>
+                                </button>
+
+                                <button type="button" id="btn-trivia-mostrar-podio" class="btn-trivia-control control-podium">
+                                    <span class="control-step">5</span>
+                                    <div>
+                                        <strong>Podio Final</strong>
+                                        <small>Tarimas y fuegos</small>
+                                    </div>
+                                </button>
+                            </div>
+
+                            <div class="console-secondary-actions">
+                                <button type="button" id="btn-trivia-reiniciar-puntajes" class="btn-action-interactivo btn-reiniciar-puntajes">
+                                    <span class="btn-reiniciar-icon">↺</span>
+                                    <span>Reiniciar Puntajes</span>
+                                </button>
+                                <button type="button" id="btn-trivia-cerrar" class="btn-action-interactivo btn-cerrar-trivia">
+                                    <span>⏹️ Cerrar Trivia</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- BANCO DE PREGUNTAS DEL EVENTO -->
+                        <div class="questions-bank-section">
+                            <div class="bank-header-row">
+                                <div>
+                                    <h4>Banco de Preguntas del Evento (<span id="count-preguntas-evento">0</span>)</h4>
+                                    <span class="card-helper">Puedes lanzar cualquier pregunta directamente con el botón "🚀 Lanzar en Vivo"</span>
+                                </div>
+                                <div class="bank-actions-group">
+                                    <button type="button" id="btn-vaciar-preguntas-evento" class="btn-action-danger-clean">
+                                        🗑️ Vaciar Preguntas
+                                    </button>
+                                    <button type="button" id="btn-abrir-modal-preguntas-inline" class="btn-outline-gold">
+                                        ➕ Crear Preguntas
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="lista-preguntas-admin" class="questions-admin-list">
+                                <!-- Se llena dinámicamente desde admin.js -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===========================================================
+                     PESTAÑA 3: LISTA DE INVITADOS CONECTADOS (BUSCADOR + PAGINACIÓN)
+                     =========================================================== -->
+                <div id="tab-contenido-invitados" class="admin-tab-pane hidden">
+                    <div class="panel-card">
+                        <div class="card-header-flex">
+                            <div>
+                                <span class="section-pill">CONTROL DE AFORO DIGITAL & RANKING</span>
+                                <h3>Invitados Conectados (<span id="count-invitados">0</span>)</h3>
+                            </div>
+                            <button type="button" id="btn-limpiar-todos-invitados" class="btn-danger-outline">
+                                Vaciar Invitados del Evento
+                            </button>
+                        </div>
+
+                        <!-- BARRA DE BÚSQUEDA RÁPIDA DE INVITADOS -->
+                        <div class="guests-search-toolbar">
+                            <div class="search-input-wrap">
+                                <span class="search-icon">🔍</span>
+                                <input
+                                    type="text"
+                                    id="input-buscar-invitado"
+                                    class="gala-input guest-search-input"
+                                    placeholder="Buscar invitado por nombre o apellido..."
+                                    autocomplete="off"
+                                />
+                                <button type="button" id="btn-limpiar-busqueda-invitado" class="btn-clear-search hidden" title="Limpiar búsqueda">✕</button>
+                            </div>
+                            <span id="conteo-filtrado-invitados" class="guests-filter-count-badge"></span>
+                        </div>
+
+                        <div id="lista-invitados-admin" class="guests-admin-list"></div>
+
+                        <!-- CONTROLES DE PAGINACIÓN (8 EN 8) -->
+                        <div id="paginacion-invitados-admin" class="pagination-controls-bar hidden">
+                            <span id="texto-paginacion-invitados" class="pagination-info-text">Mostrando 8 invitados</span>
+                            <div class="pagination-actions-row">
+                                <button type="button" id="btn-invitados-mostrar-mas" class="btn-pagination-action">
+                                    Ver más invitados (+8)
+                                </button>
+                                <button type="button" id="btn-invitados-toggle-todos" class="btn-pagination-toggle">
+                                    Ver todos
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===========================================================
+                     PESTAÑA 4: CRM & LEADS CAPTURADOS EN EL EVENTO
+                     =========================================================== -->
+                <div id="tab-contenido-leads" class="admin-tab-pane hidden">
+                    <div class="panel-card">
+                        <div class="card-header-flex">
+                            <div>
+                                <span class="section-pill">CRM & MARKETING SEGALÚ</span>
+                                <h3>Interesados & Cupones Promocionales (<span id="count-leads-total">0</span>)</h3>
+                                <p class="card-helper">Base de datos de prospectos recolectados en el evento listos para cotizaciones y remarketing.</p>
+                            </div>
+                            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                                <button type="button" id="btn-vaciar-leads-admin" class="btn-danger-outline" style="display:inline-flex; align-items:center; gap:8px;">
+                                    <span>🗑️ Vaciar Leads del Evento</span>
+                                </button>
+                                <button type="button" id="btn-exportar-leads-csv" class="btn-gold-primary" style="display:inline-flex; align-items:center; gap:8px;">
+                                    <span>📥 Exportar Base de Datos a CSV / Excel</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- MÉTRICAS RÁPIDAS DEL EVENTO -->
+                        <div class="crm-metrics-summary-row">
+                            <div class="crm-metric-card">
+                                <span class="crm-metric-label">TOTAL LEADS</span>
+                                <strong id="crm-metric-total" class="crm-metric-value">0</strong>
+                                <span class="crm-metric-sub">Prospectos registrados</span>
+                            </div>
+                            <div class="crm-metric-card">
+                                <span class="crm-metric-label">CUPONES ACTIVOS</span>
+                                <strong id="crm-metric-cupones" class="crm-metric-value text-gold">0</strong>
+                                <span class="crm-metric-sub">Pases VIP emitidos</span>
+                            </div>
+                            <div class="crm-metric-card">
+                                <span class="crm-metric-label">CONVERSIÓN</span>
+                                <strong id="crm-metric-tasa" class="crm-metric-value text-green">0%</strong>
+                                <span class="crm-metric-sub">% sobre invitados</span>
+                            </div>
+                        </div>
+
+                        <!-- DASHBOARD INTERACTIVO DE GRÁFICOS (CHART.JS) -->
+                        <div class="crm-charts-grid">
+                            <div class="crm-chart-card">
+                                <div class="crm-chart-header">
+                                    <h4>🎂 Distribución por Rangos de Edad</h4>
+                                    <span class="crm-chart-sub">Quinceañeras & Segmentos</span>
+                                </div>
+                                <div class="crm-canvas-wrap">
+                                    <canvas id="chart-crm-edades" height="200"></canvas>
+                                </div>
+                                <div class="crm-chart-footer-hint">💡 Clic en un segmento para filtrar la tabla</div>
+                            </div>
+                            <div class="crm-chart-card">
+                                <div class="crm-chart-header">
+                                    <h4>🎉 Próximos Cumpleaños (30 / 60 Días)</h4>
+                                    <span class="crm-chart-sub">Campañas de Remarketing</span>
+                                </div>
+                                <div class="crm-canvas-wrap">
+                                    <canvas id="chart-crm-cumples" height="200"></canvas>
+                                </div>
+                                <div class="crm-chart-footer-hint">💡 Clic en una barra para filtrar cumpleañeros</div>
+                            </div>
+                        </div>
+
+                        <!-- INDICADOR DE FILTRO INTERACTIVO DE GRÁFICO ACTIVO -->
+                        <div id="crm-active-filter-banner" class="crm-active-filter-banner hidden">
+                            <div class="crm-filter-banner-text">
+                                <span class="crm-filter-icon">🎯</span>
+                                <span>Filtrando tabla por gráfico: <strong id="crm-filter-label">—</strong></span>
+                            </div>
+                            <button type="button" id="btn-remover-filtro-grafico" class="btn-clear-chart-filter">✕ Ver todos los leads</button>
+                        </div>
+
+                        <!-- BARRA DE BÚSQUEDA RÁPIDA DE LEADS -->
+                        <div class="guests-search-toolbar">
+                            <div class="search-input-wrap">
+                                <span class="search-icon">🔍</span>
+                                <input
+                                    type="text"
+                                    id="input-buscar-leads"
+                                    class="gala-input guest-search-input"
+                                    placeholder="Buscar lead por nombre, teléfono, código o género..."
+                                    autocomplete="off"
+                                />
+                                <button type="button" id="btn-limpiar-busqueda-leads" class="btn-clear-search hidden" title="Limpiar búsqueda">✕</button>
+                            </div>
+                            <span id="conteo-filtrado-leads" class="guests-filter-count-badge"></span>
+                        </div>
+
+                        <!-- TABLA LIMPIA DE LEADS -->
+                        <div class="crm-table-container">
+                            <table class="crm-leads-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre y Apellido</th>
+                                        <th>Teléfono / WhatsApp</th>
+                                        <th>Nacimiento</th>
+                                        <th>Género</th>
+                                        <th>Correo Electrónico</th>
+                                        <th>Código Promocional</th>
+                                        <th>Fecha Registro</th>
+                                        <th>Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-leads-admin">
+                                    <tr>
+                                        <td colspan="8" class="crm-empty-state">
+                                            Aún no hay leads capturados en este evento. Los invitados podrán solicitarlos tocando "🎁 Pase VIP & Descuento".
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -400,7 +572,7 @@
                 <div>
                     <span class="section-pill">GALERÍA PROMOCIONAL EN EL CELULAR DEL INVITADO</span>
                     <h3 id="titulo-modal-sedes">🖼️ Administrar Galería de Fotos por Sede</h3>
-                    <p class="card-helper">Las fotos se redimensionan a proporción 16:10 y se actualizan al instante en "Vive la Experiencia Segalú".</p>
+                    <p class="card-helper">Las fotos se redimensionan a formato vertical 4:5 (1080x1350) y puedes editar el título corto de cada una.</p>
                 </div>
             </div>
 
@@ -472,6 +644,16 @@
                             <p class="card-helper">Extrae automáticamente 10 preguntas listas para jugar en vivo.</p>
                         </div>
                         <div class="builder-quick-actions">
+                            <div class="ai-duration-selector-row">
+                                <label for="select-tiempo-ia" class="field-label-sm">⏱️ Duración:</label>
+                                <select id="select-tiempo-ia" class="gala-select gala-select-sm">
+                                    <option value="10">10s</option>
+                                    <option value="15">15s</option>
+                                    <option value="20" selected>20s (Kahoot)</option>
+                                    <option value="30">30s</option>
+                                    <option value="45">45s</option>
+                                </select>
+                            </div>
                             <input
                                 type="file"
                                 id="input-pdf-trivia-ia"
@@ -589,6 +771,262 @@
         </div>
     </div>
 
+    <!-- =======================================================================
+         MODAL FLOTANTE 3: EDITAR PREGUNTA EXISTENTE DEL BANCO
+         ======================================================================= -->
+    <div id="modal-editar-pregunta-admin" class="admin-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-editar-pregunta">
+        <div class="admin-popup-modal-card modal-preguntas-card">
+            <div class="admin-popup-modal-header">
+                <div>
+                    <span class="section-pill">EDICIÓN RÁPIDA</span>
+                    <h3 id="titulo-modal-editar-pregunta">✏️ Editar Pregunta</h3>
+                    <p class="card-helper">Modifica el enunciado, alternativas, respuesta correcta o tiempo límite.</p>
+                </div>
+                <button type="button" id="btn-cerrar-modal-editar-pregunta-x" class="toast-close-btn" aria-label="Cerrar ventana">&times;</button>
+            </div>
+            <div class="admin-popup-modal-body">
+                <form id="form-editar-pregunta" novalidate>
+                    <input type="hidden" id="edit-pregunta-id" value="" />
+                    <div class="form-group">
+                        <label for="edit-enunciado-pregunta" class="field-label">Enunciado de la Pregunta</label>
+                        <input
+                            type="text"
+                            id="edit-enunciado-pregunta"
+                            class="gala-input"
+                            maxlength="280"
+                            required
+                        />
+                    </div>
+
+                    <div class="options-ABCD-grid">
+                        <div class="option-input-wrap opt-a-border">
+                            <span class="opt-badge opt-badge-a">▲ Opción A (Rojo)</span>
+                            <input
+                                type="text"
+                                id="edit-opcion-a"
+                                class="gala-input"
+                                required
+                            />
+                        </div>
+
+                        <div class="option-input-wrap opt-b-border">
+                            <span class="opt-badge opt-badge-b">◆ Opción B (Azul)</span>
+                            <input
+                                type="text"
+                                id="edit-opcion-b"
+                                class="gala-input"
+                                required
+                            />
+                        </div>
+
+                        <div class="option-input-wrap opt-c-border">
+                            <span class="opt-badge opt-badge-c">● Opción C (Amarillo)</span>
+                            <input
+                                type="text"
+                                id="edit-opcion-c"
+                                class="gala-input"
+                                required
+                            />
+                        </div>
+
+                        <div class="option-input-wrap opt-d-border">
+                            <span class="opt-badge opt-badge-d">■ Opción D (Verde)</span>
+                            <input
+                                type="text"
+                                id="edit-opcion-d"
+                                class="gala-input"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <div class="question-settings-row">
+                        <div class="form-group">
+                            <label for="edit-select-respuesta-correcta" class="field-label">Alternativa Correcta</label>
+                            <select id="edit-select-respuesta-correcta" class="gala-select">
+                                <option value="A">Alternativa A (▲ Rojo)</option>
+                                <option value="B">Alternativa B (◆ Azul)</option>
+                                <option value="C">Alternativa C (● Amarillo)</option>
+                                <option value="D">Alternativa D (■ Verde)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="edit-select-tiempo-limite" class="field-label">Tiempo Límite (Segundos)</label>
+                            <select id="edit-select-tiempo-limite" class="gala-select">
+                                <option value="10">10 segundos (Rápida)</option>
+                                <option value="15">15 segundos</option>
+                                <option value="20">20 segundos (Kahoot)</option>
+                                <option value="30">30 segundos</option>
+                                <option value="45">45 segundos</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group form-group-btn">
+                            <button type="submit" id="btn-guardar-cambios-pregunta" class="btn-gold-primary">
+                                <span>💾 Guardar Cambios</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="admin-popup-modal-footer">
+                <button type="button" id="btn-cerrar-modal-editar-pregunta" class="btn-modal-close-clean">
+                    <span>Cancelar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         MODAL FLOTANTE 4: CREAR NUEVO EVENTO EN SEGALÚ
+         ======================================================================= -->
+    <div id="modal-crear-evento-admin" class="admin-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-crear-evento">
+        <div class="admin-popup-modal-card modal-crear-evento-card">
+            <div class="admin-popup-modal-header">
+                <div>
+                    <span class="section-pill">NUEVA CELEBRACIÓN</span>
+                    <h3 id="titulo-modal-crear-evento">✨ Crear Evento en Segalú</h3>
+                    <p class="card-helper">Registra una nueva fecha, código QR y sede oficial para moderación en vivo.</p>
+                </div>
+                <button type="button" id="btn-cerrar-modal-crear-evento-x" class="toast-close-btn" aria-label="Cerrar ventana">&times;</button>
+            </div>
+
+            <div class="admin-popup-modal-body">
+                <form id="form-crear-evento" novalidate>
+                    <div class="form-group">
+                        <label for="select-sede-local" class="field-label">Sede de Segalú</label>
+                        <select id="select-sede-local" class="gala-select" required></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-nombre-evento" class="field-label">Nombre del Evento</label>
+                        <input
+                            type="text"
+                            id="input-nombre-evento"
+                            class="gala-input"
+                            placeholder="Ej: XV Años de Fernanda"
+                            required
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-codigo-qr" class="field-label">Código corto para el QR</label>
+                        <input
+                            type="text"
+                            id="input-codigo-qr"
+                            class="gala-input uppercase-input"
+                            placeholder="Ej: XV-FERNANDA"
+                            maxlength="20"
+                            required
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-fecha-evento" class="field-label">Fecha del Evento</label>
+                        <input
+                            type="date"
+                            id="input-fecha-evento"
+                            class="gala-input"
+                            required
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="select-tematica-evento" class="field-label">Temática de Accesorios del Avatar</label>
+                        <select id="select-tematica-evento" class="gala-select">
+                            <option value="todos">✨ Todos los Paquetes (Universal)</option>
+                            <option value="15anos">👑 15 Años (Coronas, Tiara, Flores, Antifaz)</option>
+                            <option value="graduacion">🎓 Graduación (Birretes, Medallas, Diplomas)</option>
+                            <option value="gala_bodas">🎩 Gala y Bodas (Sombreros, Velo, Corbatín)</option>
+                            <option value="fiesta_vip">🕶️ Fiesta VIP (Lentes Neón, Pelucas, Gorras)</option>
+                        </select>
+                    </div>
+
+                    <div class="modal-form-actions">
+                        <button type="button" id="btn-cancelar-modal-crear-evento" class="btn-modal-close-clean">
+                            Cancelar
+                        </button>
+                        <button type="submit" id="btn-crear-evento" class="btn-gold-primary">
+                            <span>Crear Evento Activo</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- =======================================================================
+         MODAL FLOTANTE 5: SUBIR ACCESORIOS PERSONALIZADOS (PNG TRANSPARENTE 256x256)
+         ======================================================================= -->
+    <div id="modal-subir-accesorio-admin" class="admin-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-accesorio">
+        <div class="admin-popup-modal-card modal-accesorio-card">
+            <div class="admin-popup-modal-header">
+                <div>
+                    <span class="section-pill">PERSONALIZACIÓN DE AVATARES</span>
+                    <h3 id="titulo-modal-accesorio">🎨 Subir Accesorio Personalizado</h3>
+                    <p class="card-helper">Sube un accesorio en PNG transparente. Se redimensiona automáticamente a 256x256 px.</p>
+                </div>
+                <button type="button" id="btn-cerrar-modal-accesorio-x" class="toast-close-btn" aria-label="Cerrar ventana">&times;</button>
+            </div>
+
+            <div class="admin-popup-modal-body">
+                <form id="form-subir-accesorio" novalidate>
+                    <div class="form-group">
+                        <label for="input-nombre-accesorio" class="field-label">Nombre del Accesorio</label>
+                        <input
+                            type="text"
+                            id="input-nombre-accesorio"
+                            class="gala-input"
+                            placeholder="Ej: Corona de Diamantes"
+                            required
+                        />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="select-tematica-accesorio" class="field-label">Temática / Paquete</label>
+                        <select id="select-tematica-accesorio" class="gala-select" required>
+                            <option value="15anos">👑 15 Años</option>
+                            <option value="graduacion">🎓 Graduación</option>
+                            <option value="gala_bodas">🎩 Gala y Bodas</option>
+                            <option value="fiesta_vip">🕶️ Fiesta VIP</option>
+                            <option value="general">✨ General / Todos</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-archivo-accesorio" class="field-label">Archivo PNG Transparente (256x256)</label>
+                        <input
+                            type="file"
+                            id="input-archivo-accesorio"
+                            class="gala-input"
+                            accept="image/png,.png"
+                            required
+                        />
+                        <span class="field-help-text" style="font-size: 0.8rem; color: var(--text-warm-gray); display: block; margin-top: 4px;">
+                            Solo imágenes PNG con fondo transparente.
+                        </span>
+                    </div>
+
+                    <div id="preview-accesorio-wrap" class="accessory-preview-box hidden">
+                        <strong style="font-size: 0.85rem;">Vista Previa:</strong>
+                        <img id="img-preview-accesorio" src="" alt="Previsualización" class="accessory-preview-thumb" />
+                    </div>
+
+                    <div class="modal-form-actions">
+                        <button type="button" id="btn-cancelar-modal-accesorio" class="btn-modal-close-clean">
+                            Cancelar
+                        </button>
+                        <button type="submit" id="btn-guardar-accesorio" class="btn-gold-primary">
+                            <span>Subir Accesorio PNG</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- VISOR DE PROYECCIÓN COMPLETA CON DOBLE CAPA AMBIENT BLUR -->
     <div id="modal-visor-foto-admin" class="admin-modal-backdrop hidden" role="dialog" aria-modal="true">
         <div class="admin-lightbox-card">
@@ -603,6 +1041,6 @@
         </div>
     </div>
 
-    <script src="/admin/admin.js?v=20261018b"></script>
+    <script src="/admin/admin.js?v=20261019a"></script>
 </body>
 </html>
