@@ -310,6 +310,8 @@ const btnVerificarCodigoEl = document.getElementById("btn-verificar-codigo");
 const formRegistroEl = document.getElementById("form-registro-invitado");
 const inputNombreEl = document.getElementById("input-nombre");
 const btnEntrarEl = document.getElementById("btn-entrar");
+const registroCharLayerEl = document.getElementById("registro-char-layer");
+const registroAccLayerEl = document.getElementById("registro-acc-layer");
 
 // Elementos del Lobby
 const lobbyCharLayerEl = document.getElementById("lobby-char-layer");
@@ -378,8 +380,42 @@ async function cargarAccesoriosPersonalizados() {
     try {
         const res = await fetch("/api/accesorios");
         const data = await res.json();
-        if (data.ok && Array.isArray(data.personalizados)) {
-            accesoriosPersonalizadosServidor = data.personalizados;
+        if (data.ok) {
+            if (Array.isArray(data.personalizados)) {
+                accesoriosPersonalizadosServidor = data.personalizados;
+            }
+            if (data.paquetes && typeof data.paquetes === "object") {
+                Object.entries(data.paquetes).forEach(([pkgId, pkgData]) => {
+                    const accesoriosProcesados = (pkgData.accesorios || []).map((acc) => ({
+                        id: acc.id,
+                        nombre: acc.nombre,
+                        subtitulo: acc.subtitulo || "Personalizado",
+                        icono: acc.icono || "✨",
+                        archivo: acc.archivo,
+                        rutaImagen: acc.url || `/static/accessories/${pkgId}/${acc.archivo}`,
+                    }));
+
+                    if (PAQUETES_ACCESORIOS_TEMATICOS[pkgId]) {
+                        PAQUETES_ACCESORIOS_TEMATICOS[pkgId].nombrePaquete = pkgData.nombre || PAQUETES_ACCESORIOS_TEMATICOS[pkgId].nombrePaquete;
+                        const idsExistentes = new Set(PAQUETES_ACCESORIOS_TEMATICOS[pkgId].accesorios.map((a) => a.id));
+                        accesoriosProcesados.forEach((a) => {
+                            if (!idsExistentes.has(a.id)) {
+                                PAQUETES_ACCESORIOS_TEMATICOS[pkgId].accesorios.push(a);
+                                idsExistentes.add(a.id);
+                            }
+                        });
+                    } else {
+                        PAQUETES_ACCESORIOS_TEMATICOS[pkgId] = {
+                            nombrePaquete: pkgData.nombre || pkgId,
+                            carpeta: `/static/accessories/${pkgId}`,
+                            accesorios: accesoriosProcesados,
+                        };
+                    }
+                    MAPA_TEMATICA_A_PAQUETE[pkgId] = pkgId;
+                    const sinPrefijo = pkgId.replace(/^paquete_/, "");
+                    MAPA_TEMATICA_A_PAQUETE[sinPrefijo] = pkgId;
+                });
+            }
             if (typeof renderizarCuadriculaAccesorios === "function") {
                 renderizarCuadriculaAccesorios();
             }
@@ -389,13 +425,31 @@ async function cargarAccesoriosPersonalizados() {
 
 const MAPA_TEMATICA_A_PAQUETE = {
     "15_anos": "paquete_15_anos",
+    "15anos": "paquete_15_anos",
     "quinceanero": "paquete_15_anos",
     "graduacion": "paquete_graduacion",
     "gala_boda": "paquete_boda",
+    "gala_bodas": "paquete_boda",
     "boda": "paquete_boda",
     "fiesta_vip": "paquete_general",
+    "vip": "paquete_general",
     "general": "paquete_general",
+    "princesas_disney": "paquete_princesas_disney",
 };
+
+function normalizarClavePaquete(tematica) {
+    if (!tematica) return "todos";
+    const t = tematica.toLowerCase().trim();
+    if (t === "todos") return "todos";
+    return (
+        MAPA_TEMATICA_A_PAQUETE[t] ||
+        (PAQUETES_ACCESORIOS_TEMATICOS[t]
+            ? t
+            : PAQUETES_ACCESORIOS_TEMATICOS[`paquete_${t}`]
+            ? `paquete_${t}`
+            : t)
+    );
+}
 
 function obtenerTodosLosAccesorios() {
     const mapa = new Map();
@@ -410,25 +464,27 @@ function obtenerTodosLosAccesorios() {
     });
 
     Object.entries(PAQUETES_ACCESORIOS_TEMATICOS).forEach(([paqueteKey, paquete]) => {
-        paquete.accesorios.forEach((acc) => {
+        (paquete.accesorios || []).forEach((acc) => {
+            const ruta = acc.rutaImagen || `${paquete.carpeta}/${acc.archivo}`;
             mapa.set(acc.id, {
                 ...acc,
                 paqueteKey,
                 nombrePaquete: paquete.nombrePaquete,
-                rutaImagen: `${paquete.carpeta}/${acc.archivo}`,
+                rutaImagen: ruta,
             });
         });
     });
 
     accesoriosPersonalizadosServidor.forEach((acc) => {
         if (!acc || !acc.id) return;
-        const pKey = MAPA_TEMATICA_A_PAQUETE[acc.tematica] || "paquete_general";
+        const pKey = normalizarClavePaquete(acc.tematica || acc.paquete_id || "general");
         const rutaImg = acc.url || acc.rutaImagen || `/static/accessories/${acc.tematica || "general"}/${acc.archivo || acc.id + ".png"}`;
         const existente = mapa.get(acc.id);
         if (existente) {
             mapa.set(acc.id, {
                 ...existente,
                 rutaImagen: rutaImg || existente.rutaImagen,
+                paqueteKey: pKey || existente.paqueteKey,
             });
         } else {
             mapa.set(acc.id, {
@@ -451,10 +507,13 @@ function obtenerAccesoriosPermitidosEvento() {
     const tematica = (eventoActual?.tematica_accesorios || "todos").toLowerCase().trim();
     if (tematica === "todos") return todos;
 
-    const paqueteRequerido = MAPA_TEMATICA_A_PAQUETE[tematica];
-    if (!paqueteRequerido) return todos;
+    const paqueteRequerido = normalizarClavePaquete(tematica);
+    const permitidos = todos.filter((acc) => acc.id === "sin_accesorio" || acc.paqueteKey === paqueteRequerido);
 
-    return todos.filter((acc) => acc.id === "sin_accesorio" || acc.paqueteKey === paqueteRequerido);
+    if (permitidos.length <= 1) {
+        return permitidos.length === 1 ? permitidos : [todos.find((a) => a.id === "sin_accesorio") || { id: "sin_accesorio", nombre: "Sin Accesorio" }];
+    }
+    return permitidos;
 }
 
 function seleccionarAccesorioAleatorioSegunTematica() {
@@ -462,6 +521,14 @@ function seleccionarAccesorioAleatorioSegunTematica() {
     if (permitidos.length === 0) return "sin_accesorio";
     const idx = Math.floor(Math.random() * permitidos.length);
     return permitidos[idx].id;
+}
+
+function actualizarPrevisualizacionRegistro() {
+    if (registroCharLayerEl && registroAccLayerEl) {
+        const personajeObj = buscarPersonajePorId(personajeSeleccionadoId);
+        const accesorioObj = buscarAccesorioPorId(accesorioSeleccionadoId);
+        pintarCapasAvatar(registroCharLayerEl, registroAccLayerEl, personajeObj, accesorioObj);
+    }
 }
 
 function buscarPersonajePorId(id) {
@@ -482,7 +549,9 @@ function buscarAccesorioPorId(id) {
             paqueteKey: "paquete_general",
         };
     }
-    return todos[1]; // Por defecto Corona Imperial
+    const permitidos = obtenerAccesoriosPermitidosEvento();
+    const primeroPermitido = permitidos.find((a) => a.id !== "sin_accesorio");
+    return primeroPermitido || todos.find((a) => a.id === "sin_accesorio") || todos[0];
 }
 
 function descomponerCodigoAvatar(codigoAvatar) {
@@ -669,6 +738,9 @@ async function cargarEventoPorCodigo(codigoAcceso) {
 
         eventoActual = resultado.evento;
         actualizarCabeceraYWhatsApp(eventoActual);
+        await cargarAccesoriosPersonalizados();
+        accesorioSeleccionadoId = seleccionarAccesorioAleatorioSegunTematica();
+        actualizarPrevisualizacionRegistro();
         return eventoActual;
     } catch (error) {
         eventoActual = null;
@@ -889,7 +961,7 @@ function renderizarFiltrosPaquetes() {
             })),
         ];
     } else {
-        const paqueteClave = MAPA_TEMATICA_A_PAQUETE[tematica] || "paquete_general";
+        const paqueteClave = normalizarClavePaquete(tematica);
         const nombrePaquete = PAQUETES_ACCESORIOS_TEMATICOS[paqueteClave]?.nombrePaquete || "Accesorios";
         opcionesFiltro = [
             { key: paqueteClave, label: `✨ ${nombrePaquete}` },

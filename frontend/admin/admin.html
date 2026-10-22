@@ -164,7 +164,7 @@
                                 class="btn-exec-action btn-exec-accessories"
                                 style="grid-column: 1 / -1; margin-top: 4px;"
                             >
-                                <span>🎨 Subir Accesorios PNG</span>
+                                <span>🎨 Paquetes Accesorios</span>
                             </button>
                         </div>
                     </div>
@@ -916,7 +916,6 @@
                     <h3 id="titulo-modal-crear-evento">✨ Crear Evento en Segalú</h3>
                     <p class="card-helper">Registra una nueva fecha, código QR y sede oficial para moderación en vivo.</p>
                 </div>
-                <button type="button" id="btn-cerrar-modal-crear-evento-x" class="toast-close-btn" aria-label="Cerrar ventana">&times;</button>
             </div>
 
             <div class="admin-popup-modal-body">
@@ -963,10 +962,11 @@
                         <label for="select-tematica-evento" class="field-label">Temática de Accesorios del Avatar</label>
                         <select id="select-tematica-evento" class="gala-select">
                             <option value="todos">✨ Todos los Paquetes (Universal)</option>
-                            <option value="15anos">👑 15 Años (Coronas, Tiara, Flores, Antifaz)</option>
-                            <option value="graduacion">🎓 Graduación (Birretes, Medallas, Diplomas)</option>
-                            <option value="gala_bodas">🎩 Gala y Bodas (Sombreros, Velo, Corbatín)</option>
-                            <option value="fiesta_vip">🕶️ Fiesta VIP (Lentes Neón, Pelucas, Gorras)</option>
+                            <option value="paquete_15_anos">👑 15 Años (Coronas, Tiara, Flores, Antifaz)</option>
+                            <option value="paquete_boda">🎩 Gala y Bodas (Sombreros, Velo, Corbatín)</option>
+                            <option value="paquete_princesas_disney">👸 Princesas Disney (Tiaras Mágicas)</option>
+                            <option value="paquete_graduacion">🎓 Graduación (Birretes, Medallas, Diplomas)</option>
+                            <option value="paquete_general">🕶️ Fiesta VIP (Lentes Neón, Pelucas, Gorras)</option>
                         </select>
                     </div>
 
@@ -984,71 +984,121 @@
     </div>
 
     <!-- =======================================================================
-         MODAL FLOTANTE 5: SUBIR ACCESORIOS PERSONALIZADOS (PNG TRANSPARENTE 256x256)
+         MODAL FLOTANTE 5: GESTOR DE PAQUETES DE ACCESORIOS PERSONALIZADOS
          ======================================================================= -->
     <div id="modal-subir-accesorio-admin" class="admin-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-accesorio">
-        <div class="admin-popup-modal-card modal-accesorio-card">
+        <div class="admin-popup-modal-card modal-paquetes-accesorios-card">
             <div class="admin-popup-modal-header">
                 <div>
-                    <span class="section-pill">PERSONALIZACIÓN DE AVATARES</span>
-                    <h3 id="titulo-modal-accesorio">🎨 Subir Accesorio Personalizado</h3>
-                    <p class="card-helper">Sube un accesorio en PNG transparente. Se redimensiona automáticamente a 256x256 px.</p>
+                    <span class="section-pill">GESTIÓN DE AVATARES</span>
+                    <h3 id="titulo-modal-accesorio">🎨 Gestor de Paquetes de Accesorios</h3>
+                    <p class="card-helper">Crea temáticas exclusivas para este evento o permanentes para toda la plataforma.</p>
                 </div>
-                <button type="button" id="btn-cerrar-modal-accesorio-x" class="toast-close-btn" aria-label="Cerrar ventana">&times;</button>
             </div>
 
             <div class="admin-popup-modal-body">
-                <form id="form-subir-accesorio" novalidate>
+                <!-- FORMULARIO DE SUBIDA / CREACIÓN DE PAQUETES -->
+                <form id="form-subir-accesorio" class="form-paquetes-accesorios" novalidate>
+                    <!-- SELECCIÓN DE MODO DE DESTINO -->
                     <div class="form-group">
-                        <label for="input-nombre-accesorio" class="field-label">Nombre del Accesorio</label>
-                        <input
-                            type="text"
-                            id="input-nombre-accesorio"
-                            class="gala-input"
-                            placeholder="Ej: Corona de Diamantes"
-                            required
-                        />
+                        <label class="field-label">Modo de Destino</label>
+                        <div class="segmented-control-group">
+                            <label class="segmented-option">
+                                <input type="radio" name="radio-modo-destino" id="modo-destino-nuevo" value="crear" checked />
+                                <span class="segmented-btn">➕ Crear Nuevo Paquete</span>
+                            </label>
+                            <label class="segmented-option">
+                                <input type="radio" name="radio-modo-destino" id="modo-destino-existente" value="existente" />
+                                <span class="segmented-btn">📂 Agregar a Paquete Existente</span>
+                            </label>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="select-tematica-accesorio" class="field-label">Temática / Paquete</label>
-                        <select id="select-tematica-accesorio" class="gala-select" required>
-                            <option value="15anos">👑 15 Años</option>
-                            <option value="graduacion">🎓 Graduación</option>
-                            <option value="gala_bodas">🎩 Gala y Bodas</option>
-                            <option value="fiesta_vip">🕶️ Fiesta VIP</option>
-                            <option value="general">✨ General / Todos</option>
-                        </select>
+                    <!-- BLOQUE A: NUEVO PAQUETE PERSONALIZADO -->
+                    <div id="bloque-destino-nuevo" class="destino-bloque">
+                        <div class="form-group">
+                            <label for="input-nombre-nuevo-paquete" class="field-label">Nombre del Nuevo Paquete</label>
+                            <input
+                                type="text"
+                                id="input-nombre-nuevo-paquete"
+                                class="gala-input"
+                                placeholder="Ej: 15 Años Princesa Diana"
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label class="field-label">Alcance del Paquete (Scope)</label>
+                            <div class="segmented-control-group scope-selector-group">
+                                <label class="segmented-option">
+                                    <input type="radio" name="radio-alcance-paquete" id="alcance-global" value="global" checked />
+                                    <span class="segmented-btn">🌐 Todos los Eventos (Permanente)</span>
+                                </label>
+                                <label class="segmented-option">
+                                    <input type="radio" name="radio-alcance-paquete" id="alcance-evento" value="evento" />
+                                    <span class="segmented-btn">📍 Solo este Evento (Temporal)</span>
+                                </label>
+                            </div>
+                            <span class="field-help-text">
+                                Los paquetes temporales se vinculan al evento activo y se purgan automáticamente si el evento se elimina.
+                            </span>
+                        </div>
                     </div>
 
+                    <!-- BLOQUE B: PAQUETE EXISTENTE -->
+                    <div id="bloque-destino-existente" class="destino-bloque hidden">
+                        <div class="form-group">
+                            <label for="select-paquete-existente-admin" class="field-label">Seleccionar Paquete de Destino</label>
+                            <select id="select-paquete-existente-admin" class="gala-select"></select>
+                        </div>
+                    </div>
+
+                    <!-- SUBIDA MÚLTIPLE DE ARCHIVOS PNG -->
                     <div class="form-group">
-                        <label for="input-archivo-accesorio" class="field-label">Archivo PNG Transparente (256x256)</label>
+                        <label for="input-archivo-accesorio" class="field-label">Subir Archivos PNG Transparentes (256x256)</label>
                         <input
                             type="file"
                             id="input-archivo-accesorio"
                             class="gala-input"
                             accept="image/png,.png"
-                            required
+                            multiple
                         />
-                        <span class="field-help-text" style="font-size: 0.8rem; color: var(--text-warm-gray); display: block; margin-top: 4px;">
-                            Solo imágenes PNG con fondo transparente.
+                        <span class="field-help-text">
+                            Selecciona uno o varios archivos PNG. Se redimensionan automáticamente a 256x256 px con fondo transparente.
                         </span>
                     </div>
 
-                    <div id="preview-accesorio-wrap" class="accessory-preview-box hidden">
-                        <strong style="font-size: 0.85rem;">Vista Previa:</strong>
-                        <img id="img-preview-accesorio" src="" alt="Previsualización" class="accessory-preview-thumb" />
+                    <!-- CONTENEDOR DE ELEMENTOS SELECCIONADOS (STAGING LIST CON NOMBRES EDITABLES) -->
+                    <div id="staged-accesorios-wrap" class="staged-accesorios-container hidden">
+                        <div class="staged-header">
+                            <strong class="staged-title">Accesorios Listos para Subir (<span id="staged-contador">0</span>)</strong>
+                            <button type="button" id="btn-limpiar-staged" class="btn-clear-staged">Limpiar Selección</button>
+                        </div>
+                        <div id="staged-accesorios-lista" class="staged-accesorios-grid"></div>
                     </div>
 
                     <div class="modal-form-actions">
-                        <button type="button" id="btn-cancelar-modal-accesorio" class="btn-modal-close-clean">
-                            Cancelar
-                        </button>
                         <button type="submit" id="btn-guardar-accesorio" class="btn-gold-primary">
-                            <span>Subir Accesorio PNG</span>
+                            <span>⬆️ Subir y Guardar Accesorios</span>
                         </button>
                     </div>
                 </form>
+
+                <!-- SECCIÓN: CATÁLOGO DE PAQUETES ACTIVOS -->
+                <div class="catalogo-paquetes-section">
+                    <div class="catalogo-paquetes-header">
+                        <h4>📦 Paquetes de Accesorios Activos</h4>
+                        <span class="card-helper">Activa o administra las temáticas disponibles para tus eventos.</span>
+                    </div>
+                    <div id="lista-paquetes-admin" class="paquetes-cards-grid">
+                        <div class="paquetes-loading">Cargando paquetes de accesorios...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-popup-modal-footer">
+                <button type="button" id="btn-cancelar-modal-accesorio" class="btn-modal-close-clean">
+                    Cerrar Ventana
+                </button>
             </div>
         </div>
     </div>

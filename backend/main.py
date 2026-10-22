@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import copy
 import hashlib
 import hmac
 import io
@@ -318,7 +319,7 @@ class CrearEventoAdminInput(BaseModel):
 
 
 class ActualizarTematicaEventoInput(BaseModel):
-    tematica_accesorios: str = Field(..., max_length=50)
+    tematica_accesorios: str = Field(..., max_length=200)
 
 
 class RenombrarInvitadoInput(BaseModel):
@@ -2791,6 +2792,32 @@ def eliminar_evento_completo_en_cascada(
             lambda db: db.table("eventos").delete().eq("id", eid).execute()
         )
 
+        # 4.5. Purgar en cascada paquetes de accesorios temporales vinculados a este evento (scope == "evento")
+        try:
+            catalogo_actual = obtener_catalogo_paquetes_completo()
+            paquetes_a_borrar = [
+                pid for pid, pkg in catalogo_actual.items()
+                if pkg.get("scope") == "evento" and str(pkg.get("evento_id") or "").strip() == eid
+            ]
+            if paquetes_a_borrar:
+                db_sb = verificar_conexion_supabase()
+                for pid in paquetes_a_borrar:
+                    pkg = catalogo_actual[pid]
+                    rutas_storage = [f"accesorios/{pid}/{acc['archivo']}" for acc in pkg.get("accesorios", []) if acc.get("archivo")]
+                    if rutas_storage:
+                        try:
+                            db_sb.storage.from_(SUPABASE_BUCKET).remove(rutas_storage)
+                        except Exception:
+                            pass
+                    dir_loc = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / pid
+                    if dir_loc.exists() and dir_loc.is_dir():
+                        import shutil
+                        shutil.rmtree(dir_loc, ignore_errors=True)
+                    del catalogo_actual[pid]
+                guardar_catalogo_paquetes(catalogo_actual)
+        except Exception as err_pkg:
+            print(f"Aviso al purgar paquetes de accesorios del evento en cascada: {err_pkg}")
+
         # 5. Limpiar estados en memoria y caché
         _ESTADO_EVENTOS.pop(eid, None)
         if _ESTADO_EVENTOS.get("__proyector_evento_id__") == eid:
@@ -3471,8 +3498,456 @@ def renombrar_invitado_admin(
         return JSONResponse(status_code=500, content={"ok": False, "detail": f"Error interno al renombrar invitado: {str(err)}"})
 
 
+# ------------------------------------------------------------------------------
+# 11. GESTOR DE PAQUETES DE ACCESORIOS PERSONALIZADOS (PERSISTENCIA SUPABASE STORAGE & CACHÉ RAM)
+# ------------------------------------------------------------------------------
+CATALOGO_STORAGE_PATH = "accesorios/paquetes_catalogo.json"
+CATALOGO_PERSONALIZADOS_STORAGE_PATH = "accesorios/accesorios_personalizados.json"
+CATALOGO_LOCAL_PATH = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / "paquetes_catalogo.json"
+PERSONALIZADOS_LOCAL_PATH = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / "accesorios_personalizados.json"
+
+DEFAULT_CATALOGO_PAQUETES = {
+    "paquete_15_anos": {
+        "id": "paquete_15_anos",
+        "nombre": "15 Años",
+        "scope": "global",
+        "evento_id": None,
+        "icono": "👑",
+        "descripcion": "Coronas, Tiara XV, Flores y Antifaces de Gala",
+        "accesorios": [
+            {
+                "id": "tiara_xv",
+                "nombre": "Tiara XV Años",
+                "subtitulo": "Princesa",
+                "icono": "👑",
+                "archivo": "tiara_xv.png",
+                "tematica": "quinceanero",
+                "url": "/static/accessories/quinceanero/tiara_xv.png",
+            },
+            {
+                "id": "corona_flores",
+                "nombre": "Corona de Flores",
+                "subtitulo": "Primavera",
+                "icono": "🌸",
+                "archivo": "corona_flores.png",
+                "tematica": "quinceanero",
+                "url": "/static/accessories/quinceanero/corona_flores.png",
+            },
+            {
+                "id": "antifaz_15",
+                "nombre": "Antifaz Veneciano",
+                "subtitulo": "Gala XV",
+                "icono": "🎭",
+                "archivo": "antifaz_15.png",
+                "tematica": "quinceanero",
+                "url": "/static/accessories/quinceanero/antifaz_15.png",
+            },
+        ],
+    },
+    "paquete_boda": {
+        "id": "paquete_boda",
+        "nombre": "Gala & Bodas",
+        "scope": "global",
+        "evento_id": None,
+        "icono": "🎩",
+        "descripcion": "Coronas Reales, Corbatines y Sombreros de Gala",
+        "accesorios": [
+            {
+                "id": "corona_imperial",
+                "nombre": "Corona Imperial",
+                "subtitulo": "Oro Real",
+                "icono": "👑",
+                "archivo": "corona_imperial.png",
+                "tematica": "boda",
+                "url": "/static/accessories/boda/corona_imperial.png",
+            },
+            {
+                "id": "corbatin_gala",
+                "nombre": "Corbatín de Gala",
+                "subtitulo": "Smoking VIP",
+                "icono": "👔",
+                "archivo": "corbatin_gala.png",
+                "tematica": "boda",
+                "url": "/static/accessories/boda/corbatin_gala.png",
+            },
+            {
+                "id": "sombrero_gala",
+                "nombre": "Sombrero de Gala",
+                "subtitulo": "Clásico",
+                "icono": "🎩",
+                "archivo": "sombrero_gala.png",
+                "tematica": "boda",
+                "url": "/static/accessories/boda/sombrero_gala.png",
+            },
+        ],
+    },
+    "paquete_princesas_disney": {
+        "id": "paquete_princesas_disney",
+        "nombre": "Princesas Disney",
+        "scope": "global",
+        "evento_id": None,
+        "icono": "👸",
+        "descripcion": "Tiaras mágicas y accesorios de fantasía",
+        "accesorios": [],
+    },
+    "paquete_graduacion": {
+        "id": "paquete_graduacion",
+        "nombre": "Graduación",
+        "scope": "global",
+        "evento_id": None,
+        "icono": "🎓",
+        "descripcion": "Birretes académicos y medallas de honor",
+        "accesorios": [
+            {
+                "id": "birrete",
+                "nombre": "Birrete de Gala",
+                "subtitulo": "Académico",
+                "icono": "🎓",
+                "archivo": "birrete.png",
+                "tematica": "graduacion",
+                "url": "/static/accessories/graduacion/birrete.png",
+            },
+        ],
+    },
+    "paquete_general": {
+        "id": "paquete_general",
+        "nombre": "Fiesta VIP",
+        "scope": "global",
+        "evento_id": None,
+        "icono": "🕶️",
+        "descripcion": "Lentes VIP, gorras y accesorios de hora loca",
+        "accesorios": [
+            {
+                "id": "lentes_vip",
+                "nombre": "Lentes VIP",
+                "subtitulo": "Glamour",
+                "icono": "🕶️",
+                "archivo": "lentes_vip.png",
+                "tematica": "general",
+                "url": "/static/accessories/general/lentes_vip.png",
+            },
+            {
+                "id": "gorra_vip",
+                "nombre": "Gorra Fiesta",
+                "subtitulo": "Hora Loca",
+                "icono": "🧢",
+                "archivo": "gorra_vip.png",
+                "tematica": "general",
+                "url": "/static/accessories/general/gorra_vip.png",
+            },
+        ],
+    },
+}
+
+
+def obtener_catalogo_paquetes_completo() -> dict[str, dict]:
+    """
+    Carga el catálogo de paquetes de accesorios unificado:
+    1. Intenta descargar desde Supabase Storage (accesorios/paquetes_catalogo.json).
+    2. Si falla o no existe, lee el archivo local frontend/static/accessories/paquetes_catalogo.json.
+    3. Si no existe, inicializa con DEFAULT_CATALOGO_PAQUETES y asegura persistencia.
+    """
+    catalogo = None
+    # 1. Intentar descargar desde Supabase Storage
+    try:
+        db = verificar_conexion_supabase()
+        raw_bytes = db.storage.from_(SUPABASE_BUCKET).download(CATALOGO_STORAGE_PATH)
+        if raw_bytes:
+            catalogo = json.loads(raw_bytes.decode("utf-8"))
+    except Exception:
+        pass
+
+    # 2. Fallback de lectura desde disco local
+    if not isinstance(catalogo, dict) and CATALOGO_LOCAL_PATH.exists():
+        try:
+            catalogo = json.loads(CATALOGO_LOCAL_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    # 3. Inicializar con catálogo predeterminado si aún no existe
+    if not isinstance(catalogo, dict):
+        catalogo = copy.deepcopy(DEFAULT_CATALOGO_PAQUETES)
+
+    # 4. Asegurar que los paquetes base siempre existan en el catálogo
+    for pkg_id, pkg_base in DEFAULT_CATALOGO_PAQUETES.items():
+        if pkg_id not in catalogo:
+            catalogo[pkg_id] = copy.deepcopy(pkg_base)
+        else:
+            catalogo[pkg_id].setdefault("id", pkg_id)
+            catalogo[pkg_id].setdefault("nombre", pkg_base.get("nombre", pkg_id))
+            catalogo[pkg_id].setdefault("scope", pkg_base.get("scope", "global"))
+            catalogo[pkg_id].setdefault("evento_id", None)
+            catalogo[pkg_id].setdefault("icono", pkg_base.get("icono", "✨"))
+            catalogo[pkg_id].setdefault("descripcion", pkg_base.get("descripcion", ""))
+            catalogo[pkg_id].setdefault("accesorios", [])
+
+    return catalogo
+
+
+def guardar_catalogo_paquetes(catalogo: dict[str, dict]):
+    """
+    Persiste el catálogo en disco local y en Supabase Storage,
+    mantiene sincronizado accesorios_personalizados.json para retrocompatibilidad
+    e invalida instantáneamente la memoria caché en RAM.
+    """
+    CATALOGO_LOCAL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    json_str = json.dumps(catalogo, ensure_ascii=False, indent=2)
+    json_bytes = json_str.encode("utf-8")
+
+    # 1. Guardar localmente el catálogo de paquetes
+    try:
+        CATALOGO_LOCAL_PATH.write_text(json_str, encoding="utf-8")
+    except Exception as err:
+        print(f"Aviso al guardar catálogo local: {err}")
+
+    # 2. Generar lista aplanada para retrocompatibilidad
+    lista_personalizados = []
+    for pkg_id, pkg in catalogo.items():
+        for acc in pkg.get("accesorios", []):
+            item = dict(acc)
+            item["paquete_id"] = pkg_id
+            item["scope"] = pkg.get("scope", "global")
+            item["evento_id"] = pkg.get("evento_id")
+            lista_personalizados.append(item)
+
+    json_pers_str = json.dumps(lista_personalizados, ensure_ascii=False, indent=2)
+    try:
+        PERSONALIZADOS_LOCAL_PATH.write_text(json_pers_str, encoding="utf-8")
+    except Exception as err:
+        print(f"Aviso al guardar accesorios personalizados local: {err}")
+
+    # 3. Subir a Supabase Storage con upsert=True y cache_control=86400
+    try:
+        db = verificar_conexion_supabase()
+        db.storage.from_(SUPABASE_BUCKET).upload(
+            path=CATALOGO_STORAGE_PATH,
+            file=json_bytes,
+            file_options={
+                "content-type": "application/json",
+                "upsert": "true",
+                "cache-control": "86400",
+            },
+        )
+        db.storage.from_(SUPABASE_BUCKET).upload(
+            path=CATALOGO_PERSONALIZADOS_STORAGE_PATH,
+            file=json_pers_str.encode("utf-8"),
+            file_options={
+                "content-type": "application/json",
+                "upsert": "true",
+                "cache-control": "86400",
+            },
+        )
+    except Exception as err:
+        print(f"Aviso Supabase Storage al subir catálogo: {err}")
+
+    # 4. Invalidar RAM caché al instante
+    _CACHE_RAM_SISTEMA.pop("catalogo_accesorios", None)
+    invalidar_cache_evento()
+
+
+@app.post("/api/admin/accesorios/paquetes/subir")
+async def subir_paquete_accesorios_admin(
+    modo_destino: str = Form("existente"),
+    nombre_paquete: str = Form(""),
+    paquete_id: str = Form(""),
+    scope: str = Form("global"),
+    evento_id: str | None = Form(None),
+    nombres_json: str = Form("[]"),
+    archivos: list[UploadFile] = File(default=[]),
+    archivo: UploadFile = File(default=None),
+    x_admin_password: str | None = Header(default=None),
+):
+    """
+    Subida múltiple de accesorios en formato PNG transparente:
+    - Redimensiona automáticamente a 256x256 px con PIL LANCZOS.
+    - Sube a Supabase Storage (multimedia_segalu/accesorios/{paquete_id}/{filename}) con cache_control="86400".
+    - Respalda en disco local.
+    - Asigna alcance global (Permanente) o por evento (Temporal).
+    - Actualiza el catálogo en Supabase Storage e invalida la caché en RAM (2.0s).
+    """
+    verificar_admin_password(x_admin_password)
+
+    # 1. Agrupar archivos enviados (soporte para lista múltiple o archivo único)
+    todos_archivos = [f for f in archivos if f and f.filename]
+    if archivo and archivo.filename:
+        todos_archivos.append(archivo)
+
+    if not todos_archivos:
+        return JSONResponse(status_code=400, content={"ok": False, "detail": "Debes seleccionar al menos un archivo PNG transparente."})
+
+    # 2. Cargar catálogo actual
+    catalogo = obtener_catalogo_paquetes_completo()
+
+    # 3. Resolver paquete de destino
+    modo_limpio = modo_destino.strip().lower()
+    scope_limpio = "evento" if scope.strip().lower() == "evento" else "global"
+    evento_id_limpio = (evento_id or "").strip() or None
+
+    if modo_limpio == "crear":
+        nom_pkg = nombre_paquete.strip()
+        if not nom_pkg:
+            return JSONResponse(status_code=400, content={"ok": False, "detail": "Por favor ingresa un nombre para el nuevo paquete."})
+
+        slug = re.sub(r"[^a-z0-9_]+", "_", nom_pkg.lower()).strip("_")
+        target_pkg_id = f"paquete_{slug}" if not slug.startswith("paquete_") else slug
+
+        # Si ya existe con el mismo ID, agregamos sufijo único
+        if target_pkg_id in catalogo and catalogo[target_pkg_id].get("nombre") != nom_pkg:
+            target_pkg_id = f"{target_pkg_id}_{int(time.time())}"
+
+        if target_pkg_id not in catalogo:
+            catalogo[target_pkg_id] = {
+                "id": target_pkg_id,
+                "nombre": nom_pkg,
+                "scope": scope_limpio,
+                "evento_id": evento_id_limpio if scope_limpio == "evento" else None,
+                "icono": "✨",
+                "descripcion": f"Paquete personalizado '{nom_pkg}'",
+                "accesorios": [],
+            }
+    else:
+        # Modo existente: resolver ID
+        mapa_alias = {
+            "15anos": "paquete_15_anos",
+            "15_anos": "paquete_15_anos",
+            "quinceanero": "paquete_15_anos",
+            "graduacion": "paquete_graduacion",
+            "gala_boda": "paquete_boda",
+            "gala_bodas": "paquete_boda",
+            "boda": "paquete_boda",
+            "fiesta_vip": "paquete_general",
+            "vip": "paquete_general",
+            "general": "paquete_general",
+            "princesas_disney": "paquete_princesas_disney",
+        }
+        target_pkg_id = mapa_alias.get((paquete_id or "").strip().lower(), (paquete_id or "").strip().lower())
+        if not target_pkg_id:
+            target_pkg_id = "paquete_general"
+
+        if target_pkg_id not in catalogo:
+            nombre_auto = target_pkg_id.replace("paquete_", "").replace("_", " ").title()
+            catalogo[target_pkg_id] = {
+                "id": target_pkg_id,
+                "nombre": nombre_auto,
+                "scope": scope_limpio,
+                "evento_id": evento_id_limpio if scope_limpio == "evento" else None,
+                "icono": "✨",
+                "descripcion": f"Paquete '{nombre_auto}'",
+                "accesorios": [],
+            }
+
+    paquete_actual = catalogo[target_pkg_id]
+
+    # 4. Parsear nombres personalizados proporcionados en el staging
+    nombres_lista = []
+    try:
+        nombres_lista = json.loads(nombres_json) if nombres_json else []
+    except Exception:
+        nombres_lista = []
+
+    dir_destino_local = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / target_pkg_id
+    dir_destino_local.mkdir(parents=True, exist_ok=True)
+
+    db_sb = None
+    try:
+        db_sb = verificar_conexion_supabase()
+    except Exception:
+        db_sb = None
+
+    accesorios_agregados = []
+
+    # 5. Procesar cada archivo individualmente
+    for idx, f in enumerate(todos_archivos):
+        nombre_orig = f.filename or f"accesorio_{idx}.png"
+        if not nombre_orig.lower().endswith(".png"):
+            return JSONResponse(status_code=400, content={"ok": False, "detail": f"El archivo '{nombre_orig}' no tiene extensión .png."})
+
+        # Nombre legible: desde staging o auto-generado desde el nombre del archivo
+        nombre_accesorio = ""
+        if idx < len(nombres_lista) and str(nombres_lista[idx]).strip():
+            nombre_accesorio = str(nombres_lista[idx]).strip()
+        else:
+            base_sin_ext = re.sub(r"\.png$", "", nombre_orig, flags=re.IGNORECASE)
+            base_limpia = re.sub(r"[_\-]+", " ", base_sin_ext).strip()
+            nombre_accesorio = base_limpia.title() or f"Accesorio {idx+1}"
+
+        # Generar ID único
+        slug_acc = re.sub(r"[^a-z0-9_]+", "_", nombre_accesorio.lower()).strip("_")
+        acc_id = f"acc_{slug_acc}_{int(time.time())}_{idx}"[:50]
+        nombre_archivo_final = f"{acc_id}.png"
+
+        # Leer contenido en bytes
+        bytes_img = await f.read()
+
+        # Optimizar / Redimensionar a 256x256 px PNG con PIL LANCZOS
+        try:
+            img = Image.open(io.BytesIO(bytes_img))
+            if img.format != "PNG":
+                return JSONResponse(status_code=400, content={"ok": False, "detail": f"El archivo '{nombre_orig}' no contiene una imagen PNG válida."})
+            if img.size != (256, 256):
+                img = img.resize((256, 256), Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            png_bytes = buf.getvalue()
+        except Exception:
+            png_bytes = bytes_img
+
+        # Guardar copia local de respaldo
+        ruta_guardado_local = dir_destino_local / nombre_archivo_final
+        with open(ruta_guardado_local, "wb") as f_out:
+            f_out.write(png_bytes)
+
+        # Subir al bucket de Supabase Storage (multimedia_segalu/accesorios/{paquete_id}/{filename})
+        ruta_storage = f"accesorios/{target_pkg_id}/{nombre_archivo_final}"
+        url_final = f"/static/accessories/{target_pkg_id}/{nombre_archivo_final}"
+
+        if db_sb:
+            try:
+                db_sb.storage.from_(SUPABASE_BUCKET).upload(
+                    path=ruta_storage,
+                    file=png_bytes,
+                    file_options={
+                        "content-type": "image/png",
+                        "upsert": "true",
+                        "cache-control": "86400",
+                    },
+                )
+                url_sb = db_sb.storage.from_(SUPABASE_BUCKET).get_public_url(ruta_storage)
+                if url_sb:
+                    url_final = url_sb
+            except Exception as sb_err:
+                print(f"Aviso al subir accesorio a Supabase Storage ({ruta_storage}): {sb_err}")
+
+        item_acc = {
+            "id": acc_id,
+            "nombre": nombre_accesorio,
+            "subtitulo": "Personalizado",
+            "icono": "✨",
+            "archivo": nombre_archivo_final,
+            "tematica": target_pkg_id,
+            "url": url_final,
+        }
+
+        # Evitar duplicados por ID
+        paquete_actual["accesorios"] = [a for a in paquete_actual.get("accesorios", []) if a.get("id") != acc_id]
+        paquete_actual["accesorios"].append(item_acc)
+        accesorios_agregados.append(item_acc)
+
+    # 6. Guardar catálogo actualizado en Storage y disco local
+    guardar_catalogo_paquetes(catalogo)
+
+    return {
+        "ok": True,
+        "mensaje": f"✅ Se subieron {len(accesorios_agregados)} accesorio(s) al paquete '{paquete_actual.get('nombre', target_pkg_id)}'.",
+        "paquete_id": target_pkg_id,
+        "paquete": paquete_actual,
+        "accesorios_agregados": accesorios_agregados,
+        "catalogo": catalogo,
+    }
+
+
 @app.post("/api/admin/accesorios/subir")
-def subir_accesorio_png_admin(
+async def subir_accesorio_png_admin(
     archivo: UploadFile = File(None),
     archivo_png: UploadFile = File(None),
     tematica: str = Form("general"),
@@ -3482,126 +3957,156 @@ def subir_accesorio_png_admin(
     subtitulo: str = Form(default="Personalizado"),
     x_admin_password: str | None = Header(default=None),
 ):
-    try:
-        verificar_admin_password(x_admin_password)
-        file_obj = archivo or archivo_png
-        if not file_obj:
-            return JSONResponse(status_code=400, content={"ok": False, "detail": "Por favor selecciona un archivo PNG."})
-
-        nombre_archivo_orig = (file_obj.filename or "").lower()
-        if not nombre_archivo_orig.endswith(".png"):
-            return JSONResponse(status_code=400, content={"ok": False, "detail": "Solo se permiten archivos en formato PNG transparente."})
-
-        tematica_limpia = tematica.strip().lower()
-        mapa_carpetas = {
-            "15_anos": "quinceanero",
-            "15anos": "quinceanero",
-            "quinceanero": "quinceanero",
-            "graduacion": "graduacion",
-            "gala_boda": "boda",
-            "gala_bodas": "boda",
-            "boda": "boda",
-            "fiesta_vip": "vip",
-            "vip": "vip",
-            "general": "general",
-            "todos": "general",
-        }
-        carpeta_sub = mapa_carpetas.get(tematica_limpia, "general")
-
-        id_limpio = re.sub(r"[^a-z0-9_]", "", (id_accesorio or "").strip().lower())
-        if not id_limpio:
-            nombre_limpio = re.sub(r"[^a-z0-9_]", "_", (nombre or "").strip().lower())
-            id_limpio = f"acc_{nombre_limpio}_{int(time.time())}"[:40]
-
-        dir_destino = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / carpeta_sub
-        dir_destino.mkdir(parents=True, exist_ok=True)
-        nombre_archivo = f"{id_limpio}.png"
-        ruta_guardado = dir_destino / nombre_archivo
-
-        bytes_img = file_obj.file.read()
-        try:
-            from PIL import Image
-            img = Image.open(io.BytesIO(bytes_img))
-            if img.format != "PNG":
-                return JSONResponse(status_code=400, content={"ok": False, "detail": "El archivo no es una imagen PNG válida."})
-            if img.size != (256, 256):
-                img = img.resize((256, 256), Image.Resampling.LANCZOS)
-            img.save(ruta_guardado, format="PNG")
-        except Exception:
-            with open(ruta_guardado, "wb") as f:
-                f.write(bytes_img)
-
-        ruta_relativa = f"/static/accessories/{carpeta_sub}/{nombre_archivo}"
-
-        ruta_catalogo = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / "accesorios_personalizados.json"
-        catalogo = []
-        if ruta_catalogo.exists():
-            try:
-                catalogo = json.loads(ruta_catalogo.read_text(encoding="utf-8"))
-            except Exception:
-                catalogo = []
-
-        nuevo_item = {
-            "id": id_limpio,
-            "nombre": (nombre or id_limpio).strip(),
-            "subtitulo": subtitulo.strip(),
-            "icono": icono.strip() or "✨",
-            "archivo": nombre_archivo,
-            "tematica": carpeta_sub,
-            "url": ruta_relativa,
-        }
-        catalogo = [c for c in catalogo if c.get("id") != id_limpio]
-        catalogo.append(nuevo_item)
-        ruta_catalogo.write_text(json.dumps(catalogo, ensure_ascii=False, indent=2), encoding="utf-8")
-
-        return JSONResponse(
-            status_code=200,
-            content={
-                "ok": True,
-                "mensaje": f"Accesorio '{(nombre or id_limpio).strip()}' subido con éxito a la temática '{carpeta_sub}'.",
-                "accesorio": nuevo_item,
-            }
-        )
-    except HTTPException as he:
-        return JSONResponse(status_code=he.status_code, content={"ok": False, "detail": he.detail})
-    except Exception as err:
-        return JSONResponse(status_code=500, content={"ok": False, "detail": f"Error interno al procesar accesorio: {str(err)}"})
+    """Endpoint de compatibilidad con subidas anteriores: delega al gestor de paquetes."""
+    file_obj = archivo or archivo_png
+    archivos_list = [file_obj] if file_obj else []
+    nombres_list = [nombre] if nombre else []
+    return await subir_paquete_accesorios_admin(
+        modo_destino="existente",
+        paquete_id=tematica,
+        nombres_json=json.dumps(nombres_list),
+        archivos=archivos_list,
+        x_admin_password=x_admin_password,
+    )
 
 
 @app.get("/api/accesorios")
 def obtener_catalogo_accesorios():
-    ruta_catalogo = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / "accesorios_personalizados.json"
-    personalizados = []
-    if ruta_catalogo.exists():
+    """
+    Retorna el catálogo completo de paquetes y la lista unificada de accesorios
+    con una caché en memoria RAM de 2.0 segundos para máxima velocidad y 0 consultas repetidas.
+    """
+    cache_hit = obtener_cache_ram("catalogo_accesorios")
+    if cache_hit:
+        return cache_hit
+
+    catalogo = obtener_catalogo_paquetes_completo()
+    lista_personalizados = []
+    for pkg_id, pkg in catalogo.items():
+        for acc in pkg.get("accesorios", []):
+            item = dict(acc)
+            item["paquete_id"] = pkg_id
+            item["scope"] = pkg.get("scope", "global")
+            item["evento_id"] = pkg.get("evento_id")
+            lista_personalizados.append(item)
+
+    resultado = {
+        "ok": True,
+        "paquetes": catalogo,
+        "personalizados": lista_personalizados,
+    }
+    guardar_cache_ram("catalogo_accesorios", resultado)
+    return resultado
+
+
+@app.delete("/api/admin/accesorios/paquetes/{paquete_id}")
+def eliminar_paquete_accesorios_admin(
+    paquete_id: str,
+    x_admin_password: str | None = Header(default=None),
+):
+    """
+    Elimina por completo un paquete de accesorios personalizado:
+    - Borra físicamente sus archivos de Supabase Storage y disco local.
+    - Elimina la entrada del catálogo (o limpia accesorios si es un paquete base).
+    - Invalida la caché en RAM al instante.
+    """
+    verificar_admin_password(x_admin_password)
+    pkg_id = paquete_id.strip()
+    catalogo = obtener_catalogo_paquetes_completo()
+
+    if pkg_id not in catalogo:
+        raise HTTPException(status_code=404, detail="El paquete de accesorios no existe.")
+
+    pkg = catalogo[pkg_id]
+    nombre_pkg = pkg.get("nombre", pkg_id)
+
+    # 1. Eliminar archivos de Supabase Storage
+    try:
+        db = verificar_conexion_supabase()
+        rutas_storage = [f"accesorios/{pkg_id}/{acc['archivo']}" for acc in pkg.get("accesorios", []) if acc.get("archivo")]
+        if rutas_storage:
+            db.storage.from_(SUPABASE_BUCKET).remove(rutas_storage)
+    except Exception as err:
+        print(f"Aviso al purgar accesorios de Supabase Storage: {err}")
+
+    # 2. Borrar carpeta local si existe
+    dir_local = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / pkg_id
+    if dir_local.exists() and dir_local.is_dir():
+        import shutil
+        shutil.rmtree(dir_local, ignore_errors=True)
+
+    # 3. Remover del catálogo (o vaciar si es base)
+    if pkg_id in DEFAULT_CATALOGO_PAQUETES:
+        catalogo[pkg_id]["accesorios"] = []
+    else:
+        del catalogo[pkg_id]
+
+    guardar_catalogo_paquetes(catalogo)
+
+    return {
+        "ok": True,
+        "mensaje": f"🗑️ El paquete '{nombre_pkg}' y sus accesorios fueron eliminados con éxito.",
+        "paquete_id": pkg_id,
+        "catalogo": catalogo,
+    }
+
+
+@app.delete("/api/admin/accesorios/paquetes/{paquete_id}/items/{accesorio_id}")
+def eliminar_accesorio_individual_admin(
+    paquete_id: str,
+    accesorio_id: str,
+    x_admin_password: str | None = Header(default=None),
+):
+    """
+    Elimina un accesorio individual dentro de un paquete:
+    - Borra su archivo PNG de Supabase Storage y disco local.
+    - Lo quita de la lista de accesorios del paquete.
+    - Invalida la caché en RAM al instante.
+    """
+    verificar_admin_password(x_admin_password)
+    pkg_id = paquete_id.strip()
+    acc_id = accesorio_id.strip()
+
+    catalogo = obtener_catalogo_paquetes_completo()
+    if pkg_id not in catalogo:
+        raise HTTPException(status_code=404, detail="El paquete indicado no existe.")
+
+    pkg = catalogo[pkg_id]
+    item_encontrado = None
+    nuevos_accesorios = []
+
+    for acc in pkg.get("accesorios", []):
+        if acc.get("id") == acc_id:
+            item_encontrado = acc
+        else:
+            nuevos_accesorios.append(acc)
+
+    if not item_encontrado:
+        raise HTTPException(status_code=404, detail="El accesorio no se encontró en este paquete.")
+
+    # 1. Purgar archivo de Supabase Storage
+    if item_encontrado.get("archivo"):
+        nombre_arch = item_encontrado["archivo"]
         try:
-            personalizados = json.loads(ruta_catalogo.read_text(encoding="utf-8"))
-        except Exception:
-            personalizados = []
+            db = verificar_conexion_supabase()
+            db.storage.from_(SUPABASE_BUCKET).remove([f"accesorios/{pkg_id}/{nombre_arch}"])
+        except Exception as sb_err:
+            print(f"Aviso al purgar accesorio de Supabase Storage: {sb_err}")
 
-    # Escaneo dinámico de accesorios físicos existentes en frontend/static/accessories
-    dir_acc = Path(__file__).parent.parent / "frontend" / "static" / "accessories"
-    ids_existentes = {p["id"] for p in personalizados if isinstance(p, dict) and "id" in p}
+        ruta_local = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / pkg_id / nombre_arch
+        if ruta_local.exists():
+            ruta_local.unlink(missing_ok=True)
 
-    if dir_acc.exists():
-        for sub in dir_acc.iterdir():
-            if sub.is_dir():
-                tematica = sub.name.lower()
-                for png_file in sub.glob("*.png"):
-                    acc_id = png_file.stem
-                    if acc_id not in ids_existentes:
-                        nombre_formateado = acc_id.replace("acc_", "").replace("_", " ").title()
-                        personalizados.append({
-                            "id": acc_id,
-                            "nombre": nombre_formateado,
-                            "subtitulo": "Accesorio Real",
-                            "icono": "✨",
-                            "archivo": png_file.name,
-                            "tematica": tematica,
-                            "url": f"/static/accessories/{tematica}/{png_file.name}",
-                        })
-                        ids_existentes.add(acc_id)
+    pkg["accesorios"] = nuevos_accesorios
+    guardar_catalogo_paquetes(catalogo)
 
-    return {"ok": True, "personalizados": personalizados}
+    return {
+        "ok": True,
+        "mensaje": f"🗑️ Accesorio '{item_encontrado.get('nombre', acc_id)}' eliminado del paquete '{pkg.get('nombre', pkg_id)}'.",
+        "paquete_id": pkg_id,
+        "accesorio_id": acc_id,
+        "catalogo": catalogo,
+    }
 
 
 @app.delete("/api/admin/eventos/{evento_id}/preguntas")

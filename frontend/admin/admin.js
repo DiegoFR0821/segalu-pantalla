@@ -186,17 +186,25 @@ const editSelectTiempoLimiteEl = document.getElementById("edit-select-tiempo-lim
 const btnCerrarModalEditarPreguntaXEl = document.getElementById("btn-cerrar-modal-editar-pregunta-x");
 const btnCerrarModalEditarPreguntaEl = document.getElementById("btn-cerrar-modal-editar-pregunta");
 
-// Elementos de la Ventana Modal de Subir Accesorio Personalizado PNG
+// Elementos de la Ventana Modal de Gestor de Paquetes de Accesorios
 const modalSubirAccesorioAdminEl = document.getElementById("modal-subir-accesorio-admin");
 const btnAbrirModalSubirAccesorioEl = document.getElementById("btn-abrir-modal-subir-accesorio");
 const btnCerrarModalAccesorioXEl = document.getElementById("btn-cerrar-modal-accesorio-x");
 const btnCancelarModalAccesorioEl = document.getElementById("btn-cancelar-modal-accesorio");
 const formSubirAccesorioEl = document.getElementById("form-subir-accesorio");
-const inputNombreAccesorioEl = document.getElementById("input-nombre-accesorio");
-const selectTematicaAccesorioEl = document.getElementById("select-tematica-accesorio");
+const radioModoDestinoNuevoEl = document.getElementById("modo-destino-nuevo");
+const radioModoDestinoExistenteEl = document.getElementById("modo-destino-existente");
+const bloqueDestinoNuevoEl = document.getElementById("bloque-destino-nuevo");
+const bloqueDestinoExistenteEl = document.getElementById("bloque-destino-existente");
+const inputNombreNuevoPaqueteEl = document.getElementById("input-nombre-nuevo-paquete");
+const selectPaqueteExistenteAdminEl = document.getElementById("select-paquete-existente-admin");
 const inputArchivoAccesorioEl = document.getElementById("input-archivo-accesorio");
-const previewAccesorioWrapEl = document.getElementById("preview-accesorio-wrap");
-const imgPreviewAccesorioEl = document.getElementById("img-preview-accesorio");
+const stagedAccesoriosWrapEl = document.getElementById("staged-accesorios-wrap");
+const stagedAccesoriosListaEl = document.getElementById("staged-accesorios-lista");
+const stagedContadorEl = document.getElementById("staged-contador");
+const btnLimpiarStagedEl = document.getElementById("btn-limpiar-staged");
+const listaPaquetesAdminEl = document.getElementById("lista-paquetes-admin");
+const selectTematicaEventoEl = document.getElementById("select-tematica-evento");
 
 // Elementos del Visor Lightbox con Ambient Blur
 const modalVisorFotoAdminEl = document.getElementById("modal-visor-foto-admin");
@@ -512,6 +520,7 @@ formLoginAdminEl.addEventListener("submit", async (e) => {
         ocultarAlertaAdmin();
         await cargarResumenPanel({ silencioso: false });
         cargarFotosSedesAdmin();
+    cargarYRenderizarPaquetesAdmin();
         iniciarCicloRefrescoSecuencial();
     } catch (err) {
         mostrarAlertaAdmin(err.message, "error");
@@ -2506,16 +2515,371 @@ if (formEditarPreguntaEl) {
 }
 
 // ==============================================================================
-// 11. MODAL PARA SUBIR ACCESORIOS PERSONALIZADOS EN PNG (256x256)
+// 11. GESTOR DE PAQUETES DE ACCESORIOS PERSONALIZADOS EN PNG (256x256)
 // ==============================================================================
+let stagedFilesAccesorios = [];
+let catalogoPaquetesAdmin = {};
+
+function alternarModoDestinoPaquetes() {
+    const esCrear = radioModoDestinoNuevoEl ? radioModoDestinoNuevoEl.checked : true;
+    if (bloqueDestinoNuevoEl) bloqueDestinoNuevoEl.classList.toggle("hidden", !esCrear);
+    if (bloqueDestinoExistenteEl) bloqueDestinoExistenteEl.classList.toggle("hidden", esCrear);
+}
+
+if (radioModoDestinoNuevoEl) {
+    radioModoDestinoNuevoEl.addEventListener("change", alternarModoDestinoPaquetes);
+}
+if (radioModoDestinoExistenteEl) {
+    radioModoDestinoExistenteEl.addEventListener("change", alternarModoDestinoPaquetes);
+}
+
+function renderizarStagedAccesorios() {
+    if (!stagedAccesoriosListaEl) return;
+    stagedAccesoriosListaEl.innerHTML = "";
+
+    const total = stagedFilesAccesorios.length;
+    if (stagedContadorEl) stagedContadorEl.textContent = String(total);
+    if (stagedAccesoriosWrapEl) {
+        stagedAccesoriosWrapEl.classList.toggle("hidden", total === 0);
+    }
+
+    stagedFilesAccesorios.forEach((item, index) => {
+        const card = document.createElement("div");
+        card.className = "staged-item-card";
+
+        const thumb = document.createElement("img");
+        thumb.className = "staged-item-thumb";
+        thumb.src = item.dataUrl;
+        thumb.alt = item.name;
+
+        const inputNombre = document.createElement("input");
+        inputNombre.type = "text";
+        inputNombre.className = "staged-item-input";
+        inputNombre.value = item.name;
+        inputNombre.placeholder = "Nombre del accesorio";
+        inputNombre.addEventListener("input", (e) => {
+            item.name = e.target.value.trim() || `Accesorio ${index + 1}`;
+        });
+
+        const btnQuitar = document.createElement("button");
+        btnQuitar.type = "button";
+        btnQuitar.className = "btn-remove-staged";
+        btnQuitar.setAttribute("aria-label", "Quitar de la lista");
+        btnQuitar.innerHTML = "&times;";
+        btnQuitar.addEventListener("click", () => {
+            stagedFilesAccesorios.splice(index, 1);
+            renderizarStagedAccesorios();
+        });
+
+        card.appendChild(thumb);
+        card.appendChild(inputNombre);
+        card.appendChild(btnQuitar);
+        stagedAccesoriosListaEl.appendChild(card);
+    });
+}
+
+function limpiarStagedAccesorios() {
+    stagedFilesAccesorios = [];
+    if (inputArchivoAccesorioEl) inputArchivoAccesorioEl.value = "";
+    renderizarStagedAccesorios();
+}
+
+if (btnLimpiarStagedEl) {
+    btnLimpiarStagedEl.addEventListener("click", limpiarStagedAccesorios);
+}
+
+if (inputArchivoAccesorioEl) {
+    inputArchivoAccesorioEl.addEventListener("change", (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        let pendientes = files.length;
+        files.forEach((file) => {
+            if (!file.name.toLowerCase().endsWith(".png")) {
+                mostrarAlertaAdmin(`El archivo '${file.name}' fue omitido porque no es PNG.`, "error");
+                pendientes--;
+                return;
+            }
+
+            const baseSinExt = file.name.replace(/\.png$/i, "");
+            const nombreLegible = baseSinExt
+                .replace(/[_\-]+/g, " ")
+                .trim()
+                .replace(/\b\w/g, (l) => l.toUpperCase());
+
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                stagedFilesAccesorios.push({
+                    id: `staged_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                    file,
+                    name: nombreLegible || "Accesorio",
+                    dataUrl: ev.target.result,
+                });
+                pendientes--;
+                if (pendientes <= 0) {
+                    renderizarStagedAccesorios();
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+    });
+}
+
+async function cargarYRenderizarPaquetesAdmin() {
+    if (!listaPaquetesAdminEl) return;
+    listaPaquetesAdminEl.innerHTML = `<div class="paquetes-loading">Cargando paquetes de accesorios...</div>`;
+
+    try {
+        const res = await fetch("/api/accesorios", { cache: "no-store" });
+        if (!res.ok) throw new Error("No se pudo obtener el catálogo de accesorios.");
+        const data = await res.json();
+        catalogoPaquetesAdmin = data.paquetes || {};
+
+        // 1. Poblar select de paquetes existentes en el formulario
+        if (selectPaqueteExistenteAdminEl) {
+            selectPaqueteExistenteAdminEl.innerHTML = "";
+            Object.values(catalogoPaquetesAdmin).forEach((pkg) => {
+                const opt = document.createElement("option");
+                opt.value = pkg.id;
+                const totalAcc = Array.isArray(pkg.accesorios) ? pkg.accesorios.length : 0;
+                opt.textContent = `${pkg.icono || "✨"} ${pkg.nombre} (${totalAcc} accesorios)`;
+                selectPaqueteExistenteAdminEl.appendChild(opt);
+            });
+        }
+
+        // 2. Actualizar dinámicamente el selector de temáticas del modal "Crear Evento"
+        if (selectTematicaEventoEl) {
+            const valorPrevio = selectTematicaEventoEl.value || "todos";
+            selectTematicaEventoEl.innerHTML = `<option value="todos">✨ Todos los Paquetes (Universal)</option>`;
+            Object.values(catalogoPaquetesAdmin).forEach((pkg) => {
+                const opt = document.createElement("option");
+                opt.value = pkg.id;
+                opt.textContent = `${pkg.icono || "✨"} ${pkg.nombre}`;
+                selectTematicaEventoEl.appendChild(opt);
+            });
+            selectTematicaEventoEl.value = valorPrevio;
+        }
+
+        // 3. Renderizar listado visual de tarjetas de paquetes
+        listaPaquetesAdminEl.innerHTML = "";
+        const listaPaquetes = Object.values(catalogoPaquetesAdmin);
+        if (listaPaquetes.length === 0) {
+            listaPaquetesAdminEl.innerHTML = `<div class="paquetes-loading">No hay paquetes registrados aún.</div>`;
+            return;
+        }
+
+        const tematicaEventoActivo = (eventoSeleccionado?.tematica_accesorios || "todos").toLowerCase().trim();
+
+        listaPaquetes.forEach((pkg) => {
+            const esActivoEnEvento =
+                tematicaEventoActivo === pkg.id.toLowerCase() ||
+                (tematicaEventoActivo === "15anos" && pkg.id === "paquete_15_anos") ||
+                (tematicaEventoActivo === "gala_bodas" && pkg.id === "paquete_boda") ||
+                (tematicaEventoActivo === "fiesta_vip" && pkg.id === "paquete_general");
+
+            const card = document.createElement("div");
+            card.className = `paquete-admin-card ${esActivoEnEvento ? "active-event-theme" : ""}`;
+
+            const headerRow = document.createElement("div");
+            headerRow.className = "paquete-admin-header";
+
+            const titleRow = document.createElement("div");
+            titleRow.className = "paquete-admin-title-row";
+
+            const titleEl = document.createElement("h5");
+            titleEl.className = "paquete-admin-title";
+            titleEl.textContent = `${pkg.icono || "✨"} ${pkg.nombre}`;
+
+            const scopeBadge = document.createElement("span");
+            scopeBadge.className = `badge-scope-pill ${pkg.scope === "evento" ? "evento" : "global"}`;
+            scopeBadge.textContent = pkg.scope === "evento" ? "📍 Solo Evento" : "🌐 Permanente";
+
+            titleRow.appendChild(titleEl);
+            titleRow.appendChild(scopeBadge);
+
+            if (esActivoEnEvento) {
+                const activeBadge = document.createElement("span");
+                activeBadge.className = "badge-scope-pill activo-en-evento";
+                activeBadge.textContent = "✓ Activo en este Evento";
+                titleRow.appendChild(activeBadge);
+            }
+
+            const actionsDiv = document.createElement("div");
+            actionsDiv.className = "paquete-admin-actions";
+
+            if (eventoSeleccionado?.id) {
+                const btnActivar = document.createElement("button");
+                btnActivar.type = "button";
+                btnActivar.className = "btn-activar-paquete";
+                btnActivar.textContent = esActivoEnEvento ? "Reactivar Temática" : "✨ Activar en Evento";
+                btnActivar.addEventListener("click", () => activarPaqueteEnEventoActual(pkg.id, pkg.nombre));
+                actionsDiv.appendChild(btnActivar);
+            }
+
+            // Paquetes base protegidos: no se elimina el contenedor, solo paquetes personalizados
+            const esPaqueteBase = ["paquete_15_anos", "paquete_boda", "paquete_graduacion", "paquete_general", "paquete_princesas_disney"].includes(pkg.id);
+            if (!esPaqueteBase) {
+                const btnEliminarPkg = document.createElement("button");
+                btnEliminarPkg.type = "button";
+                btnEliminarPkg.className = "btn-eliminar-paquete";
+                btnEliminarPkg.textContent = "🗑️ Quitar Paquete";
+                btnEliminarPkg.addEventListener("click", () => eliminarPaqueteAdmin(pkg.id, pkg.nombre));
+                actionsDiv.appendChild(btnEliminarPkg);
+            }
+
+            headerRow.appendChild(titleRow);
+            headerRow.appendChild(actionsDiv);
+            card.appendChild(headerRow);
+
+            // Lista de accesorios del paquete
+            const itemsRow = document.createElement("div");
+            itemsRow.className = "paquete-items-row";
+            const accesorios = Array.isArray(pkg.accesorios) ? pkg.accesorios : [];
+
+            if (accesorios.length === 0) {
+                const vacioPill = document.createElement("span");
+                vacioPill.style.fontSize = "0.74rem";
+                vacioPill.style.color = "var(--text-warm-gray)";
+                vacioPill.textContent = "Sin accesorios en este paquete aún. Sube archivos PNG arriba.";
+                itemsRow.appendChild(vacioPill);
+            } else {
+                accesorios.forEach((acc) => {
+                    const pill = document.createElement("div");
+                    pill.className = "paquete-item-pill";
+
+                    const thumbImg = document.createElement("img");
+                    thumbImg.className = "paquete-item-thumb";
+                    thumbImg.src = acc.url || `/static/accessories/${pkg.id}/${acc.archivo}`;
+                    thumbImg.alt = acc.nombre;
+                    thumbImg.onerror = () => { thumbImg.style.display = "none"; };
+
+                    const nameSpan = document.createElement("span");
+                    nameSpan.textContent = acc.nombre;
+
+                    const btnDelItem = document.createElement("button");
+                    btnDelItem.type = "button";
+                    btnDelItem.className = "btn-eliminar-item";
+                    btnDelItem.title = "Eliminar este accesorio";
+                    btnDelItem.innerHTML = "&times;";
+                    btnDelItem.addEventListener("click", () => eliminarItemAccesorioAdmin(pkg.id, acc.id, acc.nombre));
+
+                    pill.appendChild(thumbImg);
+                    pill.appendChild(nameSpan);
+                    pill.appendChild(btnDelItem);
+                    itemsRow.appendChild(pill);
+                });
+            }
+
+            card.appendChild(itemsRow);
+            listaPaquetesAdminEl.appendChild(card);
+        });
+    } catch (err) {
+        listaPaquetesAdminEl.innerHTML = `<div class="paquetes-loading" style="color: #ef4444;">Error al cargar paquetes: ${err.message}</div>`;
+    }
+}
+
+async function activarPaqueteEnEventoActual(paqueteId, nombrePaquete) {
+    if (!eventoSeleccionado?.id) {
+        mostrarAlertaAdmin("Selecciona primero un evento en la barra superior para asignarle esta temática.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/admin/eventos/${eventoSeleccionado.id}/tematica`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Admin-Password": adminPasswordActiva,
+            },
+            body: JSON.stringify({ tematica_accesorios: paqueteId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "No se pudo actualizar la temática del evento.");
+
+        eventoSeleccionado.tematica_accesorios = paqueteId;
+        mostrarAlertaAdmin(`✅ El evento ahora proyectará exclusivamente el paquete "${nombrePaquete}".`, "exito");
+        cargarYRenderizarPaquetesAdmin();
+
+        if (typeof BroadcastChannel !== "undefined") {
+            try {
+                const canalSync = new BroadcastChannel("segalu_proyector_sync");
+                canalSync.postMessage({ tipo: "ACCESORIOS_ACTUALIZADOS" });
+            } catch (_) {}
+        }
+    } catch (err) {
+        mostrarAlertaAdmin(err.message, "error");
+    }
+}
+
+async function eliminarPaqueteAdmin(paqueteId, nombrePaquete) {
+    if (!confirm(`¿Estás seguro de eliminar el paquete "${nombrePaquete}" y todos sus accesorios PNG asociados? Esta acción no se puede deshacer.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/admin/accesorios/paquetes/${encodeURIComponent(paqueteId)}`, {
+            method: "DELETE",
+            headers: {
+                "X-Admin-Password": adminPasswordActiva,
+            },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Error al eliminar el paquete.");
+
+        mostrarAlertaAdmin(data.mensaje || `🗑️ Paquete "${nombrePaquete}" eliminado con éxito.`, "exito");
+        cargarYRenderizarPaquetesAdmin();
+
+        if (typeof BroadcastChannel !== "undefined") {
+            try {
+                const canalSync = new BroadcastChannel("segalu_proyector_sync");
+                canalSync.postMessage({ tipo: "ACCESORIOS_ACTUALIZADOS" });
+            } catch (_) {}
+        }
+    } catch (err) {
+        mostrarAlertaAdmin(err.message, "error");
+    }
+}
+
+async function eliminarItemAccesorioAdmin(paqueteId, accesorioId, nombreAccesorio) {
+    if (!confirm(`¿Deseas eliminar el accesorio "${nombreAccesorio}" de este paquete?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/admin/accesorios/paquetes/${encodeURIComponent(paqueteId)}/items/${encodeURIComponent(accesorioId)}`, {
+            method: "DELETE",
+            headers: {
+                "X-Admin-Password": adminPasswordActiva,
+            },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Error al eliminar el accesorio.");
+
+        mostrarAlertaAdmin(data.mensaje || `🗑️ Accesorio "${nombreAccesorio}" eliminado.`, "exito");
+        cargarYRenderizarPaquetesAdmin();
+
+        if (typeof BroadcastChannel !== "undefined") {
+            try {
+                const canalSync = new BroadcastChannel("segalu_proyector_sync");
+                canalSync.postMessage({ tipo: "ACCESORIOS_ACTUALIZADOS" });
+            } catch (_) {}
+        }
+    } catch (err) {
+        mostrarAlertaAdmin(err.message, "error");
+    }
+}
+
 function abrirModalSubirAccesorioAdmin() {
     if (modalSubirAccesorioAdminEl) modalSubirAccesorioAdminEl.classList.remove("hidden");
+    alternarModoDestinoPaquetes();
+    cargarYRenderizarPaquetesAdmin();
 }
 
 function cerrarModalSubirAccesorioAdmin() {
     if (modalSubirAccesorioAdminEl) modalSubirAccesorioAdminEl.classList.add("hidden");
     if (formSubirAccesorioEl) formSubirAccesorioEl.reset();
-    if (previewAccesorioWrapEl) previewAccesorioWrapEl.classList.add("hidden");
+    limpiarStagedAccesorios();
+    alternarModoDestinoPaquetes();
 }
 
 if (btnAbrirModalSubirAccesorioEl) {
@@ -2533,46 +2897,57 @@ if (modalSubirAccesorioAdminEl) {
     });
 }
 
-if (inputArchivoAccesorioEl) {
-    inputArchivoAccesorioEl.addEventListener("change", (e) => {
-        const file = e.target.files?.[0];
-        if (file && (file.type === "image/png" || file.name.toLowerCase().endsWith(".png"))) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                if (imgPreviewAccesorioEl) imgPreviewAccesorioEl.src = ev.target.result;
-                if (previewAccesorioWrapEl) previewAccesorioWrapEl.classList.remove("hidden");
-            };
-            reader.readAsDataURL(file);
-        } else {
-            if (previewAccesorioWrapEl) previewAccesorioWrapEl.classList.add("hidden");
-        }
-    });
-}
-
 if (formSubirAccesorioEl) {
     formSubirAccesorioEl.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const archivo = inputArchivoAccesorioEl?.files?.[0];
-        if (!archivo) {
-            mostrarAlertaAdmin("Por favor selecciona un archivo PNG.", "error");
+
+        if (stagedFilesAccesorios.length === 0) {
+            mostrarAlertaAdmin("Por favor selecciona al menos un archivo PNG transparente para subir.", "error");
             return;
         }
-        const nombre = inputNombreAccesorioEl.value.trim();
-        const tematica = selectTematicaAccesorioEl.value;
+
+        const esCrear = radioModoDestinoNuevoEl ? radioModoDestinoNuevoEl.checked : true;
+        let nombrePaquete = "";
+        let paqueteId = "";
+        let scopeVal = "global";
+
+        if (esCrear) {
+            nombrePaquete = (inputNombreNuevoPaqueteEl?.value || "").trim();
+            if (!nombrePaquete) {
+                mostrarAlertaAdmin("Por favor escribe un nombre para el nuevo paquete.", "error");
+                inputNombreNuevoPaqueteEl?.focus();
+                return;
+            }
+            const radioScopeEvento = document.getElementById("alcance-evento");
+            if (radioScopeEvento && radioScopeEvento.checked) {
+                scopeVal = "evento";
+            }
+        } else {
+            paqueteId = selectPaqueteExistenteAdminEl?.value || "paquete_general";
+        }
 
         const formData = new FormData();
-        formData.append("nombre", nombre);
-        formData.append("tematica", tematica);
-        formData.append("archivo", archivo);
-        formData.append("archivo_png", archivo);
-        const idGenerado = "acc_" + (nombre.toLowerCase().replace(/[^a-z0-9]+/g, "_") || Date.now());
-        formData.append("id_accesorio", idGenerado);
+        formData.append("modo_destino", esCrear ? "crear" : "existente");
+        formData.append("nombre_paquete", nombrePaquete);
+        formData.append("paquete_id", paqueteId);
+        formData.append("scope", scopeVal);
+        formData.append("evento_id", eventoSeleccionado?.id || "");
+
+        const nombresArray = stagedFilesAccesorios.map((s) => s.name);
+        formData.append("nombres_json", JSON.stringify(nombresArray));
+
+        stagedFilesAccesorios.forEach((s) => {
+            formData.append("archivos", s.file);
+        });
 
         const btnSubmit = document.getElementById("btn-guardar-accesorio");
-        if (btnSubmit) btnSubmit.disabled = true;
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = `<span>⏳ Subiendo ${stagedFilesAccesorios.length} accesorio(s)...</span>`;
+        }
 
         try {
-            const res = await fetch("/api/admin/accesorios/subir", {
+            const res = await fetch("/api/admin/accesorios/paquetes/subir", {
                 method: "POST",
                 headers: {
                     "X-Admin-Password": adminPasswordActiva,
@@ -2583,13 +2958,20 @@ if (formSubirAccesorioEl) {
             try {
                 data = await res.json();
             } catch (_) {
-                data = { detail: "Respuesta inesperada al subir accesorio." };
+                data = { detail: "Respuesta inesperada del servidor." };
             }
             if (!res.ok) {
-                throw new Error(formatearMensajeError(data.detail || "Error al subir accesorio."));
+                throw new Error(formatearMensajeError(data.detail || "Error al subir los accesorios."));
             }
 
-            cerrarModalSubirAccesorioAdmin();
+            mostrarAlertaAdmin(
+                data.mensaje || `✅ Accesorios guardados con éxito en el paquete.`,
+                "exito"
+            );
+
+            limpiarStagedAccesorios();
+            if (inputNombreNuevoPaqueteEl) inputNombreNuevoPaqueteEl.value = "";
+            cargarYRenderizarPaquetesAdmin();
 
             if (typeof BroadcastChannel !== "undefined") {
                 try {
@@ -2597,15 +2979,13 @@ if (formSubirAccesorioEl) {
                     canalSync.postMessage({ tipo: "ACCESORIOS_ACTUALIZADOS" });
                 } catch (_) {}
             }
-
-            mostrarAlertaAdmin(
-                `✅ Accesorio "${nombre}" subido con éxito a temática ${tematica} (256x256 px).`,
-                "exito"
-            );
         } catch (err) {
-            mostrarAlertaAdmin(err, "error");
+            mostrarAlertaAdmin(err.message || err, "error");
         } finally {
-            if (btnSubmit) btnSubmit.disabled = false;
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = `<span>⬆️ Subir y Guardar Accesorios</span>`;
+            }
         }
     });
 }
@@ -3189,6 +3569,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const tabInicial = document.getElementById(tabGuardado) ? tabGuardado : "tab-contenido-fotos";
     cambiarPestanaPrincipalAdmin(tabInicial);
     cargarFotosSedesAdmin();
+    cargarYRenderizarPaquetesAdmin();
     if (adminPasswordActiva) {
         await cargarResumenPanel({ silencioso: true });
         iniciarCicloRefrescoSecuencial();
