@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;0,800;1,700&display=swap" rel="stylesheet">
 
     <!-- Hoja de estilos Modo Claro: Gala Marfil, Blanco Puro y Bronce Dorado -->
-    <link rel="stylesheet" href="styles.css?v=20261018d" />
+    <link rel="stylesheet" href="styles.css?v=20261022i" />
 </head>
 <body>
 
@@ -229,9 +229,9 @@
                     <div class="wall-loading-state">Cargando fotos del salón...</div>
                 </div>
 
-                <!-- Botón limpio de ancho completo para ver la galería completa (sin paréntesis ni subtítulos) -->
-                <button type="button" id="btn-ver-galeria-completa" class="btn-clean-gallery-full">
-                    <svg class="svg-icon svg-sm icon-gold" viewBox="0 0 24 24" aria-hidden="true">
+                <!-- Botón de ancho completo para ver la galería completa -->
+                <button type="button" id="btn-ver-galeria-completa" class="btn-clean-gallery-full" aria-label="Ver Galería Completa">
+                    <svg class="gallery-gold-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#D4AF37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="3" y="3" width="18" height="18" rx="3" />
                         <circle cx="8.5" cy="8.5" r="1.5" />
                         <polyline points="21 15 16 10 5 21" />
@@ -308,26 +308,6 @@
                         <!-- Generado dinámicamente: toda la tarjeta es clicable hacia Google Maps -->
                     </div>
                 </div>
-
-                <!-- Botón de contacto directo por WhatsApp en la página -->
-                <a
-                    href="https://wa.me/51922574048?text=%C2%A1Hola%20Eventos%20Segal%C3%BA!%20%F0%9F%8E%89%20Estoy%20participando%20en%20vivo%20desde%20la%20app%20interactiva%20y%20me%20encantar%C3%ADa%20cotizar%20una%20fecha%20con%20mi%20beneficio%20especial%20de%20invitado."
-                    id="btn-whatsapp-segalu"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="btn-whatsapp-cta"
-                >
-                    <div class="wa-icon-circle">
-                        <svg class="svg-icon svg-md wa-official-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-                            <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24zm4.52 11.66c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.26-1.5-1.41-1.75-.14-.25-.02-.39.11-.51.11-.11.25-.29.37-.44.13-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.61.19 1.16.17 1.6.1.49-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.07-.1-.23-.17-.48-.3z"/>
-                        </svg>
-                    </div>
-                    <div class="wa-text">
-                        <strong>Cotiza tu evento con Segalú</strong>
-                        <span>Reserva tu fecha y vive la experiencia</span>
-                    </div>
-                    <span class="wa-arrow">→</span>
-                </a>
             </div>
 
             <!-- 4. BOTÓN SALIR / CORREGIR NOMBRE (Elimina registro en Supabase) -->
@@ -921,48 +901,48 @@
         </div>
     </div>
 
-    <!-- DOCK FLOTANTE INFERIOR: ACCIONES RÁPIDAS (CÁMARA, TRIVIA) + BOTÓN WHATSAPP -->
-    <nav id="dock-flotante-invitado" class="bottom-floating-dock" aria-label="Acciones rápidas">
-        <div class="dock-actions-container">
-            <button type="button" id="btn-ir-fotos" class="dock-action-pill" aria-label="Subir Foto a la Pantalla">
-                <div class="dock-icon-wrap camera-glow">
-                    <svg class="svg-icon svg-sm" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-                        <circle cx="12" cy="13" r="3.5" />
-                    </svg>
-                </div>
-                <span class="dock-label">Subir Foto</span>
-            </button>
+    <!-- 3 BOTONES FLOTANTES INDEPENDIENTES (Sin contenedor visual, botones cuadrados redondeados y WhatsApp) -->
+    <nav id="dock-flotante-invitado" class="bottom-floating-dock hidden" aria-label="Acciones rápidas">
+        <!-- 1. Costado Izquierdo: Trivia (Cuadrado redondeado 52x52 en degradado violeta/azul eléctrico con trofeo y texto "Trivia") -->
+        <button type="button" id="btn-ir-trivia" class="btn-float-independent btn-float-trivia" aria-label="Jugar Ronda de Trivia" title="Jugar Trivia">
+            <svg class="svg-float-icon svg-float-trivia" viewBox="0 0 24 24" aria-hidden="true" fill="none">
+                <path d="M7 4h10v5a5 5 0 0 1-10 0V4z" fill="#FDE047" stroke="#FFFFFF" stroke-width="1.4" stroke-linejoin="round"/>
+                <path d="M5 6H3a2 2 0 0 0 2 3h2" stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round"/>
+                <path d="M17 6h2a2 2 0 0 1-2 3h-2" stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round"/>
+                <path d="M12 14v4m-3 0h6" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M10 20h4" stroke="#FDE047" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="12" cy="8.5" r="1.5" fill="#4F46E5"/>
+            </svg>
+            <span class="float-btn-label float-btn-label-trivia">Trivia</span>
+        </button>
 
-            <button type="button" id="btn-ir-trivia" class="dock-action-pill" aria-label="Jugar Ronda de Trivia">
-                <div class="dock-icon-wrap trophy-glow">
-                    <svg class="svg-icon svg-sm" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-                        <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-                        <path d="M4 22h16" />
-                        <path d="M10 14.66V17c0 .55-.45 1-1 1H7v4h10v-4h-2c-.55 0-1-.45-1-1v-2.34c3.36-.78 6-3.8 6-7.66V4H4v5c0 3.86 2.64 6.88 6 7.66z" />
-                    </svg>
-                </div>
-                <span class="dock-label">Trivia</span>
-            </button>
-        </div>
+        <!-- 2. Centro Exacto: Subir Foto (Cuadrado redondeado 56x56 en degradado dorado luminoso con cámara, destello y texto "Foto") -->
+        <button type="button" id="btn-ir-fotos" class="btn-float-independent btn-float-camera-featured" aria-label="Subir Foto a la Pantalla" title="Subir Foto a la Pantalla">
+            <svg class="svg-float-icon svg-float-camera" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#0B0F17" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14.5 4.5h-5L7.2 7.2H4.5a2 2 0 0 0-2 2v8.5a2 2 0 0 0 2 2h15a2 2 0 0 0 2-2V9.2a2 2 0 0 0-2-2h-2.7l-2.3-2.7z" />
+                <circle cx="12" cy="13.5" r="3.2" stroke-width="2.2" />
+                <path d="M18.8 4.2v2.2m-1.1-1.1h2.2" stroke="#0B0F17" stroke-width="1.8" />
+            </svg>
+            <span class="float-btn-label float-btn-label-foto">Foto</span>
+        </button>
 
-        <!-- Botón circular flotante oficial verde WhatsApp -->
+        <!-- 3. Esquina Derecha: WhatsApp Oficial (Circular Verde) -->
         <a
-            href="https://wa.me/51922574048?text=%C2%A1Hola%20Eventos%20Segal%C3%BA!%20%F0%9F%8E%89%20Estoy%20participando%20en%20vivo%20desde%20la%20app%20interactiva%20y%20me%20encantar%C3%ADa%20cotizar%20una%20fecha."
+            href="https://wa.me/51922574048"
             id="btn-whatsapp-flotante"
             target="_blank"
             rel="noopener noreferrer"
-            class="dock-wa-circle"
+            class="btn-float-independent btn-float-wa"
             aria-label="Contactar a Segalú por WhatsApp"
+            title="WhatsApp Segalú"
         >
-            <svg class="svg-icon svg-md" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+            <svg class="svg-icon svg-md icon-white" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
                 <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24zm4.52 11.66c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.26-1.5-1.41-1.75-.14-.25-.02-.39.11-.51.11-.11.25-.29.37-.44.13-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.61.19 1.16.17 1.6.1.49-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.07-.1-.23-.17-.48-.3z"/>
             </svg>
         </a>
     </nav>
 
     <!-- Script con arquitectura modular de paquetes temáticos y conexión a FastAPI -->
-    <script src="app.js?v=20261018d"></script>
+    <script src="app.js?v=20261022i"></script>
 </body>
 </html>

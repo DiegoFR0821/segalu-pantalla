@@ -24,6 +24,8 @@ services:
       - PORT=8000
       - PYTHONUNBUFFERED=1
     volumes:
+      # Sincronización en caliente del código local con el contenedor (sin reconstruir imagen)
+      - .:/app
       # Montaje del estado de eventos para persistencia de la trivia durante el test
       - ./backend/estado_eventos_segalu.json:/app/backend/estado_eventos_segalu.json
       # Montaje para inspeccionar las fotos subidas localmente sin borrarlas al reiniciar

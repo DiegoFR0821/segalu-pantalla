@@ -505,8 +505,20 @@ function obtenerTodosLosAccesorios() {
 function obtenerAccesoriosPermitidosEvento() {
     const todos = obtenerTodosLosAccesorios();
     const tematica = (eventoActual?.tematica_accesorios || "todos").toLowerCase().trim();
-    if (tematica === "todos") return todos;
 
+    // Caso 1: Paquete desactivado / excluido del evento actual (ej. "!paquete_15_anos" o "desactivado:paquete_15_anos")
+    if (tematica.startsWith("!") || tematica.startsWith("desactivado:") || tematica.startsWith("excluir:")) {
+        const pkgDesactivado = normalizarClavePaquete(tematica.replace(/^[!]|^(desactivado:|excluir:)/, ""));
+        return todos.filter((acc) => acc.id === "sin_accesorio" || acc.paqueteKey !== pkgDesactivado);
+    }
+
+    if (tematica === "todos" || !tematica) return todos;
+
+    if (tematica === "ninguno" || tematica === "desactivado") {
+        return todos.filter((acc) => acc.id === "sin_accesorio");
+    }
+
+    // Caso 2: Temática exclusiva activa (ej. "paquete_boda", "paquete_15_anos")
     const paqueteRequerido = normalizarClavePaquete(tematica);
     const permitidos = todos.filter((acc) => acc.id === "sin_accesorio" || acc.paqueteKey === paqueteRequerido);
 
@@ -713,9 +725,17 @@ function actualizarCabeceraYWhatsApp(evento) {
     tituloEventoEl.innerHTML = `¡Bienvenido a <em class="gold-italic">${nombreEvento}</em>!`;
     subtituloLocalEl.textContent = nombreLocal.toUpperCase();
 
-    // Mensaje de gancho comercial dinámico para identificar clientes desde la aplicación
+    // Mensaje de gancho comercial dinámico en UTF-8 para identificar clientes desde la aplicación
     const mensajeRastreo = `¡Hola Eventos Segalú! 🎉 Estoy participando en vivo en el evento ${nombreEvento} desde la app interactiva y me encantaría cotizar una fecha con mi beneficio especial de invitado.`;
-    btnWhatsappSegaluEl.href = `https://wa.me/${TELEFONO_WHATSAPP_SEGALU}?text=${encodeURIComponent(mensajeRastreo)}`;
+    const urlWaOficial = `https://wa.me/${TELEFONO_WHATSAPP_SEGALU}?text=${encodeURIComponent(mensajeRastreo)}`;
+
+    const btnWhatsappFlotanteEl = document.getElementById("btn-whatsapp-flotante");
+    if (btnWhatsappFlotanteEl) {
+        btnWhatsappFlotanteEl.href = urlWaOficial;
+    }
+    if (btnWhatsappSegaluEl) {
+        btnWhatsappSegaluEl.href = urlWaOficial;
+    }
 }
 
 // ------------------------------------------------------------------------------
@@ -906,6 +926,8 @@ btnCorregirNombreEl.addEventListener("click", async () => {
         vistaLobbyEl.classList.add("hidden");
         vistaTriviaInvitadoEl.classList.add("hidden");
         vistaRegistroEl.classList.remove("hidden");
+        const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+        if (dockFlotanteEl) dockFlotanteEl.classList.add("hidden");
         inputNombreEl.value = nombreActual;
         inputNombreEl.focus();
         btnCorregirNombreEl.disabled = false;
@@ -956,7 +978,21 @@ function renderizarFiltrosPaquetes() {
     const tematica = (eventoActual?.tematica_accesorios || "todos").toLowerCase().trim();
 
     let opcionesFiltro = [];
-    if (tematica === "todos") {
+    if (tematica.startsWith("!") || tematica.startsWith("desactivado:") || tematica.startsWith("excluir:")) {
+        const pkgExcluido = normalizarClavePaquete(tematica.replace(/^[!]|^(desactivado:|excluir:)/, ""));
+        opcionesFiltro = [
+            { key: "todos", label: "Todos" },
+            ...Object.entries(PAQUETES_ACCESORIOS_TEMATICOS)
+                .filter(([key]) => key !== pkgExcluido)
+                .map(([key, datos]) => ({
+                    key,
+                    label: datos.nombrePaquete,
+                })),
+        ];
+        if (paqueteFiltroActual === pkgExcluido) {
+            paqueteFiltroActual = "todos";
+        }
+    } else if (tematica === "todos" || !tematica) {
         opcionesFiltro = [
             { key: "todos", label: "Todos" },
             ...Object.entries(PAQUETES_ACCESORIOS_TEMATICOS).map(([key, datos]) => ({
@@ -1041,16 +1077,34 @@ function abrirModalPersonalizador() {
         accesorioSeleccionadoId = actual.accesorioId;
     }
 
+    const permitidos = obtenerAccesoriosPermitidosEvento();
+    const esPermitido = permitidos.some((a) => a.id === accesorioSeleccionadoId);
+    if (!esPermitido) {
+        accesorioSeleccionadoId = seleccionarAccesorioAleatorioSegunTematica();
+    }
+
     renderizarCuadriculaPersonajes();
     renderizarFiltrosPaquetes();
     renderizarCuadriculaAccesorios();
     actualizarPrevisualizacionModal();
 
     modalPersonalizarEl.classList.remove("hidden");
+    const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+    if (dockFlotanteEl) dockFlotanteEl.classList.add("hidden");
+
+    cargarAccesoriosPersonalizados().then(() => {
+        renderizarFiltrosPaquetes();
+        renderizarCuadriculaAccesorios();
+        actualizarPrevisualizacionModal();
+    }).catch(() => {});
 }
 
 function cerrarModalPersonalizador() {
     modalPersonalizarEl.classList.add("hidden");
+    const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+    if (dockFlotanteEl && vistaLobbyEl && !vistaLobbyEl.classList.contains("hidden")) {
+        dockFlotanteEl.classList.remove("hidden");
+    }
 }
 
 // Conmutación entre Pestaña "Personaje" y Pestaña "Accesorio"
@@ -1278,6 +1332,21 @@ if (typeof BroadcastChannel !== "undefined") {
             aplicarMapaFotosSedes({}, ev.data.fotos_sedes || {});
         }
     });
+
+    try {
+        const canalSyncInvitado = new BroadcastChannel("segalu_proyector_sync");
+        canalSyncInvitado.addEventListener("message", async (ev) => {
+            if (ev.data?.tipo === "ACCESORIOS_ACTUALIZADOS") {
+                if (ev.data.tematica && eventoActual) {
+                    eventoActual.tematica_accesorios = ev.data.tematica;
+                }
+                await cargarAccesoriosPersonalizados();
+                renderizarFiltrosPaquetes();
+                renderizarCuadriculaAccesorios();
+                actualizarPrevisualizacionModal();
+            }
+        });
+    } catch (_) {}
 }
 
 function mostrarSlideGaleria(indice) {
@@ -1986,6 +2055,16 @@ async function consultarEstadoTriviaEnVivo() {
         if (!res.ok) return;
         const data = await res.json();
 
+        // Sincronización en tiempo real de temáticas de accesorios si el Admin activó/desactivó paquetes
+        if (data.tematica_accesorios && eventoActual) {
+            const nuevaTematica = String(data.tematica_accesorios).trim();
+            if (eventoActual.tematica_accesorios !== nuevaTematica) {
+                eventoActual.tematica_accesorios = nuevaTematica;
+                renderizarFiltrosPaquetes();
+                renderizarCuadriculaAccesorios();
+            }
+        }
+
         const activaAhora = Boolean(data.trivia_activa);
 
         // 1. [FASE 4.5 - REQUERIMIENTO C] Sincronización automática del botón del Lobby cada 2.5s
@@ -2342,6 +2421,9 @@ function abrirModalCrmLead() {
         leadNombreEl.value = sesionInvitado.invitado.nombre;
     }
 
+    const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+    if (dockFlotanteEl) dockFlotanteEl.classList.add("hidden");
+
     const eventoId = eventoActual?.id || "global";
     const cuponGuardado = localStorage.getItem(`${STORAGE_LEAD_PREFIX}${eventoId}`);
     if (cuponGuardado) {
@@ -2363,6 +2445,10 @@ function abrirModalCrmLead() {
 function cerrarModalCrmLead() {
     if (modalCrmLeadEl) {
         modalCrmLeadEl.classList.add("hidden");
+    }
+    const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+    if (dockFlotanteEl && vistaLobbyEl && !vistaLobbyEl.classList.contains("hidden")) {
+        dockFlotanteEl.classList.remove("hidden");
     }
 }
 
@@ -2699,6 +2785,9 @@ if (btnVerGaleriaCompletaEl) {
         if (!modalGaleriaFotosEventoEl) return;
         modalGaleriaFotosEventoEl.classList.remove("hidden");
 
+        const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+        if (dockFlotanteEl) dockFlotanteEl.classList.add("hidden");
+
         if (contadorFotosGaleriaEl) {
             contadorFotosGaleriaEl.textContent = `${listaFotosAprobadasEvento.length} fotos`;
         }
@@ -2720,6 +2809,10 @@ if (btnVerGaleriaCompletaEl) {
 if (btnCerrarGaleriaCompletaEl) {
     btnCerrarGaleriaCompletaEl.addEventListener("click", () => {
         if (modalGaleriaFotosEventoEl) modalGaleriaFotosEventoEl.classList.add("hidden");
+        const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+        if (dockFlotanteEl && vistaLobbyEl && !vistaLobbyEl.classList.contains("hidden")) {
+            dockFlotanteEl.classList.remove("hidden");
+        }
     });
 }
 

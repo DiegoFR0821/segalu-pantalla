@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import copy
+import gc
 import hashlib
 import hmac
 import io
@@ -37,6 +38,7 @@ from fastapi import BackgroundTasks, FastAPI, File, Form, Header, HTTPException,
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.background import BackgroundTask
 from PIL import Image, ImageOps
 from pydantic import BaseModel, Field, field_validator
 from supabase import create_client, Client
@@ -123,6 +125,29 @@ _CACHE_RAM_SISTEMA: dict[str, dict] = {}
 _EVENTO_A_CLAVES_CACHE: dict[str, set[str]] = {}
 _CACHE_META_EVENTOS_PROYECTOR: dict[str, dict] = {}
 _CACHE_TTL_SEGUNDOS = 2.0
+_MAX_CACHE_RAM_ENTRADAS = 350
+_CONTADOR_INSERCIONES_CACHE = 0
+
+
+def purgar_cache_ram_expirada():
+    """
+    Control estricto de memoria RAM para Render:
+    1. Purga automáticamente las entradas que excedieron el TTL.
+    2. Si el diccionario supera los 350 registros, elimina las entradas más antiguas (FIFO/LRU).
+    """
+    ahora = time.time()
+    claves_expiradas = [
+        k for k, v in list(_CACHE_RAM_SISTEMA.items())
+        if (ahora - v.get("ts", 0)) > (_CACHE_TTL_SEGUNDOS * 3)
+    ]
+    for k in claves_expiradas:
+        _CACHE_RAM_SISTEMA.pop(k, None)
+
+    if len(_CACHE_RAM_SISTEMA) > _MAX_CACHE_RAM_ENTRADAS:
+        ordenadas = sorted(_CACHE_RAM_SISTEMA.items(), key=lambda it: it[1].get("ts", 0))
+        exceso = len(_CACHE_RAM_SISTEMA) - _MAX_CACHE_RAM_ENTRADAS
+        for k, _ in ordenadas[:exceso]:
+            _CACHE_RAM_SISTEMA.pop(k, None)
 
 
 def obtener_cache_ram(clave: str) -> Any | None:
@@ -139,6 +164,7 @@ def obtener_cache_ram(clave: str) -> Any | None:
 
 def guardar_cache_ram(clave: str, datos: Any, evento_id: str | None = None):
     """Guarda un resultado en memoria RAM indexado por evento para invalidación instantánea."""
+    global _CONTADOR_INSERCIONES_CACHE
     _CACHE_RAM_SISTEMA[clave] = {
         "ts": time.time(),
         "datos": datos,
@@ -149,6 +175,11 @@ def guardar_cache_ram(clave: str, datos: Any, evento_id: str | None = None):
         if eid_clean not in _EVENTO_A_CLAVES_CACHE:
             _EVENTO_A_CLAVES_CACHE[eid_clean] = set()
         _EVENTO_A_CLAVES_CACHE[eid_clean].add(clave)
+
+    _CONTADOR_INSERCIONES_CACHE += 1
+    if _CONTADOR_INSERCIONES_CACHE >= 30 or len(_CACHE_RAM_SISTEMA) > _MAX_CACHE_RAM_ENTRADAS:
+        _CONTADOR_INSERCIONES_CACHE = 0
+        purgar_cache_ram_expirada()
 
 
 def invalidar_cache_evento(evento_id: str | None = None):
@@ -178,6 +209,7 @@ def invalidar_cache_evento(evento_id: str | None = None):
         _EVENTO_A_CLAVES_CACHE.clear()
         _CACHE_DASHBOARD_POR_EVENTO.clear()
 
+    _CACHE_RAM_SISTEMA.pop("catalogo_accesorios", None)
     _CACHE_META_EVENTOS_PROYECTOR.clear()
 
 
@@ -1083,42 +1115,52 @@ def extraer_preguntas_pdf_modo_local(texto_pdf: str, max_preguntas: int = 10) ->
 # 8. PRE-FILTRO DE IA 100% GRATUITO Y MARCA DE AGUA TRANSPARENTE (PILLOW)
 # ------------------------------------------------------------------------------
 def analizar_seguridad_imagen_ia(imagen_rgb: Image.Image) -> dict:
-    miniatura = imagen_rgb.resize((160, 160), Image.Resampling.BILINEAR).convert("YCbCr")
-    pixeles = list(miniatura.getdata())
-    total_pixeles = len(pixeles)
+    miniatura = None
+    pixeles = None
+    try:
+        miniatura = imagen_rgb.resize((160, 160), Image.Resampling.BILINEAR).convert("YCbCr")
+        pixeles = list(miniatura.getdata())
+        total_pixeles = len(pixeles)
 
-    conteo_piel_total = 0
-    conteo_piel_centro = 0
-    total_centro = 0
+        conteo_piel_total = 0
+        conteo_piel_centro = 0
+        total_centro = 0
 
-    for idx, (y_val, cb, cr) in enumerate(pixeles):
-        fila = idx // 160
-        col = idx % 160
-        en_centro = (40 <= fila <= 120) and (40 <= col <= 120)
-        if en_centro:
-            total_centro += 1
-
-        if 60 < y_val < 245 and 77 <= cb <= 127 and 133 <= cr <= 173:
-            conteo_piel_total += 1
+        for idx, (y_val, cb, cr) in enumerate(pixeles):
+            fila = idx // 160
+            col = idx % 160
+            en_centro = (40 <= fila <= 120) and (40 <= col <= 120)
             if en_centro:
-                conteo_piel_centro += 1
+                total_centro += 1
 
-    ratio_global = conteo_piel_total / max(1, total_pixeles)
-    ratio_centro = conteo_piel_centro / max(1, total_centro)
-    indice_riesgo = (ratio_centro * 0.6) + (ratio_global * 0.4)
+            if 60 < y_val < 245 and 77 <= cb <= 127 and 133 <= cr <= 173:
+                conteo_piel_total += 1
+                if en_centro:
+                    conteo_piel_centro += 1
 
-    if indice_riesgo <= 0.22:
-        puntaje = int(round(99 - (indice_riesgo * 40)))
-    elif indice_riesgo <= 0.42:
-        puntaje = int(round(90 - ((indice_riesgo - 0.22) * 90)))
-    else:
-        puntaje = max(12, int(round(70 - ((indice_riesgo - 0.42) * 140))))
+        ratio_global = conteo_piel_total / max(1, total_pixeles)
+        ratio_centro = conteo_piel_centro / max(1, total_centro)
+        indice_riesgo = (ratio_centro * 0.6) + (ratio_global * 0.4)
 
-    puntaje = max(5, min(99, puntaje))
-    return {
-        "puntaje_ia_seguridad": puntaje,
-        "filtro_ia_aprobado": puntaje >= 70,
-    }
+        if indice_riesgo <= 0.22:
+            puntaje = int(round(99 - (indice_riesgo * 40)))
+        elif indice_riesgo <= 0.42:
+            puntaje = int(round(90 - ((indice_riesgo - 0.22) * 90)))
+        else:
+            puntaje = max(12, int(round(70 - ((indice_riesgo - 0.42) * 140))))
+
+        puntaje = max(5, min(99, puntaje))
+        return {
+            "puntaje_ia_seguridad": puntaje,
+            "filtro_ia_aprobado": puntaje >= 70,
+        }
+    finally:
+        if miniatura is not None:
+            try:
+                miniatura.close()
+            except Exception:
+                pass
+        del pixeles
 
 
 def procesar_ia_background(
@@ -1131,10 +1173,14 @@ def procesar_ia_background(
     """
     Tarea en segundo plano (FastAPI BackgroundTasks):
     Ejecuta el filtrado IA local sobre los píxeles de la foto sin bloquear la respuesta
-    inmediata al celular del invitado.
+    inmediata al celular del invitado. Libera explícitamente buffers y recolecta memoria al terminar.
     """
+    bio = None
+    img = None
+    img_rgb = None
     try:
-        img = Image.open(io.BytesIO(contenido_bytes))
+        bio = io.BytesIO(contenido_bytes)
+        img = Image.open(bio)
         img = ImageOps.exif_transpose(img)
         img_rgb = img.convert("RGB")
         resultado_ia = analizar_seguridad_imagen_ia(img_rgb)
@@ -1155,6 +1201,25 @@ def procesar_ia_background(
         invalidar_cache_evento(evento_id)
     except Exception as err:
         print(f"Aviso en background IA de foto {multimedia_id}: {err}")
+    finally:
+        if img is not None:
+            try:
+                img.close()
+            except Exception:
+                pass
+        if img_rgb is not None:
+            try:
+                img_rgb.close()
+            except Exception:
+                pass
+        if bio is not None:
+            try:
+                bio.close()
+            except Exception:
+                pass
+        del contenido_bytes
+        import gc
+        gc.collect()
 
 
 def extraer_puntaje_ia_de_url(url_original: str | None, filtro_aprobado: bool) -> int:
@@ -1224,7 +1289,7 @@ def obtener_evento_por_codigo(
             q = (
                 db.table("eventos")
                 .select(
-                    "id, local_id, nombre, codigo_acceso, fecha_evento, estado, trivia_activa, locales(nombre, direccion, telefono_contacto)"
+                    "*, locales(nombre, direccion, telefono_contacto)"
                 )
                 .eq("codigo_acceso", codigo_limpio)
                 .eq("estado", "activo")
@@ -1244,11 +1309,13 @@ def obtener_evento_por_codigo(
         evento = datos[0]
         estado_ev = obtener_estado_evento(evento["id"])
         evento["fase_trivia"] = estado_ev.get("fase_trivia", "inactiva")
-        evento["tematica_accesorios"] = (
-            evento.get("tematica_accesorios")
-            or estado_ev.get("tematica_accesorios")
+        tematica_val = (
+            estado_ev.get("tematica_accesorios")
+            or evento.get("tematica_accesorios")
             or "todos"
         )
+        evento["tematica_accesorios"] = tematica_val
+        estado_ev["tematica_accesorios"] = tematica_val
         resultado = {"ok": True, "evento": evento}
         guardar_cache_ram(clave_cache, resultado, evento_id=evento["id"])
         return resultado
@@ -1568,7 +1635,13 @@ def subir_foto_invitado(
     2. Ejecuta la validación de IA local en segundo plano (FastAPI BackgroundTasks)
        para responder de inmediato al celular del invitado en menos de 1 segundo ("¡Foto enviada!").
     """
-    contenido_bytes = archivo.file.read()
+    try:
+        contenido_bytes = archivo.file.read()
+    finally:
+        try:
+            archivo.file.close()
+        except Exception:
+            pass
     if not contenido_bytes:
         raise HTTPException(status_code=400, detail="El archivo de imagen está vacío.")
 
@@ -1827,6 +1900,13 @@ def obtener_estado_trivia_invitado(
     jugadores_sala = estado_ev.setdefault("jugadores_sala_trivia_ts", {})
     heartbeats = estado_ev.setdefault("heartbeat_invitados_ts", {})
 
+    # Optimización de RAM: Limpiar conexiones inactivas mayores a 60s
+    corte_inactivo = ahora_ts - 60.0
+    for k in [k for k, ts in list(heartbeats.items()) if ts < corte_inactivo]:
+        heartbeats.pop(k, None)
+    for k in [k for k, ts in list(jugadores_sala.items()) if ts < corte_inactivo]:
+        jugadores_sala.pop(k, None)
+
     if invitado_id and invitado_id.strip():
         iid_clean = invitado_id.strip()
         heartbeats[iid_clean] = ahora_ts
@@ -1925,6 +2005,7 @@ def obtener_estado_trivia_invitado(
         "pregunta_activa": datos_pregunta_publica,
         "mi_respuesta": mi_respuesta,
         "podio": podio_top,
+        "tematica_accesorios": estado_ev.get("tematica_accesorios", "todos"),
     }
     guardar_cache_ram(clave_cache, resultado, evento_id=eid)
     return resultado
@@ -2725,6 +2806,13 @@ def descargar_fotos_evento_zip(
         buffer_zip.seek(0)
         nombre_zip = f"Fotos_{codigo_limpio}_Originales.zip"
 
+        def _cerrar_y_limpiar_zip(buf):
+            try:
+                buf.close()
+            except Exception:
+                pass
+            gc.collect()
+
         return StreamingResponse(
             buffer_zip,
             media_type="application/zip",
@@ -2732,6 +2820,7 @@ def descargar_fotos_evento_zip(
                 "Content-Disposition": f'attachment; filename="{nombre_zip}"',
                 "Cache-Control": "no-store",
             },
+            background=BackgroundTask(_cerrar_y_limpiar_zip, buffer_zip),
         )
     except HTTPException:
         raise
@@ -3105,12 +3194,23 @@ def subir_foto_sede_admin(
         raise HTTPException(status_code=400, detail="Indica el número de foto (1 a 4).")
 
     num = max(1, min(4, int(indice_recibido)))
-    raw_bytes = archivo.file.read()
+    try:
+        raw_bytes = archivo.file.read()
+    finally:
+        try:
+            archivo.file.close()
+        except Exception:
+            pass
     if not raw_bytes:
         raise HTTPException(status_code=400, detail="El archivo de imagen seleccionado está vacío.")
 
+    bio = None
+    img = None
+    img_vertical = None
+    buf = None
     try:
-        img = Image.open(io.BytesIO(raw_bytes))
+        bio = io.BytesIO(raw_bytes)
+        img = Image.open(bio)
         img = ImageOps.exif_transpose(img).convert("RGB")
         # Recorte inteligente vertical 4:5 (1080x1350) protagonista para celular
         img_vertical = ImageOps.fit(img, (1080, 1350), method=Image.Resampling.LANCZOS)
@@ -3188,6 +3288,29 @@ def subir_foto_sede_admin(
             status_code=400,
             detail=f"No se pudo procesar o subir la foto de la sede: {str(err)}",
         )
+    finally:
+        if img is not None:
+            try:
+                img.close()
+            except Exception:
+                pass
+        if img_vertical is not None:
+            try:
+                img_vertical.close()
+            except Exception:
+                pass
+        if buf is not None:
+            try:
+                buf.close()
+            except Exception:
+                pass
+        if bio is not None:
+            try:
+                bio.close()
+            except Exception:
+                pass
+        del raw_bytes
+        gc.collect()
 
 
 @app.patch("/api/admin/sedes/galeria/titulo")
@@ -3977,8 +4100,12 @@ async def subir_paquete_accesorios_admin(
         bytes_img = await f.read()
 
         # Optimizar / Redimensionar a 256x256 px PNG con PIL LANCZOS
+        img = None
+        buf = None
+        bio = None
         try:
-            img = Image.open(io.BytesIO(bytes_img))
+            bio = io.BytesIO(bytes_img)
+            img = Image.open(bio)
             if img.format != "PNG":
                 return JSONResponse(status_code=400, content={"ok": False, "detail": f"El archivo '{nombre_orig}' no contiene una imagen PNG válida."})
             if img.size != (256, 256):
@@ -3988,6 +4115,23 @@ async def subir_paquete_accesorios_admin(
             png_bytes = buf.getvalue()
         except Exception:
             png_bytes = bytes_img
+        finally:
+            if img is not None:
+                try:
+                    img.close()
+                except Exception:
+                    pass
+            if buf is not None:
+                try:
+                    buf.close()
+                except Exception:
+                    pass
+            if bio is not None:
+                try:
+                    bio.close()
+                except Exception:
+                    pass
+            del bytes_img
 
         # Guardar copia local de respaldo
         ruta_guardado_local = dir_destino_local / nombre_archivo_final
@@ -4032,6 +4176,7 @@ async def subir_paquete_accesorios_admin(
 
     # 6. Guardar catálogo actualizado en Storage y disco local
     guardar_catalogo_paquetes(catalogo)
+    gc.collect()
 
     return {
         "ok": True,
@@ -5168,7 +5313,11 @@ app.mount(
 
 
 @app.get("/admin")
+@app.head("/admin")
+@app.get("/admin/")
+@app.head("/admin/")
 @app.get("/admin.html")
+@app.head("/admin.html")
 def servir_panel_admin():
     return FileResponse(FRONTEND_ADMIN_DIR / "admin.html")
 
@@ -5177,6 +5326,27 @@ app.mount(
     "/admin",
     StaticFiles(directory=str(FRONTEND_ADMIN_DIR), html=True),
     name="admin_static",
+)
+
+
+@app.get("/invitado")
+@app.head("/invitado")
+@app.get("/invitado/")
+@app.head("/invitado/")
+@app.get("/invitado/index.html")
+@app.head("/invitado/index.html")
+def servir_ruta_invitado():
+    """
+    Ruta explícita para la vista de invitado que acepta query parameters
+    (ej: /invitado?codigo=PROMO-24-11-26) sin generar error 404.
+    """
+    return FileResponse(FRONTEND_INVITADO_DIR / "index.html")
+
+
+app.mount(
+    "/invitado",
+    StaticFiles(directory=str(FRONTEND_INVITADO_DIR), html=True),
+    name="invitado_direct_static",
 )
 
 

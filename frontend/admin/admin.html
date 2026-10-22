@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;0,800;1,700&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="/admin/admin.css?v=20261019a" />
+    <link rel="stylesheet" href="/admin/admin.css?v=20261022i" />
     <!-- CDN Ligero de Chart.js para Visualización Dinámica de Leads y Cumpleaños -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
@@ -103,9 +103,6 @@
                     <!-- Cabecera de Sede & Evento -->
                     <div class="event-selector-header">
                         <span class="section-pill">EVENTO EN MODERACIÓN</span>
-                        <span id="badge-velocidad-evento" class="speed-latency-pill" title="Tiempo de respuesta">
-                            ⚡ Instantáneo
-                        </span>
                     </div>
 
                     <!-- Selector de Sede de Segalú -->
@@ -140,28 +137,28 @@
                     <div class="sidebar-operations-section">
                         <span class="sidebar-section-title">ACCIONES OPERATIVAS</span>
                         <div class="sidebar-operations-list">
-                            <a href="#" id="btn-sidebar-proyector" target="_blank" rel="noopener" class="sidebar-op-btn" title="Abrir Pantalla Gigante">
+                            <a href="#" id="btn-sidebar-proyector" target="_blank" rel="noopener" class="sidebar-op-btn op-btn-navy" title="Abrir Pantalla Gigante">
                                 <span>🖥️ Proyector</span>
                             </a>
-                            <button type="button" id="btn-sidebar-enlace-invitados" class="sidebar-op-btn" title="Copiar enlace o abrir como invitado">
+                            <button type="button" id="btn-sidebar-enlace-invitados" class="sidebar-op-btn op-btn-navy" title="Copiar enlace y abrir en nueva pestaña">
                                 <span>📱 Enlace Invitados</span>
                             </button>
-                            <button type="button" id="btn-sidebar-galeria" class="sidebar-op-btn" title="Administrar fotos de portada de las sedes">
+                            <button type="button" id="btn-sidebar-galeria" class="sidebar-op-btn op-btn-gold" title="Administrar fotos de portada de las sedes">
                                 <span>🖼️ Galería</span>
                             </button>
-                            <button type="button" id="btn-sidebar-preguntas" class="sidebar-op-btn" title="Crear preguntas para la trivia">
+                            <button type="button" id="btn-sidebar-preguntas" class="sidebar-op-btn op-btn-purple" title="Crear preguntas para la trivia">
                                 <span>➕ Crear Preguntas</span>
                             </button>
-                            <button type="button" id="btn-abrir-modal-subir-accesorio" class="sidebar-op-btn" title="Gestionar paquetes de accesorios temáticos">
+                            <button type="button" id="btn-abrir-modal-subir-accesorio" class="sidebar-op-btn op-btn-charcoal" title="Gestionar paquetes de accesorios temáticos">
                                 <span>🎨 Paquetes Accesorios</span>
                             </button>
-                            <button type="button" id="btn-descargar-zip-originales" class="sidebar-op-btn" title="Descargar fotos en archivo ZIP">
+                            <button type="button" id="btn-descargar-zip-originales" class="sidebar-op-btn op-btn-charcoal" title="Descargar fotos en archivo ZIP">
                                 <span>📦 Descargar Fotos</span>
                             </button>
-                            <button type="button" id="btn-purgar-fotos-storage" class="sidebar-op-btn btn-danger-action" title="Eliminar fotos del evento">
+                            <button type="button" id="btn-purgar-fotos-storage" class="sidebar-op-btn op-btn-amber" title="Eliminar fotos del evento">
                                 <span>🧹 Vaciar Fotos</span>
                             </button>
-                            <button type="button" id="btn-eliminar-evento-completo" class="sidebar-op-btn btn-danger-action" title="Eliminar evento de la base de datos">
+                            <button type="button" id="btn-eliminar-evento-completo" class="sidebar-op-btn op-btn-crimson" title="Eliminar evento de la base de datos">
                                 <span>🗑️ Eliminar Evento</span>
                             </button>
                         </div>
@@ -1123,6 +1120,6 @@
         </div>
     </div>
 
-    <script src="/admin/admin.js?v=20261019a"></script>
+    <script src="/admin/admin.js?v=20261022i"></script>
 </body>
 </html>

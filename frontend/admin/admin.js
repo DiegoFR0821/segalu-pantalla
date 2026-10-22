@@ -40,6 +40,7 @@ function escaparHtml(texto) {
 // Estado en memoria y semáforos de concurrencia para evitar peticiones solapadas
 let adminPasswordActiva = sessionStorage.getItem(SESSION_ADMIN_KEY) || "";
 let eventoSeleccionadoId = null;
+let eventoSeleccionado = null;
 let filtroSedeAdminActivo = localStorage.getItem("segalu_admin_sede_filtro") || "todos";
 let filtroEstadoFoto = "pendiente";
 let autoAprobarFotosActivo = false;
@@ -47,12 +48,31 @@ let autoAprobarFotosActivo = false;
 let cacheMultimedia = [];
 let cacheEventos = [];
 let cacheInvitados = [];
+let cacheLeads = [];
 let cachePreguntas = [];
 let estadoTriviaActual = {
     fase: "inactiva",
     pregunta_activa_id: null,
     total_respuestas_activa: 0,
 };
+
+function obtenerEventoSeleccionado() {
+    if (eventoSeleccionadoId && Array.isArray(cacheEventos)) {
+        const ev = cacheEventos.find((e) => e.id === eventoSeleccionadoId);
+        if (ev) return ev;
+    }
+    return cacheEventos && cacheEventos.length > 0 ? cacheEventos[0] : null;
+}
+
+function actualizarContadorTopbarEnVivo() {
+    const el = document.getElementById("topbar-live-count");
+    if (!el) return;
+    const countInv = Array.isArray(cacheInvitados) ? cacheInvitados.length : 0;
+    const countLeads = Array.isArray(cacheLeads) ? cacheLeads.length : 0;
+    // Refleja dinámicamente las conexiones reales combinando invitados en vivo y prospectos CRM del evento activo
+    const totalReal = Math.max(countInv, countLeads);
+    el.textContent = String(totalReal);
+}
 
 let peticionResumenEnCurso = false;
 let refrescoPendienteEnCola = false;
@@ -568,8 +588,9 @@ function aplicarDatosDashboardEnDOM(data, tiempoClienteMs) {
     }
 
     const msMostrados = data.tiempo_carga_ms ?? Math.round(tiempoClienteMs);
-    if (badgeVelocidadEventoEl) {
-        badgeVelocidadEventoEl.textContent = `⚡ ${msMostrados} ms`;
+    const pingEl = document.getElementById("server-ping-ms");
+    if (pingEl) {
+        pingEl.textContent = String(msMostrados);
     }
 
     // 1. Llenar selectores de Sedes (Filtro superior y Creador de Eventos)
@@ -846,7 +867,8 @@ function obtenerUrlProyectorEventoActual() {
 }
 
 function pintarResumenEventoActual() {
-    const ev = cacheEventos.find((e) => e.id === eventoSeleccionadoId);
+    const ev = obtenerEventoSeleccionado();
+    eventoSeleccionado = ev;
     if (!ev) {
         infoEventoSeleccionadoEl.innerHTML = `
             <div>Aún no hay eventos creados.</div>
@@ -897,14 +919,10 @@ if (btnSidebarEnlaceInvEl) {
         }
         const url = `${window.location.origin}/invitado?codigo=${encodeURIComponent(ev.codigo_acceso)}`;
         if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(url).then(() => {
-                mostrarAlertaAdmin(`📱 Enlace copiado al portapapeles: ${url}`, "exito");
-            }).catch(() => {
-                window.open(url, "_blank");
-            });
-        } else {
-            window.open(url, "_blank");
+            navigator.clipboard.writeText(url).catch(() => {});
         }
+        mostrarAlertaAdmin(`📱 Enlace copiado al portapapeles y abierto en nueva pestaña: ${url}`, "exito");
+        window.open(url, "_blank");
     });
 }
 
@@ -2056,6 +2074,7 @@ function renderizarListaInvitados(invitados) {
     if (tabBadgeInvitadosEl) {
         tabBadgeInvitadosEl.textContent = totalInvitados;
     }
+    actualizarContadorTopbarEnVivo();
 
     const busqueda = (filtroTextoInvitado || "").trim().toLowerCase();
     const invitadosFiltrados = busqueda
@@ -2702,7 +2721,9 @@ async function cargarYRenderizarPaquetesAdmin() {
             return;
         }
 
-        const tematicaEventoActivo = (eventoSeleccionado?.tematica_accesorios || "todos").toLowerCase().trim();
+        const evActivo = obtenerEventoSeleccionado();
+        eventoSeleccionado = evActivo;
+        const tematicaEventoActivo = (evActivo?.tematica_accesorios || "todos").toLowerCase().trim();
 
         listaPaquetes.forEach((pkg) => {
             const esActivoEnEvento =
@@ -2711,8 +2732,12 @@ async function cargarYRenderizarPaquetesAdmin() {
                 (tematicaEventoActivo === "gala_bodas" && pkg.id === "paquete_boda") ||
                 (tematicaEventoActivo === "fiesta_vip" && pkg.id === "paquete_general");
 
+            const esDesactivadoEnEvento =
+                tematicaEventoActivo === `!${pkg.id.toLowerCase()}` ||
+                tematicaEventoActivo === `desactivado:${pkg.id.toLowerCase()}`;
+
             const card = document.createElement("div");
-            card.className = `paquete-admin-card ${esActivoEnEvento ? "active-event-theme" : ""}`;
+            card.className = `paquete-admin-card ${esActivoEnEvento ? "active-event-theme" : ""} ${esDesactivadoEnEvento ? "disabled-event-theme" : ""}`;
 
             const headerRow = document.createElement("div");
             headerRow.className = "paquete-admin-header";
@@ -2736,18 +2761,36 @@ async function cargarYRenderizarPaquetesAdmin() {
                 activeBadge.className = "badge-scope-pill activo-en-evento";
                 activeBadge.textContent = "✓ Activo en este Evento";
                 titleRow.appendChild(activeBadge);
+            } else if (esDesactivadoEnEvento) {
+                const disabledBadge = document.createElement("span");
+                disabledBadge.className = "badge-scope-pill desactivado-en-evento";
+                disabledBadge.style.background = "rgba(239, 68, 68, 0.25)";
+                disabledBadge.style.color = "#f87171";
+                disabledBadge.style.border = "1px solid rgba(239, 68, 68, 0.4)";
+                disabledBadge.textContent = "✕ Desactivado en este Evento";
+                titleRow.appendChild(disabledBadge);
             }
 
             const actionsDiv = document.createElement("div");
             actionsDiv.className = "paquete-admin-actions";
 
-            if (eventoSeleccionado?.id) {
+            if (evActivo?.id) {
                 const btnActivar = document.createElement("button");
                 btnActivar.type = "button";
                 btnActivar.className = "btn-activar-paquete";
-                btnActivar.textContent = esActivoEnEvento ? "Reactivar Temática" : "✨ Activar en Evento";
+                btnActivar.textContent = esActivoEnEvento ? "Reactivar Temática" : (esDesactivadoEnEvento ? "Reactivar Paquete" : "✨ Activar en Evento");
                 btnActivar.addEventListener("click", () => activarPaqueteEnEventoActual(pkg.id, pkg.nombre));
                 actionsDiv.appendChild(btnActivar);
+
+                if (esActivoEnEvento) {
+                    const btnDesactivar = document.createElement("button");
+                    btnDesactivar.type = "button";
+                    btnDesactivar.className = "btn-desactivar-paquete";
+                    btnDesactivar.textContent = "✕ Desactivar";
+                    btnDesactivar.title = "Quitar este paquete del evento y prohibir sus accesorios en los invitados";
+                    btnDesactivar.addEventListener("click", () => desactivarTematicaEnEventoActual(pkg.id, pkg.nombre));
+                    actionsDiv.appendChild(btnDesactivar);
+                }
             }
 
             // Paquetes base protegidos: no se elimina el contenedor, solo paquetes personalizados
@@ -2813,13 +2856,16 @@ async function cargarYRenderizarPaquetesAdmin() {
 }
 
 async function activarPaqueteEnEventoActual(paqueteId, nombrePaquete) {
-    if (!eventoSeleccionado?.id) {
+    const evActivo = obtenerEventoSeleccionado();
+    eventoSeleccionado = evActivo;
+    const eventoId = evActivo?.id || eventoSeleccionadoId;
+    if (!eventoId) {
         mostrarAlertaAdmin("Selecciona primero un evento en la barra superior para asignarle esta temática.", "error");
         return;
     }
 
     try {
-        const res = await fetch(`/api/admin/eventos/${eventoSeleccionado.id}/tematica`, {
+        const res = await fetch(`/api/admin/eventos/${encodeURIComponent(eventoId)}/tematica`, {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",
@@ -2830,7 +2876,8 @@ async function activarPaqueteEnEventoActual(paqueteId, nombrePaquete) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || "No se pudo actualizar la temática del evento.");
 
-        eventoSeleccionado.tematica_accesorios = paqueteId;
+        if (evActivo) evActivo.tematica_accesorios = paqueteId;
+        if (eventoSeleccionado) eventoSeleccionado.tematica_accesorios = paqueteId;
         mostrarAlertaAdmin(`✅ El evento ahora proyectará exclusivamente el paquete "${nombrePaquete}".`, "exito");
         cargarYRenderizarPaquetesAdmin();
 
@@ -2838,6 +2885,44 @@ async function activarPaqueteEnEventoActual(paqueteId, nombrePaquete) {
             try {
                 const canalSync = new BroadcastChannel("segalu_proyector_sync");
                 canalSync.postMessage({ tipo: "ACCESORIOS_ACTUALIZADOS" });
+            } catch (_) {}
+        }
+    } catch (err) {
+        mostrarAlertaAdmin(err.message, "error");
+    }
+}
+
+async function desactivarTematicaEnEventoActual(paqueteId, nombrePaquete) {
+    const evActivo = obtenerEventoSeleccionado();
+    eventoSeleccionado = evActivo;
+    const eventoId = evActivo?.id || eventoSeleccionadoId;
+    if (!eventoId) {
+        mostrarAlertaAdmin("Selecciona primero un evento en la barra superior.", "error");
+        return;
+    }
+
+    try {
+        const valorTematica = `!${paqueteId}`;
+        const res = await fetch(`/api/admin/eventos/${encodeURIComponent(eventoId)}/tematica`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Admin-Password": adminPasswordActiva,
+            },
+            body: JSON.stringify({ tematica_accesorios: valorTematica }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "No se pudo desactivar el paquete del evento.");
+
+        if (evActivo) evActivo.tematica_accesorios = valorTematica;
+        if (eventoSeleccionado) eventoSeleccionado.tematica_accesorios = valorTematica;
+        mostrarAlertaAdmin(`Paquete "${nombrePaquete}" desactivado en el evento. Los invitados ya no verán sus accesorios.`, "exito");
+        cargarYRenderizarPaquetesAdmin();
+
+        if (typeof BroadcastChannel !== "undefined") {
+            try {
+                const canalSync = new BroadcastChannel("segalu_proyector_sync");
+                canalSync.postMessage({ tipo: "ACCESORIOS_ACTUALIZADOS", tematica: valorTematica, paquete_id: paqueteId });
             } catch (_) {}
         }
     } catch (err) {
@@ -2965,7 +3050,7 @@ if (formSubirAccesorioEl) {
         formData.append("nombre_paquete", nombrePaquete);
         formData.append("paquete_id", paqueteId);
         formData.append("scope", scopeVal);
-        formData.append("evento_id", eventoSeleccionado?.id || "");
+        formData.append("evento_id", eventoSeleccionadoId || (obtenerEventoSeleccionado()?.id) || "");
 
         const nombresArray = stagedFilesAccesorios.map((s) => s.name);
         formData.append("nombres_json", JSON.stringify(nombresArray));
@@ -3027,7 +3112,6 @@ if (formSubirAccesorioEl) {
 // ==============================================================================
 // 14. MÓDULO CRM & LEADS DE MARKETING
 // ==============================================================================
-let cacheLeads = [];
 let peticionLeadsEnCurso = false;
 
 const tabBadgeLeadsEl = document.getElementById("tab-badge-leads");
@@ -3355,7 +3439,8 @@ function renderizarTablaLeads(listaLeads) {
     const totalLeads = cacheLeads.length;
     const totalInvitados = cacheInvitados.length || 1;
 
-    // Actualizar badges y métricas
+    // Actualizar badges, métricas y contador en vivo del topbar
+    actualizarContadorTopbarEnVivo();
     if (tabBadgeLeadsEl) tabBadgeLeadsEl.textContent = String(totalLeads);
     if (countLeadsTotalEl) countLeadsTotalEl.textContent = String(totalLeads);
     if (crmMetricTotalEl) crmMetricTotalEl.textContent = String(totalLeads);

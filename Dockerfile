@@ -9,8 +9,10 @@ FROM python:3.11-slim
 # - PYTHONUNBUFFERED=1: Flujo continuo de logs sin retención en búfer
 # - PYTHONDONTWRITEBYTECODE=1: Evita generar archivos .pyc innecesarios
 # - PORT=8000: Puerto estándar de la aplicación
+# - MALLOC_TRIM_THRESHOLD_=65536: Retorna memoria liberada de Pillow/Python al SO (Render) de inmediato
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    MALLOC_TRIM_THRESHOLD_=65536 \
     PORT=8000
 
 # Directorio de trabajo dentro del contenedor
