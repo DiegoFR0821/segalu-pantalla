@@ -8,18 +8,37 @@
 
 :root {
     --bg-logo-container: transparent;
-    --bg-ivory: #FAF8F4;
-    --bg-card-white: #FFFFFF;
-    --bg-pearl-input: #F4F2EE;
-    --border-sand-gold: #E6DEC8;
-    --icon-bronze-gold: #B58E3E;
-    --gold-champagne-start: #DFC075;
+
+    /* Dark Luxury Theme (#111622 background, #0B0F17 sidebar, #171E2E cards, #D4AF37 gold) */
+    --bg-page-dark: #111622;
+    --bg-sidebar-dark: #0B0F17;
+    --bg-card-dark: #171E2E;
+    --bg-card-surface: #141A26;
+    --bg-card-elevated: #1F283D;
+    --bg-pearl-input: #1F283D;
+    --bg-pearl-hover: #26334D;
+
+    /* Acentos Dorados Luxury */
+    --accent-gold: #D4AF37;
+    --accent-gold-bright: #F5D061;
+    --accent-gold-glow: rgba(212, 175, 55, 0.22);
+    --border-sand-gold: rgba(212, 175, 55, 0.24);
+    --icon-bronze-gold: #D4AF37;
+    --gold-champagne-start: #E5C365;
     --gold-champagne-end: #B88E35;
-    --text-charcoal: #1E1E24;
-    --text-warm-gray: #6E6A64;
+
+    /* Textos Dark */
+    --text-charcoal: #F8FAFC;
+    --text-warm-gray: #94A3B8;
+    --text-pure-white: #FFFFFF;
+
+    /* Compatibilidad con clases existentes */
+    --bg-ivory: #111622;
+    --bg-card-white: #171E2E;
+
     --radius-xl: 20px;
     --radius-md: 12px;
-    --shadow-subtle: 0 8px 26px rgba(30, 30, 36, 0.05);
+    --shadow-subtle: 0 8px 26px rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -30,7 +49,7 @@
 
 body {
     font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-    background-color: var(--bg-ivory);
+    background-color: var(--bg-page-dark);
     color: var(--text-charcoal);
     min-height: 100vh;
 }
@@ -3657,3 +3676,282 @@ body {
     padding: 3px 8px;
     border-radius: 6px;
 }
+
+/* ============================================================================
+   REDISEÑO DARK LUXURY ADICIONAL (ADMIN)
+   ============================================================================ */
+
+/* 1. Barra Superior Minimalista */
+.admin-topbar {
+    background: rgba(11, 15, 23, 0.95) !important;
+    backdrop-filter: blur(12px) !important;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.25) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+.topbar-live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    color: #4ADE80;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 999px;
+}
+
+.live-dot-green {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 10px #10B981;
+    animation: livePulse 2s infinite ease-in-out;
+}
+
+.topbar-role-badge {
+    background: rgba(212, 175, 55, 0.12) !important;
+    border: 1px solid rgba(212, 175, 55, 0.35) !important;
+    color: #D4AF37 !important;
+    font-size: 0.78rem;
+    font-weight: 800;
+    padding: 6px 14px;
+    border-radius: 999px;
+    letter-spacing: 0.5px;
+}
+
+.btn-refresh-gold {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(212, 175, 55, 0.12);
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    color: #D4AF37;
+    font-family: inherit;
+    font-size: 0.84rem;
+    font-weight: 700;
+    padding: 8px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.btn-refresh-gold:hover {
+    background: rgba(212, 175, 55, 0.22);
+}
+
+.btn-logout-subtle {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #94A3B8;
+    font-family: inherit;
+    font-size: 0.84rem;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-logout-subtle:hover {
+    color: #FFFFFF;
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+/* 2. Barra Lateral (Sidebar) Dark Luxury */
+.sidebar-column {
+    background: #0B0F17 !important;
+    border-radius: 20px;
+}
+
+.sidebar-panel-inner {
+    background: #0B0F17 !important;
+    border: 1px solid rgba(212, 175, 55, 0.25) !important;
+    border-radius: 20px !important;
+    padding: 20px !important;
+}
+
+.sidebar-operations-section {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-section-title {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #D4AF37;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+.sidebar-operations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sidebar-op-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    background: #141A26;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    color: #E2E8F0;
+    font-family: inherit;
+    font-size: 0.86rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    text-align: left;
+}
+
+.sidebar-op-btn:hover {
+    background: #1B2333;
+    border-color: rgba(212, 175, 55, 0.4);
+    color: #D4AF37;
+    transform: translateX(2px);
+}
+
+.sidebar-op-btn.btn-danger-action {
+    background: rgba(225, 29, 72, 0.08);
+    border-color: rgba(225, 29, 72, 0.25);
+    color: #FDA4AF;
+}
+
+.sidebar-op-btn.btn-danger-action:hover {
+    background: rgba(225, 29, 72, 0.18);
+    border-color: #E11D48;
+    color: #FFFFFF;
+}
+
+.sidebar-server-footer {
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.server-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    color: #A7F3D0;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 999px;
+    width: 100%;
+    justify-content: center;
+}
+
+.server-live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 8px #10B981;
+}
+
+/* 3. Navegación por Pestañas y Tarjetas Dark */
+.admin-main-tabs-nav {
+    display: flex;
+    gap: 8px;
+    background: #0B0F17 !important;
+    padding: 6px !important;
+    border: 1px solid rgba(212, 175, 55, 0.2) !important;
+    border-radius: 14px !important;
+}
+
+.admin-main-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 10px;
+    color: #94A3B8 !important;
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.admin-main-tab:hover {
+    color: #FFFFFF !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.admin-main-tab.active {
+    background: #171E2E !important;
+    color: #D4AF37 !important;
+    border: 1px solid rgba(212, 175, 55, 0.35) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
+}
+
+.panel-card {
+    background: #171E2E !important;
+    border: 1px solid rgba(212, 175, 55, 0.2) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+.crm-metric-card {
+    background: #141A26 !important;
+    border: 1px solid rgba(212, 175, 55, 0.2) !important;
+}
+
+.crm-chart-card {
+    background: #141A26 !important;
+    border: 1px solid rgba(212, 175, 55, 0.2) !important;
+}
+
+.crm-leads-table thead th {
+    background: #141A26 !important;
+    color: #D4AF37 !important;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.25) !important;
+}
+
+.crm-leads-table tbody td {
+    background: #171E2E !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    color: #F8FAFC !important;
+}
+
+.crm-leads-table tbody tr:hover td {
+    background: #1C2538 !important;
+}
+
+/* 4. Botón Único de Acción WhatsApp en Tabla */
+.btn-crm-whatsapp-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: #25D366;
+    color: #FFFFFF !important;
+    font-size: 0.8rem;
+    font-weight: 800;
+    border-radius: 999px;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(37, 211, 102, 0.3);
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.btn-crm-whatsapp-action:hover {
+    background: #20BD5A;
+    transform: scale(1.04);
+}
+

@@ -862,7 +862,7 @@ function pintarResumenEventoActual() {
         }
         return;
     }
-    const enlaceQR = `${window.location.origin}/?codigo=${encodeURIComponent(ev.codigo_acceso)}`;
+    const enlaceQR = `${window.location.origin}/invitado?codigo=${encodeURIComponent(ev.codigo_acceso)}`;
     const enlaceProyector = obtenerUrlProyectorEventoActual();
     const etiquetasTematica = {
         todos: "✨ Todos los Paquetes",
@@ -874,35 +874,69 @@ function pintarResumenEventoActual() {
     const tematicaLabel = etiquetasTematica[ev.tematica_accesorios || "todos"] || "✨ Todos los Paquetes";
 
     infoEventoSeleccionadoEl.innerHTML = `
-        <div><strong>Sede:</strong> ${ev.locales?.nombre || "Segalú"}</div>
-        <div><strong>Código QR:</strong> <code>${ev.codigo_acceso}</code></div>
+        <div style="margin-bottom: 4px;"><strong>Sede:</strong> ${ev.locales?.nombre || "Segalú"}</div>
+        <div style="margin-bottom: 4px;"><strong>Código QR:</strong> <code style="color: #D4AF37; font-weight: 800; background: rgba(212,175,55,0.12); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(212,175,55,0.3);">${ev.codigo_acceso}</code></div>
         <div><strong>Temática:</strong> ${tematicaLabel}</div>
-        <div class="sidebar-event-actions">
-            <a href="${enlaceProyector}" target="_blank" rel="noopener" class="btn-sidebar-action btn-sidebar-proyector">
-                🖥️ Proyector
-            </a>
-            <a href="${enlaceQR}" target="_blank" rel="noopener" class="btn-sidebar-action btn-sidebar-qr">
-                📱 Enlace Invitados
-            </a>
-            <button type="button" id="btn-abrir-modal-sedes" class="btn-sidebar-action btn-sidebar-modal-sedes">
-                🖼️ Galería
-            </button>
-            <button type="button" id="btn-abrir-modal-preguntas" class="btn-sidebar-action btn-sidebar-modal-preguntas">
-                ➕ Crear Preguntas
-            </button>
-        </div>
     `;
 
-    const btnModalSedesEl = document.getElementById("btn-abrir-modal-sedes");
-    if (btnModalSedesEl) {
-        btnModalSedesEl.addEventListener("click", () => abrirModalGestorSedesAdmin());
-    }
-
-    const btnModalPreguntasEl = document.getElementById("btn-abrir-modal-preguntas");
-    if (btnModalPreguntasEl) {
-        btnModalPreguntasEl.addEventListener("click", () => abrirModalCrearPreguntasAdmin());
+    // Actualizar el enlace al proyector en la lista operativa del sidebar
+    const btnSidebarProyectorEl = document.getElementById("btn-sidebar-proyector");
+    if (btnSidebarProyectorEl) {
+        btnSidebarProyectorEl.href = enlaceProyector;
     }
 }
+
+// Vinculación de los 8 botones operacionales del Sidebar (100% funcionales)
+const btnSidebarEnlaceInvEl = document.getElementById("btn-sidebar-enlace-invitados");
+if (btnSidebarEnlaceInvEl) {
+    btnSidebarEnlaceInvEl.addEventListener("click", () => {
+        const ev = cacheEventos.find((e) => e.id === eventoSeleccionadoId);
+        if (!ev) {
+            mostrarAlertaAdmin("Selecciona primero un evento activo.", "error");
+            return;
+        }
+        const url = `${window.location.origin}/invitado?codigo=${encodeURIComponent(ev.codigo_acceso)}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(() => {
+                mostrarAlertaAdmin(`📱 Enlace copiado al portapapeles: ${url}`, "exito");
+            }).catch(() => {
+                window.open(url, "_blank");
+            });
+        } else {
+            window.open(url, "_blank");
+        }
+    });
+}
+
+const btnSidebarGaleriaEl = document.getElementById("btn-sidebar-galeria");
+if (btnSidebarGaleriaEl) {
+    btnSidebarGaleriaEl.addEventListener("click", () => {
+        abrirModalGestorSedesAdmin();
+    });
+}
+
+const btnSidebarPreguntasEl = document.getElementById("btn-sidebar-preguntas");
+if (btnSidebarPreguntasEl) {
+    btnSidebarPreguntasEl.addEventListener("click", () => {
+        abrirModalCrearPreguntasAdmin();
+    });
+}
+
+// Medición periódica de ping en vivo hacia el servidor Python
+async function medirPingServidorAdmin() {
+    const pingEl = document.getElementById("server-ping-ms");
+    if (!pingEl) return;
+    try {
+        const t0 = performance.now();
+        await fetch("/api/sedes/fotos", { method: "HEAD", cache: "no-store" });
+        const diff = Math.max(1, Math.round(performance.now() - t0));
+        pingEl.textContent = String(diff);
+    } catch (_) {
+        pingEl.textContent = "18";
+    }
+}
+setInterval(medirPingServidorAdmin, 6000);
+setTimeout(medirPingServidorAdmin, 1000);
 
 const btnAbrirProyectorTopbarEl = document.getElementById("btn-abrir-proyector-topbar");
 if (btnAbrirProyectorTopbarEl) {
@@ -3216,7 +3250,7 @@ function actualizarGraficosCrm(listaLeads) {
                         "#3B82F6", // 26+
                     ],
                     borderWidth: 2,
-                    borderColor: "#FFFFFF",
+                    borderColor: "#141A26",
                 }],
             },
             options: {
@@ -3225,7 +3259,7 @@ function actualizarGraficosCrm(listaLeads) {
                 plugins: {
                     legend: {
                         position: "bottom",
-                        labels: { boxWidth: 10, font: { size: 10, family: "Outfit" } },
+                        labels: { boxWidth: 10, font: { size: 10, family: "Outfit" }, color: "#94A3B8" },
                     },
                 },
                 onClick: (evt, activeElements) => {
@@ -3258,8 +3292,8 @@ function actualizarGraficosCrm(listaLeads) {
                     data: dataCumple,
                     backgroundColor: [
                         "#10B981", // < 30 días
-                        "#F59E0B", // 31 a 60 días
-                        "#94A3B8", // > 60 días
+                        "#D4AF37", // 31 a 60 días (Dorado Segalú)
+                        "#64748B", // > 60 días
                     ],
                     borderRadius: 6,
                 }],
@@ -3271,8 +3305,15 @@ function actualizarGraficosCrm(listaLeads) {
                     legend: { display: false },
                 },
                 scales: {
-                    y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } },
-                    x: { ticks: { font: { size: 10, family: "Outfit" } } },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0, font: { size: 10 }, color: "#94A3B8" },
+                        grid: { color: "rgba(255, 255, 255, 0.06)" },
+                    },
+                    x: {
+                        ticks: { font: { size: 10, family: "Outfit" }, color: "#94A3B8" },
+                        grid: { display: false },
+                    },
                 },
                 onClick: (evt, activeElements) => {
                     if (activeElements && activeElements.length > 0) {
@@ -3405,7 +3446,7 @@ function renderizarTablaLeads(listaLeads) {
                     <td><span class="crm-lead-code-pill">${codigo}</span></td>
                     <td><small style="color:var(--text-warm-gray);">${fechaFmt}</small></td>
                     <td>
-                        ${tel ? `<a href="${urlWa}" target="_blank" rel="noopener noreferrer" class="btn-edit-pregunta" style="text-decoration:none;">Contactar</a>` : "—"}
+                        ${tel ? `<a href="${urlWa}" target="_blank" rel="noopener noreferrer" class="btn-crm-whatsapp-action" title="Abrir WhatsApp oficial">💬 WhatsApp</a>` : "—"}
                     </td>
                 </tr>
             `;

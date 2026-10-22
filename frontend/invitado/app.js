@@ -832,18 +832,22 @@ function mostrarPantallaLobby(sesion) {
     // Pintamos las 2 capas en el medallón central del Lobby
     pintarCapasAvatar(lobbyCharLayerEl, lobbyAccLayerEl, personajeObj, accesorioObj);
 
-    // Nombre bloqueado en el Lobby (sin puntos de trivia)
+    // Nombre bloqueado en el Lobby y subtítulo fijo oficial Dark Luxury
     lobbyNombreInvitadoEl.textContent = sesion.invitado.nombre;
-    lobbyDescripcionAvatarEl.textContent =
-        accesorioObj.id === "sin_accesorio"
-            ? `Invitado de Honor • ${personajeObj.nombre}`
-            : `Invitado de Honor • ${personajeObj.nombre} con ${accesorioObj.nombre}`;
+    lobbyDescripcionAvatarEl.textContent = "INVITADO DE HONOR";
 
     vistaRegistroEl.classList.add("hidden");
     vistaLobbyEl.classList.remove("hidden");
 
+    // Mostrar el dock flotante inferior fijo
+    const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+    if (dockFlotanteEl) dockFlotanteEl.classList.remove("hidden");
+
     // Actualizar tarjetas de ubicación con el nombre del evento activo
     renderizarSeccionUbicacionSedes();
+
+    // Cargar fotos aprobadas en el Muro en Vivo interactivo
+    cargarFotosMuroLive();
 
     // [FASE 4.5 - REQUERIMIENTO C] Iniciamos el pulso automático en segundo plano (cada 2.5s)
     // para que el invitado nunca tenga que recargar la página si el Admin abre o cierra la trivia.
@@ -1144,7 +1148,6 @@ function renderizarSeccionUbicacionSedes() {
     const listaSedes = [CONFIG_SEDES_SEGALU.sede1, CONFIG_SEDES_SEGALU.sede2];
     contenedorEl.innerHTML = listaSedes
         .map((sede) => {
-            const urlWaShare = generarUrlCompartirUbicacionWhatsApp(sede);
             const esSede1 = sede.id === "sede1";
             // Ubicación exacta por sede: Sede 1 apunta a Eventos Segalu y Sede 2 a Salón Florencia
             const queryMapa = esSede1
@@ -1153,7 +1156,13 @@ function renderizarSeccionUbicacionSedes() {
             const srcIframe = `https://maps.google.com/maps?q=${queryMapa}&t=&z=16&ie=UTF8&iwloc=&output=embed`;
 
             return `
-                <article class="sede-ubicacion-card">
+                <a
+                    href="${sede.googleMapsUrl}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="sede-ubicacion-card"
+                    title="Abrir ubicación de ${sede.nombre} en Google Maps"
+                >
                     <div class="sede-map-embed-wrapper">
                         <iframe
                             class="sede-map-iframe"
@@ -1162,34 +1171,17 @@ function renderizarSeccionUbicacionSedes() {
                             allowfullscreen=""
                             referrerpolicy="no-referrer-when-downgrade"
                             title="Mapa de ubicación ${sede.nombre}"
+                            tabindex="-1"
                         ></iframe>
                     </div>
-                    <div class="sede-ubicacion-top">
-                        <div class="sede-pin-badge" aria-hidden="true">📍</div>
-                        <div class="sede-ubicacion-info">
+                    <div class="sede-ubicacion-body">
+                        <div class="sede-info-text">
                             <strong>${sede.nombre}</strong>
-                            <span>${sede.direccionTexto}</span>
+                            <span>📍 ${sede.direccionTexto}</span>
                         </div>
+                        <span class="map-open-badge">Abrir ubicación ↗</span>
                     </div>
-                    <div class="sede-ubicacion-actions">
-                        <a
-                            href="${sede.googleMapsUrl}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="btn-sede-maps"
-                        >
-                            <span>🗺️ Google Maps</span>
-                        </a>
-                        <a
-                            href="${urlWaShare}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="btn-sede-share-wa"
-                        >
-                            <span>📲 Compartir</span>
-                        </a>
-                    </div>
-                </article>
+                </a>
             `;
         })
         .join("");
@@ -1502,10 +1494,14 @@ function reiniciarModalFoto() {
 btnIrFotosEl.addEventListener("click", () => {
     reiniciarModalFoto();
     modalSubirFotoEl.classList.remove("hidden");
+    const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+    if (dockFlotanteEl) dockFlotanteEl.classList.add("hidden");
 });
 
 btnCerrarModalFotoEl.addEventListener("click", () => {
     modalSubirFotoEl.classList.add("hidden");
+    const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+    if (dockFlotanteEl) dockFlotanteEl.classList.remove("hidden");
 });
 
 inputArchivoFotoEl.addEventListener("change", (eventoChange) => {
@@ -2193,6 +2189,8 @@ btnIrTriviaEl.addEventListener("click", () => {
     sincronizarBarraJugadorTrivia();
     vistaLobbyEl.classList.add("hidden");
     vistaTriviaInvitadoEl.classList.remove("hidden");
+    const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+    if (dockFlotanteEl) dockFlotanteEl.classList.add("hidden");
     iniciarPollingTriviaMovil();
 });
 
@@ -2203,6 +2201,8 @@ btnVolverLobbyTriviaEl.addEventListener("click", () => {
     detenerPollingTriviaMovil();
     vistaTriviaInvitadoEl.classList.add("hidden");
     vistaLobbyEl.classList.remove("hidden");
+    const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+    if (dockFlotanteEl) dockFlotanteEl.classList.remove("hidden");
     consultarEstadoTriviaEnVivo();
 });
 
@@ -2524,6 +2524,202 @@ if (leadTelefonoEl) {
 if (modalCrmLeadEl) {
     modalCrmLeadEl.addEventListener("click", (e) => {
         if (e.target === modalCrmLeadEl) cerrarModalCrmLead();
+    });
+}
+
+// ==============================================================================
+// 15. MURO DE FOTOS EN VIVO Y CORAZONES INTERACTIVOS (FASE DARK LUXURY)
+// ==============================================================================
+const STORAGE_KEY_LIKES = "segalu_fotos_liked_ids";
+let listaFotosAprobadasEvento = [];
+
+function obtenerFotosLikedLocal() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_LIKES);
+        return raw ? JSON.parse(raw) : [];
+    } catch (_) {
+        return [];
+    }
+}
+
+function guardarFotoLikedLocal(fotoId, liked) {
+    try {
+        let lista = obtenerFotosLikedLocal();
+        if (liked) {
+            if (!lista.includes(fotoId)) lista.push(fotoId);
+        } else {
+            lista = lista.filter((id) => id !== fotoId);
+        }
+        localStorage.setItem(STORAGE_KEY_LIKES, JSON.stringify(lista));
+    } catch (_) {}
+}
+
+function dispararBurstCorazon(contenedor) {
+    if (!contenedor) return;
+    const anim = document.createElement("span");
+    anim.className = "heart-burst-anim";
+    anim.textContent = "❤️";
+    contenedor.appendChild(anim);
+    setTimeout(() => anim.remove(), 850);
+}
+
+async function toggleLikeFoto(fotoId, btnEl, countEl, cardEl, forzarLike = false) {
+    const likedList = obtenerFotosLikedLocal();
+    const yaTieneLike = likedList.includes(fotoId);
+
+    if (forzarLike && yaTieneLike) {
+        dispararBurstCorazon(cardEl);
+        return;
+    }
+
+    const nuevoEstado = forzarLike ? true : !yaTieneLike;
+    guardarFotoLikedLocal(fotoId, nuevoEstado);
+
+    let cuentaActual = parseInt(countEl?.textContent || "0", 10);
+    if (isNaN(cuentaActual)) cuentaActual = 0;
+    const nuevaCuenta = nuevoEstado ? cuentaActual + 1 : Math.max(0, cuentaActual - 1);
+
+    if (countEl) countEl.textContent = String(nuevaCuenta);
+    if (btnEl) {
+        if (nuevoEstado) btnEl.classList.add("liked");
+        else btnEl.classList.remove("liked");
+    }
+
+    if (nuevoEstado) {
+        dispararBurstCorazon(cardEl);
+    }
+
+    // Sincronizar otros botones que muestren la misma foto
+    document.querySelectorAll(`.photo-heart-btn[data-foto-id="${fotoId}"]`).forEach((b) => {
+        if (nuevoEstado) b.classList.add("liked");
+        else b.classList.remove("liked");
+        const c = b.querySelector(".like-count");
+        if (c) c.textContent = String(nuevaCuenta);
+    });
+
+    try {
+        await fetch(`/api/multimedia/${encodeURIComponent(fotoId)}/like`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                delta: nuevoEstado ? 1 : -1,
+                invitado_id: sesionInvitado?.invitado?.id || null,
+            }),
+        });
+    } catch (e) {
+        console.warn("Aviso al registrar like:", e);
+    }
+}
+
+function construirTarjetaFotoMuro(foto) {
+    const card = document.createElement("article");
+    card.className = "live-photo-card";
+    card.dataset.fotoId = foto.id;
+
+    const likedList = obtenerFotosLikedLocal();
+    const tieneLike = likedList.includes(foto.id);
+    const likesCount = foto.likes || 0;
+
+    card.innerHTML = `
+        <img src="${foto.url}" alt="Foto del evento" class="live-photo-img" loading="lazy" />
+        <div class="live-photo-overlay">
+            <span class="live-photo-author">👤 ${foto.autor || "Invitado"}</span>
+        </div>
+        <button type="button" class="live-photo-heart-btn photo-heart-btn ${tieneLike ? 'liked' : ''}" data-foto-id="${foto.id}" aria-label="Dar me gusta">
+            <span>❤️</span>
+            <span class="like-count">${likesCount}</span>
+        </button>
+    `;
+
+    const heartBtn = card.querySelector(".photo-heart-btn");
+    const countEl = card.querySelector(".like-count");
+
+    // 1-tap sobre el corazón
+    heartBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleLikeFoto(foto.id, heartBtn, countEl, card, false);
+    });
+
+    // Doble tap sobre la tarjeta
+    let lastTapTime = 0;
+    card.addEventListener("click", (e) => {
+        if (e.target.closest(".photo-heart-btn")) return;
+        const now = Date.now();
+        if (now - lastTapTime < 320) {
+            toggleLikeFoto(foto.id, heartBtn, countEl, card, true);
+            lastTapTime = 0;
+        } else {
+            lastTapTime = now;
+        }
+    });
+
+    return card;
+}
+
+async function cargarFotosMuroLive() {
+    const gridMuroEl = document.getElementById("grid-muro-fotos-live");
+    if (!gridMuroEl || !eventoActual?.id) return;
+
+    try {
+        const res = await fetch(`/api/eventos/${encodeURIComponent(eventoActual.id)}/fotos`);
+        if (!res.ok) return;
+        const data = await res.json();
+        listaFotosAprobadasEvento = data.fotos || [];
+
+        const ultimasFotos = listaFotosAprobadasEvento.slice(0, 4);
+        gridMuroEl.innerHTML = "";
+
+        if (ultimasFotos.length === 0) {
+            gridMuroEl.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 24px; color: #94A3B8; font-size: 0.82rem; background: rgba(20,26,38,0.6); border: 1px dashed rgba(212,175,55,0.25); border-radius: 12px;">
+                    📷 Sé el primero en compartir tu selfie tocando "Subir Foto" abajo
+                </div>
+            `;
+            return;
+        }
+
+        ultimasFotos.forEach((f) => {
+            gridMuroEl.appendChild(construirTarjetaFotoMuro(f));
+        });
+    } catch (err) {
+        console.warn("Aviso al cargar fotos del muro live:", err);
+    }
+}
+
+// Modal de Galería Completa
+const modalGaleriaFotosEventoEl = document.getElementById("modal-galeria-fotos-evento");
+const btnVerGaleriaCompletaEl = document.getElementById("btn-ver-galeria-completa");
+const btnCerrarGaleriaCompletaEl = document.getElementById("btn-cerrar-galeria-completa");
+const gridGaleriaCompletaEl = document.getElementById("grid-galeria-completa");
+const contadorFotosGaleriaEl = document.getElementById("contador-fotos-galeria");
+const galeriaVaciaAvisoEl = document.getElementById("galeria-vacia-aviso");
+
+if (btnVerGaleriaCompletaEl) {
+    btnVerGaleriaCompletaEl.addEventListener("click", () => {
+        if (!modalGaleriaFotosEventoEl) return;
+        modalGaleriaFotosEventoEl.classList.remove("hidden");
+
+        if (contadorFotosGaleriaEl) {
+            contadorFotosGaleriaEl.textContent = `${listaFotosAprobadasEvento.length} fotos`;
+        }
+
+        if (gridGaleriaCompletaEl) {
+            gridGaleriaCompletaEl.innerHTML = "";
+            if (listaFotosAprobadasEvento.length === 0) {
+                if (galeriaVaciaAvisoEl) galeriaVaciaAvisoEl.classList.remove("hidden");
+            } else {
+                if (galeriaVaciaAvisoEl) galeriaVaciaAvisoEl.classList.add("hidden");
+                listaFotosAprobadasEvento.forEach((f) => {
+                    gridGaleriaCompletaEl.appendChild(construirTarjetaFotoMuro(f));
+                });
+            }
+        }
+    });
+}
+
+if (btnCerrarGaleriaCompletaEl) {
+    btnCerrarGaleriaCompletaEl.addEventListener("click", () => {
+        if (modalGaleriaFotosEventoEl) modalGaleriaFotosEventoEl.classList.add("hidden");
     });
 }
 

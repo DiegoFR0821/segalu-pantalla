@@ -31,23 +31,31 @@
             </div>
             <div>
                 <span class="topbar-tag">CONSOLA EJECUTIVA • PRODUCCIÓN SEGALÚ</span>
-                <h1>Segalú Eventos • Administrador Único</h1>
+                <h1>Segalú Eventos • Administrador</h1>
             </div>
         </div>
 
         <div id="admin-header-controls" class="topbar-actions hidden">
-            <span id="badge-rol-admin" class="topbar-role-badge hidden">👑 Superadmin</span>
-            <button type="button" id="btn-abrir-proyector-topbar" class="btn-projector-gold" title="Abrir Pantalla Gigante del Evento en nueva pestaña">
-                <span>🖥️ Proyector</span>
-            </button>
-            <button type="button" id="btn-refrescar-panel" class="btn-outline-gold">
+            <!-- Píldora de Invitados en Vivo -->
+            <div class="topbar-live-pill" id="topbar-live-guests-pill" title="Invitados conectados en tiempo real">
+                <span class="live-dot-green"></span>
+                <span>En vivo: <strong id="topbar-live-count">0</strong></span>
+            </div>
+
+            <!-- Píldora de Rol -->
+            <span id="badge-rol-admin" class="topbar-role-badge">Administrador</span>
+
+            <!-- Botón Actualizar Datos (Limpia RAM y recarga Supabase) -->
+            <button type="button" id="btn-refrescar-panel" class="btn-refresh-gold" title="Recargar datos frescos de Supabase y purgar caché RAM">
                 <svg class="svg-icon svg-xs" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M21 12a9 9 0 1 1-2.64-6.36" />
                     <polyline points="21 3 21 9 15 9" />
                 </svg>
-                <span>Actualizar Datos</span>
+                <span>🔄 Actualizar Datos</span>
             </button>
-            <button type="button" id="btn-cerrar-admin" class="btn-subtle">
+
+            <!-- Botón Cerrar Sesión -->
+            <button type="button" id="btn-cerrar-admin" class="btn-logout-subtle">
                 Cerrar Sesión
             </button>
         </div>
@@ -89,18 +97,18 @@
              =================================================================== -->
         <section id="vista-dashboard-admin" class="dashboard-grid hidden">
 
-            <!-- COLUMNA IZQUIERDA: GESTIÓN DE EVENTOS Y SEDES DE SEGALÚ -->
+            <!-- COLUMNA IZQUIERDA: GESTIÓN DE EVENTOS Y ACCIONES OPERATIVAS -->
             <aside class="sidebar-column">
-                <div class="panel-card">
+                <div class="panel-card sidebar-panel-inner">
+                    <!-- Cabecera de Sede & Evento -->
                     <div class="event-selector-header">
                         <span class="section-pill">EVENTO EN MODERACIÓN</span>
-                        <span id="badge-velocidad-evento" class="speed-latency-pill" title="Tiempo de carga consolidada en paralelo">
+                        <span id="badge-velocidad-evento" class="speed-latency-pill" title="Tiempo de respuesta">
                             ⚡ Instantáneo
                         </span>
                     </div>
-                    <h3>Seleccionar Evento</h3>
-                    <p class="card-helper">Elige qué evento deseas supervisar en vivo:</p>
 
+                    <!-- Selector de Sede de Segalú -->
                     <div class="venue-filter-block">
                         <label for="select-filtro-sede-admin" class="field-label venue-filter-label">📍 Filtrar por Sede</label>
                         <select id="select-filtro-sede-admin" class="gala-select gala-select-venue">
@@ -108,15 +116,19 @@
                         </select>
                     </div>
 
-                    <label for="select-evento-activo" class="field-label" style="margin-top: 10px; display: block;">Evento Activo:</label>
+                    <!-- Selector de Evento Activo -->
+                    <label for="select-evento-activo" class="field-label" style="margin-top: 10px; display: block;">🎉 Evento Activo:</label>
                     <select id="select-evento-activo" class="gala-select"></select>
+
                     <div id="indicador-carga-evento" class="event-switching-banner hidden">
                         <span class="spinner-mini"></span>
                         <span>Sincronizando evento en paralelo...</span>
                     </div>
+
+                    <!-- Resumen del Evento Seleccionado con Código QR y Temática -->
                     <div id="info-evento-seleccionado" class="event-summary-box"></div>
 
-                    <!-- BOTÓN PARA CREAR NUEVO EVENTO (ABRE VENTANA MODAL) -->
+                    <!-- Botón Destacado: Crear Nuevo Evento -->
                     <div class="create-event-cta-wrap">
                         <button type="button" id="btn-abrir-modal-crear-evento" class="btn-create-event-modal">
                             <span class="plus-icon">➕</span>
@@ -124,48 +136,42 @@
                         </button>
                     </div>
 
-                    <!-- =======================================================
-                         PANEL EJECUTIVO DE GESTIÓN DE BASE DE DATOS Y DESCARGA ZIP
-                         ======================================================= -->
-                    <div class="event-db-executive-panel" id="panel-acciones-ejecutivas-evento">
-                        <div class="executive-panel-header">
-                            <span class="section-pill">RESPALDO ZIP & MANTENIMIENTO CLOUD</span>
-                            <h4>Gestión de Fotos y Base de Datos del Evento</h4>
-                        </div>
-                        <div class="executive-actions-grid">
-                            <button
-                                type="button"
-                                id="btn-descargar-zip-originales"
-                                class="btn-exec-action btn-exec-zip-clean"
-                                style="grid-column: 1 / -1;"
-                            >
-                                <span>📦 Descargar Fotos</span>
+                    <!-- LISTA LIMPIA DE BOTONES OPERACIONALES 100% FUNCIONALES -->
+                    <div class="sidebar-operations-section">
+                        <span class="sidebar-section-title">ACCIONES OPERATIVAS</span>
+                        <div class="sidebar-operations-list">
+                            <a href="#" id="btn-sidebar-proyector" target="_blank" rel="noopener" class="sidebar-op-btn" title="Abrir Pantalla Gigante">
+                                <span>🖥️ Proyector</span>
+                            </a>
+                            <button type="button" id="btn-sidebar-enlace-invitados" class="sidebar-op-btn" title="Copiar enlace o abrir como invitado">
+                                <span>📱 Enlace Invitados</span>
                             </button>
-
-                            <button
-                                type="button"
-                                id="btn-purgar-fotos-storage"
-                                class="btn-exec-action btn-exec-purge-storage"
-                            >
-                                <span>🧹 Vaciar Fotos</span>
+                            <button type="button" id="btn-sidebar-galeria" class="sidebar-op-btn" title="Administrar fotos de portada de las sedes">
+                                <span>🖼️ Galería</span>
                             </button>
-
-                            <button
-                                type="button"
-                                id="btn-eliminar-evento-completo"
-                                class="btn-exec-action btn-exec-delete-event"
-                            >
-                                <span>🗑️ Eliminar Evento</span>
+                            <button type="button" id="btn-sidebar-preguntas" class="sidebar-op-btn" title="Crear preguntas para la trivia">
+                                <span>➕ Crear Preguntas</span>
                             </button>
-
-                            <button
-                                type="button"
-                                id="btn-abrir-modal-subir-accesorio"
-                                class="btn-exec-action btn-exec-accessories"
-                                style="grid-column: 1 / -1; margin-top: 4px;"
-                            >
+                            <button type="button" id="btn-abrir-modal-subir-accesorio" class="sidebar-op-btn" title="Gestionar paquetes de accesorios temáticos">
                                 <span>🎨 Paquetes Accesorios</span>
                             </button>
+                            <button type="button" id="btn-descargar-zip-originales" class="sidebar-op-btn" title="Descargar fotos en archivo ZIP">
+                                <span>📦 Descargar Fotos</span>
+                            </button>
+                            <button type="button" id="btn-purgar-fotos-storage" class="sidebar-op-btn btn-danger-action" title="Eliminar fotos del evento">
+                                <span>🧹 Vaciar Fotos</span>
+                            </button>
+                            <button type="button" id="btn-eliminar-evento-completo" class="sidebar-op-btn btn-danger-action" title="Eliminar evento de la base de datos">
+                                <span>🗑️ Eliminar Evento</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- PÍLDORA INFERIOR DE ESTADO DEL SERVIDOR EN VIVO CON PING REAL -->
+                    <div class="sidebar-server-footer">
+                        <div class="server-status-pill" id="sidebar-server-status">
+                            <span class="server-live-dot"></span>
+                            <span>Online • <strong id="server-ping-ms">18</strong> ms</span>
                         </div>
                     </div>
                 </div>

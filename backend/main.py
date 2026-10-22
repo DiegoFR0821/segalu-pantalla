@@ -333,6 +333,11 @@ class TituloFotoSedeInput(BaseModel):
     titulo: str = Field(..., max_length=120)
 
 
+class LikeFotoInput(BaseModel):
+    delta: int = Field(default=1)
+    invitado_id: str | None = Field(default=None)
+
+
 class EditarPreguntaAdminInput(BaseModel):
     enunciado: str | None = Field(default=None, max_length=280)
     opcion_a: str | None = Field(default=None, max_length=140)
@@ -1669,6 +1674,98 @@ def subir_foto_invitado(
             status_code=500,
             detail=f"Error al guardar la foto en la tabla multimedia de Supabase: {str(db_err)}",
         )
+
+
+@app.get("/api/eventos/{evento_id}/fotos")
+def listar_fotos_aprobadas_evento(evento_id: str):
+    """
+    Retorna la lista de fotos aprobadas del evento para el muro en vivo y la galería del invitado,
+    con soporte para código de acceso o UUID y caché RAM de 2.0s.
+    """
+    eid = evento_id.strip()
+    clave_cache = f"fotos_aprobadas:{eid}"
+    hit = obtener_cache_ram(clave_cache)
+    if hit:
+        return hit
+
+    eid_real = eid
+    if not re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", eid, re.I):
+        try:
+            ev_res = ejecutar_consulta_segura(
+                lambda db: db.table("eventos").select("id").eq("codigo_acceso", eid.upper()).limit(1).execute()
+            )
+            if ev_res.data:
+                eid_real = ev_res.data[0]["id"]
+        except Exception:
+            pass
+
+    try:
+        def _q(db):
+            return (
+                db.table("multimedia")
+                .select("id, evento_id, invitado_id, url_con_marca, url_original, created_at, invitados(id, nombre, avatar)")
+                .eq("evento_id", eid_real)
+                .eq("estado_moderacion", "aprobado")
+                .order("created_at", desc=True)
+                .limit(60)
+                .execute()
+            )
+        res = ejecutar_consulta_segura(_q)
+        registros = res.data or []
+    except Exception as err:
+        print(f"Aviso al listar fotos aprobadas del evento: {err}")
+        registros = []
+
+    likes_map = _ESTADO_EVENTOS.get("__likes_fotos__", {}) if isinstance(_ESTADO_EVENTOS.get("__likes_fotos__"), dict) else {}
+    fotos_formateadas = []
+    for f in registros:
+        inv = f.get("invitados") or {}
+        nombre_autor = inv.get("nombre") if isinstance(inv, dict) else "Invitado"
+        mid = f["id"]
+        likes_count = int(likes_map.get(mid, 0))
+        fotos_formateadas.append({
+            "id": mid,
+            "url": f.get("url_con_marca") or f.get("url_original"),
+            "autor": nombre_autor or "Invitado",
+            "autor_avatar": inv.get("avatar") if isinstance(inv, dict) else None,
+            "created_at": f.get("created_at"),
+            "likes": likes_count,
+        })
+
+    resultado = {"ok": True, "fotos": fotos_formateadas, "total": len(fotos_formateadas)}
+    guardar_cache_ram(clave_cache, resultado, evento_id=eid_real)
+    return resultado
+
+
+@app.post("/api/multimedia/{multimedia_id}/like")
+def dar_like_foto(multimedia_id: str, datos: LikeFotoInput | None = None):
+    """
+    Suma (+1) o resta (-1) likes a una foto interactiva con persistencia en el servidor.
+    """
+    mid = multimedia_id.strip()
+    delta = 1
+    if datos and hasattr(datos, "delta"):
+        delta = 1 if datos.delta >= 0 else -1
+
+    if not isinstance(_ESTADO_EVENTOS.get("__likes_fotos__"), dict):
+        _ESTADO_EVENTOS["__likes_fotos__"] = {}
+
+    actual = int(_ESTADO_EVENTOS["__likes_fotos__"].get(mid, 0))
+    nuevo = max(0, actual + delta)
+    _ESTADO_EVENTOS["__likes_fotos__"][mid] = nuevo
+    _guardar_estado_eventos_disco()
+
+    # Intentar actualizar en Supabase si la columna existiera
+    try:
+        ejecutar_consulta_segura(
+            lambda db: db.table("multimedia").update({"likes": nuevo}).eq("id", mid).execute()
+        )
+    except Exception:
+        pass
+
+    invalidar_cache_evento()
+
+    return {"ok": True, "multimedia_id": mid, "likes": nuevo}
 
 
 # ------------------------------------------------------------------------------

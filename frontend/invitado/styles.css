@@ -1,35 +1,45 @@
 /* ============================================================================
    PROYECTO: MVP WEB SEGALU
    ARCHIVO: frontend/invitado/styles.css
-   FASE 2.5 (Refinamiento Visual): Modo Claro "Gala Marfil y Gris Sobrio"
+   DISEÑO OFICIAL: Dark Luxury (#0B0F17, #141A26, #D4AF37)
    ============================================================================ */
 
-/* 1. VARIABLES DE COLOR - PALETA GALA MARFIL Y GRIS SOBRIO */
+/* 1. VARIABLES DE COLOR - PALETA DARK LUXURY & ACENTOS DORADOS */
 :root {
-    /* ---> LÍNEA 10: Variable de fondo del contenedor del Logo PNG (transparent por defecto) <--- */
     --bg-logo-container: transparent;
 
-    /* Fondos principales Modo Claro */
-    --bg-ivory: #FAF8F4;
-    --bg-card-white: #FFFFFF;
-    --bg-pearl-input: #F4F2EE;
-    --bg-pearl-hover: #EBE7DF;
+    /* Fondos Dark Luxury */
+    --bg-dark-obsidian: #0B0F17;
+    --bg-card-dark: #141A26;
+    --bg-card-secondary: #171E2E;
+    --bg-card-elevated: #1F273B;
+    --bg-pearl-input: #171E2E;
+    --bg-pearl-hover: #222B3D;
 
-    /* Bordes y Acentos Dorados / Bronce Sobrio */
-    --border-sand-gold: #E6DEC8;
-    --icon-bronze-gold: #B58E3E;
-    --gold-champagne-start: #DFC075;
+    /* Acentos Dorados Luxury */
+    --accent-gold: #D4AF37;
+    --accent-gold-bright: #F5D061;
+    --accent-gold-glow: rgba(212, 175, 55, 0.22);
+    --border-sand-gold: rgba(212, 175, 55, 0.28);
+    --icon-bronze-gold: #D4AF37;
+    --gold-champagne-start: #E5C365;
     --gold-champagne-end: #B88E35;
 
-    /* Tipografía */
-    --text-charcoal: #1E1E24;
-    --text-warm-gray: #6E6A64;
+    /* Textos Dark */
+    --text-charcoal: #F8FAFC;
+    --text-warm-gray: #94A3B8;
+    --text-pure-white: #FFFFFF;
 
-    /* Radios y Sombras sutiles */
+    /* Compatibilidad con clases previas */
+    --bg-ivory: #0B0F17;
+    --bg-card-white: #141A26;
+
+    /* Radios y Sombras */
     --radius-xl: 24px;
     --radius-lg: 16px;
     --radius-md: 12px;
-    --shadow-subtle: 0 10px 30px rgba(30, 30, 36, 0.05);
+    --shadow-subtle: 0 10px 30px rgba(0, 0, 0, 0.45);
+    --shadow-gold-soft: 0 4px 16px rgba(212, 175, 55, 0.18);
 }
 
 /* 2. RESETEO GENERAL */
@@ -42,13 +52,13 @@
 
 body {
     font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-    background-color: var(--bg-ivory);
-    background-image: radial-gradient(circle at 50% 10%, rgba(223, 192, 117, 0.14) 0%, transparent 60%);
+    background-color: var(--bg-dark-obsidian);
+    background-image: radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.08) 0%, transparent 60%);
     color: var(--text-charcoal);
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    padding: 14px 16px 32px;
+    padding: 14px 16px 120px;
 }
 
 .app-container {
@@ -3161,6 +3171,564 @@ body {
 .btn-wa-voucher:active {
     transform: scale(0.98);
 }
+
+/* ============================================================================
+   REDISEÑO DARK LUXURY ADICIONAL (INVITADO)
+   ============================================================================ */
+
+/* 1. Tarjeta Cuadrada del Invitado con Medallón Dorado */
+.hero-avatar-card {
+    background: var(--bg-card-dark) !important;
+    border: 1px solid rgba(212, 175, 55, 0.32) !important;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5) !important;
+}
+
+.avatar-medallion-wrapper .avatar-stage {
+    background: radial-gradient(circle at 50% 35%, rgba(245, 208, 97, 0.22) 0%, rgba(20, 26, 38, 0.95) 80%) !important;
+    border: 3px solid #D4AF37 !important;
+    box-shadow: 0 0 25px rgba(212, 175, 55, 0.35) !important;
+}
+
+.btn-edit-avatar {
+    background: rgba(212, 175, 55, 0.12) !important;
+    border: 1px solid rgba(212, 175, 55, 0.35) !important;
+    color: #D4AF37 !important;
+}
+
+.guest-honor-subtitle {
+    color: #D4AF37 !important;
+    font-weight: 800 !important;
+    letter-spacing: 1.4px !important;
+    text-transform: uppercase !important;
+    font-size: 0.8rem !important;
+}
+
+.screen-status-pill {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(212, 175, 55, 0.22) !important;
+    color: #E2E8F0 !important;
+}
+
+.status-dot {
+    background: #10B981 !important;
+    box-shadow: 0 0 8px #10B981;
+}
+
+/* 2. Tarjeta Prominente Pase VIP / Descuento Especial */
+.vip-discount-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 16px 18px;
+    background: linear-gradient(135deg, #171E2E 0%, #141A26 100%);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    text-align: left;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    text-decoration: none;
+    color: inherit;
+    outline: none;
+}
+
+.vip-discount-card:hover,
+.vip-discount-card:active {
+    transform: translateY(-2px);
+    border-color: #D4AF37;
+    box-shadow: 0 10px 28px rgba(212, 175, 55, 0.22);
+}
+
+.vip-discount-icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: radial-gradient(circle, rgba(212, 175, 55, 0.25) 0%, rgba(20, 26, 38, 0.8) 100%);
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.vip-discount-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.vip-discount-tag {
+    font-size: 0.66rem;
+    font-weight: 800;
+    color: #D4AF37;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+}
+
+.vip-discount-title {
+    font-size: 0.98rem;
+    font-weight: 800;
+    color: #FFFFFF;
+}
+
+.vip-discount-sub {
+    font-size: 0.76rem;
+    color: #94A3B8;
+}
+
+.vip-discount-arrow {
+    color: #D4AF37;
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+/* 3. Muro de Fotos en Vivo y Corazones Interactivos */
+.live-photos-wall-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.live-pulse-badge {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #4ADE80;
+    letter-spacing: 1px;
+    background: rgba(74, 222, 128, 0.12);
+    border: 1px solid rgba(74, 222, 128, 0.25);
+    padding: 3px 10px;
+    border-radius: 999px;
+    animation: livePulse 2s infinite ease-in-out;
+}
+
+@keyframes livePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+}
+
+.live-photos-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.live-photo-card {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: #141A26;
+    border: 1px solid rgba(212, 175, 55, 0.22);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.live-photo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.25s ease;
+}
+
+.live-photo-card:hover .live-photo-img {
+    transform: scale(1.04);
+}
+
+.live-photo-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 40%, rgba(11, 15, 23, 0.88) 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 10px;
+    pointer-events: none;
+}
+
+.live-photo-author {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+    max-width: 65%;
+}
+
+.live-photo-heart-btn {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    pointer-events: auto;
+    background: rgba(11, 15, 23, 0.78);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    padding: 4px 9px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.74rem;
+    font-weight: 800;
+    color: #FFFFFF;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    user-select: none;
+}
+
+.live-photo-heart-btn.liked {
+    background: rgba(225, 29, 72, 0.25);
+    border-color: #E11D48;
+    color: #FF6482;
+}
+
+.live-photo-heart-btn:active {
+    transform: scale(1.2);
+}
+
+.heart-burst-anim {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-size: 3.5rem;
+    pointer-events: none;
+    z-index: 10;
+    animation: heartPop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes heartPop {
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0;
+    }
+    40% {
+        transform: translate(-50%, -50%) scale(1.4);
+        opacity: 1;
+    }
+    70% {
+        transform: translate(-50%, -50%) scale(1.1);
+        opacity: 0.9;
+    }
+    100% {
+        transform: translate(-50%, -60%) scale(1.6);
+        opacity: 0;
+    }
+}
+
+/* Botón Ancho Limpio Ver Galería Completa */
+.btn-ver-galeria-completa {
+    width: 100%;
+    padding: 13px 18px;
+    background: #141A26;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: var(--radius-md);
+    color: #D4AF37;
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(212, 175, 55, 0.18);
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-ver-galeria-completa:hover,
+.btn-ver-galeria-completa:active {
+    background: #171E2E;
+    border-color: #D4AF37;
+    transform: translateY(-1px);
+}
+
+/* 4. Sedes y Mapas Clicables con Badge */
+.sede-ubicacion-card {
+    position: relative;
+    background: #141A26;
+    border: 1px solid rgba(212, 175, 55, 0.25);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.sede-ubicacion-card:hover,
+.sede-ubicacion-card:active {
+    transform: translateY(-2px);
+    border-color: #D4AF37;
+}
+
+.sede-map-embed-wrapper {
+    position: relative;
+    width: 100%;
+    height: 160px;
+    background: #0B0F17;
+    overflow: hidden;
+    pointer-events: none; /* Permite clic en toda la tarjeta hacia Google Maps */
+}
+
+.sede-map-iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    filter: invert(90%) hue-rotate(180deg) contrast(95%); /* Modo oscuro automático en mapas */
+}
+
+.sede-ubicacion-body {
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.sede-info-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.sede-info-text strong {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #FFFFFF;
+}
+
+.sede-info-text span {
+    font-size: 0.76rem;
+    color: #94A3B8;
+}
+
+.map-open-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(212, 175, 55, 0.12);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    color: #D4AF37;
+    font-size: 0.74rem;
+    font-weight: 800;
+    padding: 6px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* 5. Modal Galería Completa de Fotos */
+.galeria-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 9990;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+    animation: gentleFade 0.2s ease-out;
+}
+
+.galeria-modal-card {
+    width: 100%;
+    max-width: 480px;
+    height: 90vh;
+    background: #111622;
+    border-top: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 24px 24px 0 0;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.7);
+    overflow: hidden;
+}
+
+.galeria-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: #0B0F17;
+}
+
+.btn-regresar-galeria {
+    background: rgba(212, 175, 55, 0.12);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    color: #D4AF37;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 7px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.btn-regresar-galeria:active {
+    transform: scale(0.95);
+}
+
+.galeria-modal-titles {
+    text-align: right;
+}
+
+.galeria-modal-titles h3 {
+    font-size: 0.96rem;
+    font-weight: 800;
+    color: #FFFFFF;
+    margin: 0;
+}
+
+.galeria-counter-badge {
+    font-size: 0.7rem;
+    color: #94A3B8;
+}
+
+.galeria-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.galeria-full-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.galeria-empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #94A3B8;
+}
+
+.galeria-empty-state .empty-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 12px;
+    opacity: 0.6;
+}
+
+/* 6. Dock Flotante Inferior */
+.bottom-floating-dock {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    max-width: 420px;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    pointer-events: none;
+}
+
+.dock-actions-container {
+    pointer-events: auto;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    background: rgba(20, 26, 38, 0.95);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 20px;
+    padding: 8px 14px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.65);
+}
+
+.dock-action-pill {
+    background: transparent;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    padding: 4px 12px;
+    border-radius: 12px;
+    transition: transform 0.15s ease, background 0.15s ease;
+    outline: none;
+}
+
+.dock-action-pill:active {
+    transform: scale(0.92);
+}
+
+.dock-icon-wrap {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+}
+
+.dock-icon-wrap.camera-glow {
+    background: linear-gradient(135deg, #D4AF37 0%, #AA820A 100%);
+    box-shadow: 0 2px 10px rgba(212, 175, 55, 0.35);
+}
+
+.dock-icon-wrap.trophy-glow {
+    background: linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%);
+    box-shadow: 0 2px 10px rgba(139, 92, 246, 0.35);
+}
+
+.dock-label {
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #E2E8F0;
+}
+
+.dock-wa-circle {
+    pointer-events: auto;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #25D366;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    text-decoration: none;
+    box-shadow: 0 6px 20px rgba(37, 211, 102, 0.45);
+    flex-shrink: 0;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dock-wa-circle:active {
+    transform: scale(0.92);
+}
+
+.dock-wa-circle svg {
+    width: 26px;
+    height: 26px;
+    fill: #FFFFFF;
+}
+
 
 
 

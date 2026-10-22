@@ -184,7 +184,7 @@
 
                 <!-- Nombre del Invitado (BLOQUEADO, sin puntos de trivia aquí) -->
                 <h2 id="lobby-nombre-invitado" class="guest-locked-name">Diego</h2>
-                <p id="lobby-descripcion-avatar" class="guest-honor-subtitle">Invitado de Honor • Pug Real</p>
+                <p id="lobby-descripcion-avatar" class="guest-honor-subtitle">INVITADO DE HONOR</p>
 
                 <!-- Estado de conexión con la pantalla gigante OBS -->
                 <div class="screen-status-pill">
@@ -198,71 +198,49 @@
                 </div>
             </div>
 
-            <!-- 2. LOS DOS BOTONES GRANDES DE ACTIVIDADES EN VIVO -->
-            <div class="section-header-row">
-                <span class="section-label">ACTIVIDADES EN VIVO</span>
-                <span class="section-tag">
-                    <svg class="svg-icon svg-xs" viewBox="0 0 24 24" aria-hidden="true">
-                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                    </svg>
-                    Interactivo
-                </span>
-            </div>
+            <!-- 2. TARJETA PROMINENTE: RECLAMA TU DESCUENTO ESPECIAL (PASE VIP CRM) -->
+            <button type="button" id="btn-abrir-modal-lead" class="vip-discount-card" aria-label="Reclamar Pase VIP y Descuento Especial">
+                <div class="vip-discount-icon-box">
+                    <span class="lead-icon-gift">🎁</span>
+                </div>
+                <div class="vip-discount-text">
+                    <span class="vip-discount-tag">BENEFICIO DE INVITADO</span>
+                    <strong class="vip-discount-title">¡Reclama tu Descuento Especial!</strong>
+                    <span class="vip-discount-sub">Pase VIP con código QR para tu próximo evento</span>
+                </div>
+                <div class="vip-discount-arrow">→</div>
+            </button>
 
-            <div class="live-actions-list">
-                <!-- Botón Grande 1: Subir Foto a la Pantalla -->
-                <button type="button" id="btn-ir-fotos" class="gala-action-btn">
-                    <div class="action-icon-box gold-box">
-                        <!-- SVG Cámara lineal sobria -->
-                        <svg class="svg-icon svg-md icon-dark" viewBox="0 0 24 24" aria-hidden="true">
+            <!-- 3. MURO DE FOTOS EN VIVO (ÚLTIMAS 3 O 4 FOTOS CON CORAZONES INTERACTIVOS) -->
+            <section class="live-photos-wall-section" id="seccion-muro-fotos-live">
+                <div class="section-header-row">
+                    <span class="section-title-gold">
+                        <svg class="svg-icon svg-xs" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
                             <circle cx="12" cy="13" r="3.5" />
                         </svg>
-                    </div>
-                    <div class="action-content">
-                        <h3>Subir Foto a la Pantalla <span class="gold-dot"></span></h3>
-                        <p>Comparte tu selfie o recuerdo con el marco oficial dorado de Segalú.</p>
-                    </div>
-                    <div class="action-circle-arrow">→</div>
-                </button>
+                        Muro de Fotos en Vivo
+                    </span>
+                    <span class="live-pulse-badge">● EN PANTALLA</span>
+                </div>
 
-                <!-- Botón Grande 2: Jugar Ronda de Preguntas con Identidad Morado Vibrante Kahoot -->
-                <button type="button" id="btn-ir-trivia" class="gala-action-btn action-btn-trivia">
-                    <div class="action-icon-box purple-game-box">
-                        <!-- SVG Mando de Trivia / Trofeo lineal en blanco puro -->
-                        <svg class="svg-icon svg-md icon-white" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="2" y="6" width="20" height="12" rx="6" />
-                            <path d="M6 12h4" />
-                            <path d="M8 10v4" />
-                            <circle cx="15" cy="11" r="1" fill="currentColor" />
-                            <circle cx="17" cy="13" r="1" fill="currentColor" />
-                        </svg>
-                    </div>
-                    <div class="action-content">
-                        <h3>Jugar Ronda de Preguntas</h3>
-                        <p>Participa en la trivia estilo Kahoot en vivo del salón.</p>
-                        <span id="etiqueta-estado-trivia-lobby" class="host-wait-tag">⏳ En espera del Host</span>
-                    </div>
-                    <div class="action-circle-arrow action-arrow-purple">›</div>
-                </button>
+                <!-- Cuadrícula de fotos en vivo (con likes interactivos y doble toque) -->
+                <div id="grid-muro-fotos-live" class="wall-photos-grid">
+                    <div class="wall-loading-state">Cargando fotos del salón...</div>
+                </div>
 
-                <!-- Botón Grande 3: Reclama tu Pase VIP & Descuento Especial (CRM Leads) -->
-                <button type="button" id="btn-abrir-modal-lead" class="gala-action-btn action-btn-vip-lead">
-                    <div class="action-icon-box gold-gradient-box">
-                        <span class="lead-icon-gift">🎁</span>
-                    </div>
-                    <div class="action-content">
-                        <div class="vip-lead-badge-row">
-                            <span class="vip-lead-pill">BENEFICIO DE INVITADO</span>
-                        </div>
-                        <h3>¡Reclama tu Pase VIP & Descuento Especial!</h3>
-                        <p>Obtén un cupón promocional con código QR para tu próximo evento en Segalú.</p>
-                    </div>
-                    <div class="action-circle-arrow action-arrow-gold">›</div>
+                <!-- Botón limpio de ancho completo para ver la galería completa (sin paréntesis ni subtítulos) -->
+                <button type="button" id="btn-ver-galeria-completa" class="btn-clean-gallery-full">
+                    <svg class="svg-icon svg-sm icon-gold" viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="3" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    <span>Ver Galería Completa</span>
                 </button>
-            </div>
+            </section>
 
-            <!-- 3. SECCIÓN PROMOCIONAL DE "SEGALÚ" (GALERÍA + WHATSAPP SOBRIO) -->
+            <!-- 4. SECCIÓN PROMOCIONAL DE "SEGALÚ" (VIVE LA EXPERIENCIA SEGALÚ) -->
             <div class="promo-segalu-section">
                 <div class="section-header-row">
                     <span class="section-title-gold">
@@ -276,7 +254,7 @@
                     </button>
                 </div>
 
-                <!-- Tarjetas de portada de las 2 sedes de Segalú (conectadas a CONFIG_SEDES_SEGALU en app.js) -->
+                <!-- Tarjetas limpias de las 2 sedes (sin etiquetas encima de la foto) -->
                 <div class="spaces-grid" id="grid-espacios-promo">
                     <article class="space-card" data-sede="sede1" data-slide="0">
                         <div class="space-visual space-bg-colocho">
@@ -292,7 +270,6 @@
                                 <path d="M5 21V7l7-4 7 4v14" />
                                 <path d="M9 21v-6h6v6" />
                             </svg>
-                            <span class="space-tag">Sede 1 • 4 Fotos</span>
                         </div>
                         <div class="space-info">
                             <h4 id="titulo-card-sede1">Sede 1 - El Colocho</h4>
@@ -313,7 +290,6 @@
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                                 <path d="M9 12l2 2 4-4" />
                             </svg>
-                            <span class="space-tag">Sede 2 • 4 Fotos</span>
                         </div>
                         <div class="space-info">
                             <h4 id="titulo-card-sede2">Sede 2 - Crystal Garden</h4>
@@ -322,18 +298,18 @@
                     </article>
                 </div>
 
-                <!-- SECCIÓN: 📍 NUESTRAS SEDES Y CÓMO LLEGAR (MAPA EMBEBIDO GOOGLE MAPS + COMPARTIR WHATSAPP) -->
+                <!-- SECCIÓN: 📍 NUESTRAS SEDES Y CÓMO LLEGAR (MAPAS EMBEBIDOS CLICABLES CON BADGE "ABRIR UBICACIÓN ↗") -->
                 <div class="sedes-ubicacion-section">
                     <div class="section-header-row">
                         <span class="section-title-gold">📍 Nuestras Sedes y Cómo Llegar</span>
                         <span class="section-tag">GPS & Mapa en Vivo</span>
                     </div>
                     <div id="contenedor-tarjetas-ubicacion" class="sedes-ubicacion-list">
-                        <!-- Se genera dinámicamente desde CONFIG_SEDES_SEGALU en app.js con el iframe de Google Maps -->
+                        <!-- Generado dinámicamente: toda la tarjeta es clicable hacia Google Maps -->
                     </div>
                 </div>
 
-                <!-- Botón de Contacto Directo WhatsApp Oficial con Estilo Elegante Segalú -->
+                <!-- Botón de contacto directo por WhatsApp en la página -->
                 <a
                     href="https://wa.me/51922574048?text=%C2%A1Hola%20Eventos%20Segal%C3%BA!%20%F0%9F%8E%89%20Estoy%20participando%20en%20vivo%20desde%20la%20app%20interactiva%20y%20me%20encantar%C3%ADa%20cotizar%20una%20fecha%20con%20mi%20beneficio%20especial%20de%20invitado."
                     id="btn-whatsapp-segalu"
@@ -342,7 +318,6 @@
                     class="btn-whatsapp-cta"
                 >
                     <div class="wa-icon-circle">
-                        <!-- Ícono SVG Oficial de WhatsApp en color verde oficial -->
                         <svg class="svg-icon svg-md wa-official-icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
                             <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24zm4.52 11.66c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.26-1.5-1.41-1.75-.14-.25-.02-.39.11-.51.11-.11.25-.29.37-.44.13-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.61.19 1.16.17 1.6.1.49-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.07-.1-.23-.17-.48-.3z"/>
                         </svg>
@@ -921,6 +896,71 @@
             </div>
         </div>
     </div>
+
+    <!-- MODAL GALERÍA COMPLETA DE FOTOS DEL EVENTO (LISTADO TOTAL CON CORAZONES Y REGRESAR) -->
+    <div id="modal-galeria-fotos-evento" class="galeria-modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="titulo-galeria-modal">
+        <div class="galeria-modal-card">
+            <div class="galeria-modal-header">
+                <button type="button" id="btn-cerrar-galeria-completa" class="btn-regresar-galeria">
+                    <span>← Regresar</span>
+                </button>
+                <div class="galeria-modal-titles">
+                    <h3 id="titulo-galeria-modal">Muro de Fotos del Evento</h3>
+                    <span id="contador-fotos-galeria" class="galeria-counter-badge">0 fotos</span>
+                </div>
+            </div>
+            <div class="galeria-modal-body">
+                <div id="grid-galeria-completa" class="galeria-full-grid">
+                    <!-- Se llena dinámicamente con todas las fotos aprobadas del evento -->
+                </div>
+                <div id="galeria-vacia-aviso" class="galeria-empty-state hidden">
+                    <span class="empty-icon">📷</span>
+                    <p>Aún no hay fotos aprobadas en este evento.<br>¡Sé el primero en compartir tu selfie!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DOCK FLOTANTE INFERIOR: ACCIONES RÁPIDAS (CÁMARA, TRIVIA) + BOTÓN WHATSAPP -->
+    <nav id="dock-flotante-invitado" class="bottom-floating-dock" aria-label="Acciones rápidas">
+        <div class="dock-actions-container">
+            <button type="button" id="btn-ir-fotos" class="dock-action-pill" aria-label="Subir Foto a la Pantalla">
+                <div class="dock-icon-wrap camera-glow">
+                    <svg class="svg-icon svg-sm" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                        <circle cx="12" cy="13" r="3.5" />
+                    </svg>
+                </div>
+                <span class="dock-label">Subir Foto</span>
+            </button>
+
+            <button type="button" id="btn-ir-trivia" class="dock-action-pill" aria-label="Jugar Ronda de Trivia">
+                <div class="dock-icon-wrap trophy-glow">
+                    <svg class="svg-icon svg-sm" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+                        <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+                        <path d="M4 22h16" />
+                        <path d="M10 14.66V17c0 .55-.45 1-1 1H7v4h10v-4h-2c-.55 0-1-.45-1-1v-2.34c3.36-.78 6-3.8 6-7.66V4H4v5c0 3.86 2.64 6.88 6 7.66z" />
+                    </svg>
+                </div>
+                <span class="dock-label">Trivia</span>
+            </button>
+        </div>
+
+        <!-- Botón circular flotante oficial verde WhatsApp -->
+        <a
+            href="https://wa.me/51922574048?text=%C2%A1Hola%20Eventos%20Segal%C3%BA!%20%F0%9F%8E%89%20Estoy%20participando%20en%20vivo%20desde%20la%20app%20interactiva%20y%20me%20encantar%C3%ADa%20cotizar%20una%20fecha."
+            id="btn-whatsapp-flotante"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="dock-wa-circle"
+            aria-label="Contactar a Segalú por WhatsApp"
+        >
+            <svg class="svg-icon svg-md" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+                <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2zm.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24zm4.52 11.66c-.25-.13-1.47-.72-1.7-.81-.23-.08-.39-.13-.56.13-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.13-1.06-.39-2.02-1.25-.75-.67-1.26-1.5-1.41-1.75-.14-.25-.02-.39.11-.51.11-.11.25-.29.37-.44.13-.15.17-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1 0 1.24.9 2.44 1.03 2.61.13.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.44.53.61.19 1.16.17 1.6.1.49-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.15-1.18-.07-.1-.23-.17-.48-.3z"/>
+            </svg>
+        </a>
+    </nav>
 
     <!-- Script con arquitectura modular de paquetes temáticos y conexión a FastAPI -->
     <script src="app.js?v=20261018d"></script>
