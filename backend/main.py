@@ -83,6 +83,8 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "multimedia_segalu").strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "SegaluAdmin2026").strip()
+ADMIN_SEDE1_PASSWORD = os.getenv("ADMIN_SEDE1_PASSWORD", "segalu-sede1").strip()
+ADMIN_SEDE2_PASSWORD = os.getenv("ADMIN_SEDE2_PASSWORD", "segalu-sede2").strip()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip() or "gemini-3.5-flash-lite"
 
@@ -413,11 +415,86 @@ def ejecutar_consulta_segura(operacion_fn):
         return operacion_fn(verificar_conexion_supabase())
 
 
-def verificar_admin_password(x_admin_password: str | None):
-    if not x_admin_password or x_admin_password.strip() != ADMIN_PASSWORD:
+def obtener_rol_admin(x_admin_password: str | None) -> dict:
+    """
+    Control de acceso por sede con 0 MB de memoria extra:
+    Compara en O(1) la contraseña recibida contra las variables de entorno:
+    - ADMIN_PASSWORD -> superadmin (acceso global a todas las sedes)
+    - ADMIN_SEDE1_PASSWORD -> sede1 (Sede 1 - El Colocho)
+    - ADMIN_SEDE2_PASSWORD -> sede2 (Sede 2 - Crystal Garden)
+    """
+    if not x_admin_password:
         raise HTTPException(
             status_code=401,
             detail="Contraseña de Administrador incorrecta o no proporcionada.",
+        )
+    pw = x_admin_password.strip()
+    if pw == ADMIN_PASSWORD:
+        return {
+            "rol": "superadmin",
+            "sede_clave": None,
+            "sede_nombre": "Todas las Sedes (Superadmin)",
+            "es_superadmin": True,
+        }
+    elif pw == ADMIN_SEDE1_PASSWORD:
+        return {
+            "rol": "sede1",
+            "sede_clave": "sede1",
+            "sede_nombre": "Sede 1 - El Colocho",
+            "es_superadmin": False,
+        }
+    elif pw == ADMIN_SEDE2_PASSWORD:
+        return {
+            "rol": "sede2",
+            "sede_clave": "sede2",
+            "sede_nombre": "Sede 2 - Crystal Garden",
+            "es_superadmin": False,
+        }
+    else:
+        raise HTTPException(
+            status_code=401,
+            detail="Contraseña de Administrador incorrecta o no autorizada.",
+        )
+
+
+def verificar_admin_password(x_admin_password: str | None) -> dict:
+    return obtener_rol_admin(x_admin_password)
+
+
+def validar_permiso_sede_evento(evento_id: str, info_rol: dict):
+    """
+    Verifica que un operador de Sede 1 o Sede 2 solo pueda modificar eventos de su sede asignada.
+    """
+    if not info_rol or info_rol.get("rol") == "superadmin":
+        return
+    eid = str(evento_id).strip()
+    nombre_loc = ""
+    try:
+        res = ejecutar_consulta_segura(
+            lambda db: db.table("eventos")
+            .select("id, local_id, locales(nombre)")
+            .or_(f"id.eq.{eid},codigo_acceso.eq.{eid}")
+            .limit(1)
+            .execute()
+        )
+        if res and res.data:
+            nombre_loc = ((res.data[0].get("locales") or {}).get("nombre") or "").lower()
+    except Exception:
+        pass
+
+    if not nombre_loc:
+        return
+
+    rol = info_rol.get("rol")
+    if rol == "sede1" and ("colocho" not in nombre_loc and "sede 1" not in nombre_loc):
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso denegado: este evento pertenece a Sede 2 - Crystal Garden.",
+        )
+    if rol == "sede2" and ("crystal" not in nombre_loc and "sede 2" not in nombre_loc):
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso denegado: este evento pertenece a Sede 1 - El Colocho.",
         )
 
 
@@ -1990,10 +2067,14 @@ def construir_dashboard_evento_rapido(evento_id: str, usar_cache: bool = True) -
 
 @app.post("/api/admin/login")
 def login_administrador(datos: LoginAdminInput):
-    verificar_admin_password(datos.password)
+    info_rol = verificar_admin_password(datos.password)
     return {
         "ok": True,
-        "mensaje": "Sesión de Administrador Único verificada correctamente.",
+        "mensaje": f"Sesión de Administrador verificada correctamente ({info_rol['rol']}).",
+        "rol": info_rol["rol"],
+        "sede_permitida": info_rol["sede_clave"],
+        "sede_nombre": info_rol["sede_nombre"],
+        "es_superadmin": info_rol["es_superadmin"],
     }
 
 
@@ -2056,7 +2137,7 @@ def obtener_resumen_admin(
     x_admin_password: str | None = Header(default=None),
 ):
     global _CACHE_LOCALES
-    verificar_admin_password(x_admin_password)
+    info_rol = verificar_admin_password(x_admin_password)
     t0 = time.perf_counter()
 
     if force_refresh:
@@ -2082,7 +2163,33 @@ def obtener_resumen_admin(
             st_ev = obtener_estado_evento(ev["id"])
             ev["tematica_accesorios"] = ev.get("tematica_accesorios") or st_ev.get("tematica_accesorios") or "todos"
 
+        # Filtrado por Sede según el rol del operador autenticado
+        locales_visibles = list(_CACHE_LOCALES or [])
+        if info_rol["rol"] == "sede1":
+            locales_visibles = [
+                l for l in locales_visibles
+                if "colocho" in (l.get("nombre") or "").lower() or "sede 1" in (l.get("nombre") or "").lower()
+            ]
+            ids_permitidos = {str(l.get("id")) for l in locales_visibles}
+            eventos = [
+                ev for ev in eventos
+                if str(ev.get("local_id")) in ids_permitidos or "colocho" in ((ev.get("locales") or {}).get("nombre") or "").lower()
+            ]
+        elif info_rol["rol"] == "sede2":
+            locales_visibles = [
+                l for l in locales_visibles
+                if "crystal" in (l.get("nombre") or "").lower() or "sede 2" in (l.get("nombre") or "").lower()
+            ]
+            ids_permitidos = {str(l.get("id")) for l in locales_visibles}
+            eventos = [
+                ev for ev in eventos
+                if str(ev.get("local_id")) in ids_permitidos or "crystal" in ((ev.get("locales") or {}).get("nombre") or "").lower()
+            ]
+
+        ids_eventos_disponibles = [ev["id"] for ev in eventos]
         evento_seleccionado_id = evento_id
+        if evento_seleccionado_id and evento_seleccionado_id not in ids_eventos_disponibles:
+            evento_seleccionado_id = None
         if not evento_seleccionado_id and eventos:
             evento_seleccionado_id = eventos[0]["id"]
 
@@ -2109,9 +2216,13 @@ def obtener_resumen_admin(
         return {
             "ok": True,
             "tiempo_carga_ms": ms,
+            "rol": info_rol["rol"],
+            "sede_permitida": info_rol["sede_clave"],
+            "sede_nombre": info_rol["sede_nombre"],
+            "es_superadmin": info_rol["es_superadmin"],
             "bucket_configurado": SUPABASE_BUCKET,
             "gemini_configurado": bool(GEMINI_API_KEY and "tu-api-key" not in GEMINI_API_KEY.lower()),
-            "locales": _CACHE_LOCALES,
+            "locales": locales_visibles,
             "eventos": eventos,
             **datos_evento,
         }
@@ -2127,7 +2238,23 @@ def crear_evento_admin(
     datos: CrearEventoAdminInput,
     x_admin_password: str | None = Header(default=None),
 ):
-    verificar_admin_password(x_admin_password)
+    info_rol = verificar_admin_password(x_admin_password)
+    if info_rol["rol"] in ("sede1", "sede2"):
+        locales_actuales = _CACHE_LOCALES or []
+        local_target = next((loc for loc in locales_actuales if loc.get("id") == datos.local_id), None)
+        if not local_target and supabase:
+            try:
+                res_loc = ejecutar_consulta_segura(lambda db: db.table("locales").select("*").eq("id", datos.local_id).limit(1).execute())
+                if res_loc and res_loc.data:
+                    local_target = res_loc.data[0]
+            except Exception:
+                pass
+        if local_target:
+            nom_l = (local_target.get("nombre") or "").lower()
+            if info_rol["rol"] == "sede1" and ("colocho" not in nom_l and "sede 1" not in nom_l):
+                raise HTTPException(status_code=403, detail="No tienes permisos para crear eventos en Sede 2 - Crystal Garden.")
+            if info_rol["rol"] == "sede2" and ("crystal" not in nom_l and "sede 2" not in nom_l):
+                raise HTTPException(status_code=403, detail="No tienes permisos para crear eventos en Sede 1 - El Colocho.")
 
     codigo_limpio = re.sub(r"[^A-Z0-9\-]", "", datos.codigo_acceso.strip().upper())
     if len(codigo_limpio) < 3:
@@ -4055,6 +4182,88 @@ def obtener_estado_proyector_en_vivo(
 # ------------------------------------------------------------------------------
 # 13.5. MÓDULO CRM DE LEADS & CUPONES PROMOCIONALES (SEGALÚ MARKETING)
 # ------------------------------------------------------------------------------
+def normalizar_fecha_nacimiento_iso(fecha_str: str) -> tuple[str, str]:
+    """
+    Retorna (fecha_iso, fecha_dmy)
+    Garantiza que Supabase reciba 'YYYY-MM-DD' para su columna DATE
+    y el frontend / Excel reciban 'DD/MM/YYYY'.
+    """
+    f = str(fecha_str or "").strip()
+    if "/" in f:
+        partes = f.split("/")
+        if len(partes) == 3:
+            try:
+                d, m, y = int(partes[0]), int(partes[1]), int(partes[2])
+                return f"{y:04d}-{m:02d}-{d:02d}", f"{d:02d}/{m:02d}/{y:04d}"
+            except ValueError:
+                pass
+    elif "-" in f:
+        partes = f.split("-")
+        if len(partes) == 3:
+            try:
+                if len(partes[0]) == 4:
+                    y, m, d = int(partes[0]), int(partes[1]), int(partes[2])
+                    return f"{y:04d}-{m:02d}-{d:02d}", f"{d:02d}/{m:02d}/{y:04d}"
+                else:
+                    d, m, y = int(partes[0]), int(partes[1]), int(partes[2])
+                    return f"{y:04d}-{m:02d}-{d:02d}", f"{d:02d}/{m:02d}/{y:04d}"
+            except ValueError:
+                pass
+    return f, f
+
+
+def calcular_edad_anios_meses_py(fecha_str: str) -> tuple[str, str]:
+    """
+    Calcula dinámicamente con la fecha actual los años y meses exactos.
+    Retorna (fecha_formateada_dmy, edad_texto).
+    """
+    if not fecha_str:
+        return "—", "—"
+    f = str(fecha_str).strip()
+    d, m, y = None, None, None
+    if "/" in f:
+        p = f.split("/")
+        if len(p) == 3:
+            try:
+                d, m, y = int(p[0]), int(p[1]), int(p[2])
+            except ValueError:
+                pass
+    elif "-" in f:
+        p = f.split("-")
+        if len(p) == 3:
+            try:
+                if len(p[0]) == 4:
+                    y, m, d = int(p[0]), int(p[1]), int(p[2])
+                else:
+                    d, m, y = int(p[0]), int(p[1]), int(p[2])
+            except ValueError:
+                pass
+    if not (d and m and y):
+        return f, "—"
+
+    fecha_dmy = f"{d:02d}/{m:02d}/{y:04d}"
+    try:
+        hoy = date.today()
+        anios = hoy.year - y
+        meses = hoy.month - m
+        if hoy.day < d:
+            meses -= 1
+        if meses < 0:
+            anios -= 1
+            meses += 12
+        if anios < 0:
+            return fecha_dmy, "—"
+        if anios == 0:
+            texto_edad = f"{meses} meses" if meses != 1 else "1 mes"
+        elif meses == 0:
+            texto_edad = f"{anios} años" if anios != 1 else "1 año"
+        else:
+            texto_edad = f"{anios} años, {meses} meses"
+        return fecha_dmy, texto_edad
+    except Exception:
+        return fecha_dmy, "—"
+
+
 @app.post("/api/eventos/{evento_id}/leads")
 def registrar_lead_evento(evento_id: str, datos: RegistroLeadInput):
     """
@@ -4066,6 +4275,7 @@ def registrar_lead_evento(evento_id: str, datos: RegistroLeadInput):
     nombre_limpio = datos.nombre.strip()
     telefono_limpio = re.sub(r"\s+", "", datos.telefono.strip())
     fecha_nac = datos.fecha_nacimiento.strip()
+    f_iso, f_dmy = normalizar_fecha_nacimiento_iso(fecha_nac)
     genero_limpio = (datos.genero or "No especificado").strip()
     if genero_limpio not in ["Femenino", "Masculino", "Otro", "No especificado"]:
         genero_limpio = "No especificado"
@@ -4100,7 +4310,7 @@ def registrar_lead_evento(evento_id: str, datos: RegistroLeadInput):
         "evento_id": eid_uuid,
         "nombre": nombre_limpio,
         "telefono": telefono_limpio,
-        "fecha_nacimiento": fecha_nac,
+        "fecha_nacimiento": f_iso,
         "genero": genero_limpio,
         "codigo_promocional": codigo_promocional,
         "creado_en": ahora_iso,
@@ -4240,7 +4450,8 @@ def vaciar_leads_evento_admin(
     Vacía todos los leads y cupones de un evento en Supabase (tabla crm_leads),
     limpia el respaldo local en _ESTADO_EVENTOS y purga la caché en RAM.
     """
-    verificar_admin_password(x_admin_password)
+    info_rol = verificar_admin_password(x_admin_password)
+    validar_permiso_sede_evento(evento_id, info_rol)
     eid = evento_id.strip()
 
     # Resolver UUID si vino como código
@@ -4282,6 +4493,7 @@ def exportar_leads_evento_csv(evento_id: str):
     """
     Exporta la base de datos de leads del evento en formato CSV con codificación UTF-8 BOM
     compatible directamente con Microsoft Excel y herramientas de remarketing.
+    Incluye la fecha de nacimiento en formato DD/MM/YYYY y la edad en años y meses.
     """
     import csv
     eid = evento_id.strip()
@@ -4298,6 +4510,7 @@ def exportar_leads_evento_csv(evento_id: str):
         "Nombre y Apellido",
         "Teléfono / WhatsApp",
         "Fecha de Nacimiento",
+        "Edad Actual (Años y Meses)",
         "Género",
         "Correo Electrónico",
         "Código Promocional",
@@ -4305,11 +4518,13 @@ def exportar_leads_evento_csv(evento_id: str):
     ])
 
     for l in leads:
+        f_dmy, edad_txt = calcular_edad_anios_meses_py(l.get("fecha_nacimiento", ""))
         writer.writerow([
             l.get("id", ""),
             l.get("nombre", ""),
             l.get("telefono", ""),
-            l.get("fecha_nacimiento", ""),
+            f_dmy,
+            edad_txt,
             l.get("genero", "") or "No especificado",
             l.get("correo", "") or "No especificado",
             l.get("codigo_promocional", ""),

@@ -2909,7 +2909,7 @@ body {
    ============================================================================== */
 .crm-metrics-summary-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 14px;
     margin: 18px 0;
 }
@@ -3192,4 +3192,121 @@ body {
 
 .lead-row-bday-highlight {
     background: rgba(254, 243, 199, 0.25) !important;
+}
+
+/* Indicador de Rol en Barra Superior */
+.topbar-role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    background: #FEF9C3;
+    border: 1px solid #FACC15;
+    color: #854D0E;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.topbar-role-badge.role-sede1 {
+    background: #E0F2FE;
+    border-color: #7DD3FC;
+    color: #0369A1;
+}
+
+.topbar-role-badge.role-sede2 {
+    background: #F3E8FF;
+    border-color: #D8B4FE;
+    color: #6B21A8;
+}
+
+/* Filtros Rápidos de CRM (Prospectos Clave) */
+.crm-quick-filters-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0 12px;
+    flex-wrap: wrap;
+}
+
+.crm-quick-filter-title {
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: var(--text-dark-charcoal);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.crm-filter-pills-wrap {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.crm-filter-btn {
+    background: var(--bg-card-white);
+    border: 1px solid var(--border-sand-gold);
+    color: var(--text-dark-charcoal);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.crm-filter-btn:hover {
+    background: #FAF7F0;
+    border-color: var(--gold-deep);
+    transform: translateY(-1px);
+}
+
+.crm-filter-btn.active {
+    background: linear-gradient(135deg, #B58E3E 0%, #8C6514 100%);
+    border-color: #8C6514;
+    color: #FFFFFF;
+    box-shadow: 0 2px 6px rgba(181, 142, 62, 0.35);
+}
+
+/* Tipografía y Badges de Edad en la Tabla CRM */
+.crm-age-text {
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--text-dark-charcoal);
+    display: block;
+}
+
+.crm-badge-prospect-15 {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    background: linear-gradient(135deg, #FDF2F8 0%, #FCE7F3 100%);
+    border: 1px solid #F472B6;
+    color: #9D174D;
+    font-size: 0.73rem;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(244, 114, 182, 0.15);
+}
+
+.crm-badge-prospect-18 {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+    border: 1px solid #F59E0B;
+    color: #92400E;
+    font-size: 0.73rem;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
 }

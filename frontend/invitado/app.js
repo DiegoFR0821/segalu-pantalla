@@ -2248,8 +2248,23 @@ document.addEventListener("visibilitychange", () => {
 // ------------------------------------------------------------------------------
 // MÓDULO CRM LEADS & CUPONES PROMOCIONALES (SEGALÚ VIP)
 // ------------------------------------------------------------------------------
+function inicializarSelectorFechaNacimiento() {
+    const anioSelect = document.getElementById("lead-nac-anio");
+    if (anioSelect && anioSelect.options.length <= 1) {
+        const anioActual = new Date().getFullYear();
+        for (let a = anioActual; a >= 1940; a--) {
+            const opt = document.createElement("option");
+            opt.value = String(a);
+            opt.textContent = String(a);
+            anioSelect.appendChild(opt);
+        }
+    }
+}
+
 function abrirModalCrmLead() {
     if (!modalCrmLeadEl) return;
+
+    inicializarSelectorFechaNacimiento();
 
     if (leadNombreEl && sesionInvitado?.invitado?.nombre && !leadNombreEl.value) {
         leadNombreEl.value = sesionInvitado.invitado.nombre;
@@ -2313,13 +2328,48 @@ async function enviarFormularioLead(e) {
 
     const nombre = (leadNombreEl?.value || "").trim();
     const telefono = (leadTelefonoEl?.value || "").trim();
-    const nacimiento = (leadNacimientoEl?.value || "").trim();
+    const diaEl = document.getElementById("lead-nac-dia");
+    const mesEl = document.getElementById("lead-nac-mes");
+    const anioEl = document.getElementById("lead-nac-anio");
+
+    const dia = (diaEl?.value || "").trim();
+    const mes = (mesEl?.value || "").trim();
+    const anio = (anioEl?.value || "").trim();
+
     const genero = (leadGeneroEl?.value || "No especificado").trim();
     const correo = (leadCorreoEl?.value || "").trim();
 
-    if (!nombre || !telefono || !nacimiento) {
-        mostrarAlerta("Por favor completa tu Nombre, Teléfono y Fecha de Nacimiento.", "error");
+    if (!nombre || !telefono) {
+        mostrarAlerta("Por favor completa tu Nombre y Teléfono.", "error");
         return;
+    }
+
+    if (!dia || !mes || !anio) {
+        mostrarAlerta("Por favor selecciona tu Día, Mes y Año de nacimiento.", "error");
+        if (!dia && diaEl) diaEl.focus();
+        else if (!mes && mesEl) mesEl.focus();
+        else if (!anio && anioEl) anioEl.focus();
+        return;
+    }
+
+    // Validación de fecha válida
+    const numDia = parseInt(dia, 10);
+    const numMes = parseInt(mes, 10);
+    const numAnio = parseInt(anio, 10);
+    const fechaObj = new Date(numAnio, numMes - 1, numDia);
+    if (
+        fechaObj.getFullYear() !== numAnio ||
+        fechaObj.getMonth() !== (numMes - 1) ||
+        fechaObj.getDate() !== numDia
+    ) {
+        mostrarAlerta("La fecha de nacimiento seleccionada no es válida en el calendario.", "error");
+        return;
+    }
+
+    // Formato exacto dd/mm/aaaa
+    const nacimiento = `${String(numDia).padStart(2, "0")}/${String(numMes).padStart(2, "0")}/${numAnio}`;
+    if (leadNacimientoEl) {
+        leadNacimientoEl.value = nacimiento;
     }
 
     // Validación estricta de teléfono: exactamente 9 dígitos numéricos
@@ -2406,6 +2456,7 @@ if (modalCrmLeadEl) {
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
+    inicializarSelectorFechaNacimiento();
     cargarAccesoriosPersonalizados();
     renderizarSeccionUbicacionSedes();
     sincronizarFotosSedesDesdeServidor();

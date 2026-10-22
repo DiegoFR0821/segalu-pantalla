@@ -2839,6 +2839,22 @@ body {
     position: relative;
 }
 
+/* Barra de scroll delgada y oscura para el modal CRM */
+.crm-lightbox-card::-webkit-scrollbar {
+    width: 6px;
+}
+.crm-lightbox-card::-webkit-scrollbar-track {
+    background: rgba(17, 18, 26, 0.7);
+    border-radius: 8px;
+}
+.crm-lightbox-card::-webkit-scrollbar-thumb {
+    background: rgba(212, 175, 55, 0.35);
+    border-radius: 8px;
+}
+.crm-lightbox-card::-webkit-scrollbar-thumb:hover {
+    background: rgba(212, 175, 55, 0.7);
+}
+
 @keyframes crmFadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -2926,19 +2942,34 @@ body {
 }
 
 .crm-form-group label {
-    font-size: 0.84rem;
+    font-size: 0.86rem;
     font-weight: 700;
-    color: var(--text-charcoal);
+    color: #F3E8D2; /* Dorado claro suave con contraste óptimo en fondo oscuro */
+    letter-spacing: 0.01em;
 }
 
 .required-star {
-    color: #DC2626;
+    color: #F87171;
 }
 
 .optional-tag {
-    font-size: 0.72rem;
+    font-size: 0.74rem;
     font-weight: 500;
-    color: var(--text-warm-gray);
+    color: #CBD5E1;
+}
+
+.crm-dob-row {
+    display: grid;
+    grid-template-columns: 1fr 1.35fr 1.15fr;
+    gap: 8px;
+    width: 100%;
+}
+
+.crm-select-dob {
+    padding: 11px 8px;
+    font-size: 0.9rem;
+    text-align: center;
+    text-align-last: center;
 }
 
 .crm-input-text {
@@ -2946,24 +2977,34 @@ body {
     padding: 12px 14px;
     font-size: 0.95rem;
     border-radius: 10px;
-    border: 1px solid var(--border-sand-gold);
-    background: var(--bg-pearl-input);
-    color: var(--text-charcoal);
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    background: #14151E;
+    color: #FFFFFF;
     font-family: inherit;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
     box-sizing: border-box;
+}
+
+.crm-input-text::placeholder {
+    color: #64748B;
 }
 
 .crm-input-text:focus {
     outline: none;
     border-color: var(--gold-deep);
-    box-shadow: 0 0 0 3px rgba(181, 142, 62, 0.18);
-    background: #FFFFFF;
+    box-shadow: 0 0 0 3px rgba(181, 142, 62, 0.22);
+    background: #1A1C28;
+    color: #FFFFFF;
+}
+
+.crm-input-text option {
+    background: #1A1C28;
+    color: #FFFFFF;
 }
 
 .crm-field-hint {
-    font-size: 0.73rem;
-    color: var(--text-warm-gray);
+    font-size: 0.74rem;
+    color: #94A3B8;
     font-style: italic;
 }
 

@@ -36,6 +36,7 @@
         </div>
 
         <div id="admin-header-controls" class="topbar-actions hidden">
+            <span id="badge-rol-admin" class="topbar-role-badge hidden">👑 Superadmin</span>
             <button type="button" id="btn-abrir-proyector-topbar" class="btn-projector-gold" title="Abrir Pantalla Gigante del Evento en nueva pestaña">
                 <span>🖥️ Proyector</span>
             </button>
@@ -480,6 +481,11 @@
                                 <strong id="crm-metric-tasa" class="crm-metric-value text-green">0%</strong>
                                 <span class="crm-metric-sub">% sobre invitados</span>
                             </div>
+                            <div class="crm-metric-card">
+                                <span class="crm-metric-label">👑 PROSPECTOS 15 AÑOS</span>
+                                <strong id="crm-metric-quinceaneras" class="crm-metric-value text-gold">0</strong>
+                                <span class="crm-metric-sub">13 y 14 años</span>
+                            </div>
                         </div>
 
                         <!-- DASHBOARD INTERACTIVO DE GRÁFICOS (CHART.JS) -->
@@ -515,6 +521,25 @@
                             <button type="button" id="btn-remover-filtro-grafico" class="btn-clear-chart-filter">✕ Ver todos los leads</button>
                         </div>
 
+                        <!-- BOTONES DE FILTRO RÁPIDO CRM -->
+                        <div class="crm-quick-filters-row">
+                            <span class="crm-quick-filter-title">⚡ Filtros Rápidos:</span>
+                            <div class="crm-filter-pills-wrap">
+                                <button type="button" class="crm-filter-btn active" data-filtro-rapido="todos">
+                                    🌐 Todos
+                                </button>
+                                <button type="button" class="crm-filter-btn" data-filtro-rapido="15_anos">
+                                    👑 Próximos 15 Años (13-14)
+                                </button>
+                                <button type="button" class="crm-filter-btn" data-filtro-rapido="hitos_18">
+                                    🥂 Rumbo a 18 / Hitos (17, 27, 29, 39, 49)
+                                </button>
+                                <button type="button" class="crm-filter-btn" data-filtro-rapido="cumple_mes">
+                                    🎂 Cumpleaños del Mes
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- BARRA DE BÚSQUEDA RÁPIDA DE LEADS -->
                         <div class="guests-search-toolbar">
                             <div class="search-input-wrap">
@@ -539,6 +564,7 @@
                                         <th>Nombre y Apellido</th>
                                         <th>Teléfono / WhatsApp</th>
                                         <th>Nacimiento</th>
+                                        <th>Edad Actual (Años y Meses)</th>
                                         <th>Género</th>
                                         <th>Correo Electrónico</th>
                                         <th>Código Promocional</th>
@@ -548,7 +574,7 @@
                                 </thead>
                                 <tbody id="tbody-leads-admin">
                                     <tr>
-                                        <td colspan="8" class="crm-empty-state">
+                                        <td colspan="9" class="crm-empty-state">
                                             Aún no hay leads capturados en este evento. Los invitados podrán solicitarlos tocando "🎁 Pase VIP & Descuento".
                                         </td>
                                     </tr>

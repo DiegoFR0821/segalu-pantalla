@@ -63,6 +63,10 @@ const adminAlertaEl = document.getElementById("admin-alerta");
 const vistaLoginAdminEl = document.getElementById("vista-login-admin");
 const vistaDashboardAdminEl = document.getElementById("vista-dashboard-admin");
 const adminHeaderControlsEl = document.getElementById("admin-header-controls");
+const badgeRolAdminEl = document.getElementById("badge-rol-admin");
+
+let rolAdminActivo = sessionStorage.getItem("segalu_admin_rol") || "superadmin";
+let sedeNombreActiva = sessionStorage.getItem("segalu_admin_sede_nom") || "";
 
 const formLoginAdminEl = document.getElementById("form-login-admin");
 const inputAdminPassEl = document.getElementById("input-admin-pass");
@@ -500,7 +504,11 @@ formLoginAdminEl.addEventListener("submit", async (e) => {
         }
 
         adminPasswordActiva = pass;
+        rolAdminActivo = data.rol || "superadmin";
+        sedeNombreActiva = data.sede_nombre || "";
         sessionStorage.setItem(SESSION_ADMIN_KEY, pass);
+        sessionStorage.setItem("segalu_admin_rol", rolAdminActivo);
+        sessionStorage.setItem("segalu_admin_sede_nom", sedeNombreActiva);
         ocultarAlertaAdmin();
         await cargarResumenPanel({ silencioso: false });
         cargarFotosSedesAdmin();
@@ -513,7 +521,12 @@ formLoginAdminEl.addEventListener("submit", async (e) => {
 btnCerrarAdminEl.addEventListener("click", () => {
     detenerCicloRefrescoSecuencial();
     sessionStorage.removeItem(SESSION_ADMIN_KEY);
+    sessionStorage.removeItem("segalu_admin_rol");
+    sessionStorage.removeItem("segalu_admin_sede_nom");
     adminPasswordActiva = "";
+    rolAdminActivo = "superadmin";
+    sedeNombreActiva = "";
+    if (badgeRolAdminEl) badgeRolAdminEl.classList.add("hidden");
     vistaDashboardAdminEl.classList.add("hidden");
     adminHeaderControlsEl.classList.add("hidden");
     vistaLoginAdminEl.classList.remove("hidden");
@@ -528,6 +541,23 @@ function aplicarDatosDashboardEnDOM(data, tiempoClienteMs) {
     vistaDashboardAdminEl.classList.remove("hidden");
     adminHeaderControlsEl.classList.remove("hidden");
 
+    if (data.rol) rolAdminActivo = data.rol;
+    if (data.sede_nombre) sedeNombreActiva = data.sede_nombre;
+
+    if (badgeRolAdminEl) {
+        badgeRolAdminEl.classList.remove("hidden");
+        if (rolAdminActivo === "sede1") {
+            badgeRolAdminEl.className = "topbar-role-badge role-sede1";
+            badgeRolAdminEl.textContent = `📍 ${sedeNombreActiva || "Sede 1 - El Colocho"}`;
+        } else if (rolAdminActivo === "sede2") {
+            badgeRolAdminEl.className = "topbar-role-badge role-sede2";
+            badgeRolAdminEl.textContent = `📍 ${sedeNombreActiva || "Sede 2 - Crystal Garden"}`;
+        } else {
+            badgeRolAdminEl.className = "topbar-role-badge";
+            badgeRolAdminEl.textContent = `👑 Superadmin (Todas las Sedes)`;
+        }
+    }
+
     const msMostrados = data.tiempo_carga_ms ?? Math.round(tiempoClienteMs);
     if (badgeVelocidadEventoEl) {
         badgeVelocidadEventoEl.textContent = `⚡ ${msMostrados} ms`;
@@ -535,25 +565,50 @@ function aplicarDatosDashboardEnDOM(data, tiempoClienteMs) {
 
     // 1. Llenar selectores de Sedes (Filtro superior y Creador de Eventos)
     if (data.locales) {
-        if (selectSedeLocalEl.options.length === 0) {
-            data.locales.forEach((loc) => {
-                const opt = document.createElement("option");
-                opt.value = loc.id;
-                opt.textContent = `${loc.nombre} (${loc.direccion})`;
-                selectSedeLocalEl.appendChild(opt);
-            });
-        }
+        selectSedeLocalEl.innerHTML = "";
+        data.locales.forEach((loc) => {
+            const opt = document.createElement("option");
+            opt.value = loc.id;
+            opt.textContent = `${loc.nombre} (${loc.direccion})`;
+            selectSedeLocalEl.appendChild(opt);
+        });
 
-        if (selectFiltroSedeAdminEl && selectFiltroSedeAdminEl.options.length <= 1) {
-            selectFiltroSedeAdminEl.innerHTML = '<option value="todos">🌐 Todas las Sedes</option>';
+        if (selectFiltroSedeAdminEl) {
+            selectFiltroSedeAdminEl.innerHTML = rolAdminActivo === "superadmin"
+                ? '<option value="todos">🌐 Todas las Sedes</option>'
+                : '';
             data.locales.forEach((loc) => {
                 const opt = document.createElement("option");
                 opt.value = loc.id;
                 opt.textContent = `📍 ${loc.nombre}`;
-                if (loc.id === filtroSedeAdminActivo) opt.selected = true;
                 selectFiltroSedeAdminEl.appendChild(opt);
             });
-            selectFiltroSedeAdminEl.value = filtroSedeAdminActivo;
+        }
+
+        // Control estricto por sede: si es operador de Sede 1 o Sede 2, bloquear selector
+        if (rolAdminActivo === "sede1" || rolAdminActivo === "sede2") {
+            const sedeAsignada = data.locales[0];
+            if (sedeAsignada) {
+                filtroSedeAdminActivo = sedeAsignada.id;
+                if (selectFiltroSedeAdminEl) {
+                    selectFiltroSedeAdminEl.value = sedeAsignada.id;
+                    selectFiltroSedeAdminEl.disabled = true;
+                    selectFiltroSedeAdminEl.title = `🔒 Acceso restringido: ${sedeAsignada.nombre}`;
+                }
+                if (selectSedeLocalEl) {
+                    selectSedeLocalEl.value = sedeAsignada.id;
+                    selectSedeLocalEl.disabled = true;
+                    selectSedeLocalEl.title = `🔒 Acceso restringido: ${sedeAsignada.nombre}`;
+                }
+            }
+        } else {
+            if (selectFiltroSedeAdminEl) {
+                selectFiltroSedeAdminEl.disabled = false;
+                selectFiltroSedeAdminEl.value = filtroSedeAdminActivo;
+            }
+            if (selectSedeLocalEl) {
+                selectSedeLocalEl.disabled = false;
+            }
         }
     }
 
@@ -698,6 +753,10 @@ async function cambiarEventoInstantaneo(nuevoEventoId) {
     // Reiniciar filtros de CRM & Leads para no mezclar eventos ajenos
     cacheLeads = [];
     filtroActivoGrafico = null;
+    filtroRapidoCrmActivo = "todos";
+    document.querySelectorAll(".crm-filter-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.filtroRapido === "todos");
+    });
     if (inputBuscarLeadsEl) inputBuscarLeadsEl.value = "";
     if (btnLimpiarBusquedaLeadsEl) btnLimpiarBusquedaLeadsEl.classList.add("hidden");
     const bannerCrm = document.getElementById("crm-active-filter-banner");
@@ -2562,6 +2621,7 @@ const countLeadsTotalEl = document.getElementById("count-leads-total");
 const crmMetricTotalEl = document.getElementById("crm-metric-total");
 const crmMetricCuponesEl = document.getElementById("crm-metric-cupones");
 const crmMetricTasaEl = document.getElementById("crm-metric-tasa");
+const crmMetricQuinceanerasEl = document.getElementById("crm-metric-quinceaneras");
 const inputBuscarLeadsEl = document.getElementById("input-buscar-leads");
 const btnLimpiarBusquedaLeadsEl = document.getElementById("btn-limpiar-busqueda-leads");
 const conteoFiltradoLeadsEl = document.getElementById("conteo-filtrado-leads");
@@ -2572,43 +2632,120 @@ const btnRemoverFiltroGraficoEl = document.getElementById("btn-remover-filtro-gr
 let chartEdadesInstance = null;
 let chartCumplesInstance = null;
 let filtroActivoGrafico = null; // { tipo: 'edad' | 'cumple', valor: string }
+let filtroRapidoCrmActivo = "todos"; // 'todos' | '15_anos' | 'hitos_18' | 'cumple_mes'
 
-function calcularEdadLead(fechaNacStr) {
-    if (!fechaNacStr) return null;
-    const partes = String(fechaNacStr).trim().split("-");
-    if (partes.length !== 3) return null;
-    const anio = parseInt(partes[0], 10);
-    const mes = parseInt(partes[1], 10) - 1;
-    const dia = parseInt(partes[2], 10);
-    if (isNaN(anio) || isNaN(mes) || isNaN(dia)) return null;
+function parsearFechaNacimiento(fechaStr) {
+    if (!fechaStr) return null;
+    const str = String(fechaStr).trim();
+    if (str.includes("/")) {
+        const partes = str.split("/");
+        if (partes.length === 3) {
+            const d = parseInt(partes[0], 10);
+            const m = parseInt(partes[1], 10) - 1;
+            const y = parseInt(partes[2], 10);
+            if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+                return { anio: y, mes: m, dia: d };
+            }
+        }
+    } else if (str.includes("-")) {
+        const partes = str.split("-");
+        if (partes.length === 3) {
+            if (partes[0].length === 4) {
+                const y = parseInt(partes[0], 10);
+                const m = parseInt(partes[1], 10) - 1;
+                const d = parseInt(partes[2], 10);
+                if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+                    return { anio: y, mes: m, dia: d };
+                }
+            } else {
+                const d = parseInt(partes[0], 10);
+                const m = parseInt(partes[1], 10) - 1;
+                const y = parseInt(partes[2], 10);
+                if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+                    return { anio: y, mes: m, dia: d };
+                }
+            }
+        }
+    }
+    return null;
+}
+
+function formatearFechaDMY(fechaStr) {
+    const p = parsearFechaNacimiento(fechaStr);
+    if (!p) return fechaStr || "—";
+    const d = String(p.dia).padStart(2, "0");
+    const m = String(p.mes + 1).padStart(2, "0");
+    return `${d}/${m}/${p.anio}`;
+}
+
+function calcularEdadDetallada(fechaNacStr) {
+    const p = parsearFechaNacimiento(fechaNacStr);
+    if (!p) return null;
 
     const hoy = new Date();
-    let edad = hoy.getFullYear() - anio;
-    const m = hoy.getMonth() - mes;
-    if (m < 0 || (m === 0 && hoy.getDate() < dia)) {
-        edad--;
+    const aHoy = hoy.getFullYear();
+    const mHoy = hoy.getMonth();
+    const dHoy = hoy.getDate();
+
+    let anios = aHoy - p.anio;
+    let meses = mHoy - p.mes;
+
+    if (dHoy < p.dia) {
+        meses--;
     }
-    return edad >= 0 ? edad : null;
+    if (meses < 0) {
+        anios--;
+        meses += 12;
+    }
+
+    if (anios < 0) return null;
+
+    // Meses faltantes para cumplir 15 años
+    let mesesPara15 = null;
+    if (anios >= 13 && anios < 15) {
+        const totalMesesActual = anios * 12 + meses;
+        const totalMeses15 = 15 * 12;
+        mesesPara15 = Math.max(1, totalMeses15 - totalMesesActual);
+    }
+
+    // Próximo cumpleaños y días restantes
+    let cumpleEsteAnio = new Date(aHoy, p.mes, p.dia);
+    if (cumpleEsteAnio < new Date(aHoy, mHoy, dHoy)) {
+        cumpleEsteAnio = new Date(aHoy + 1, p.mes, p.dia);
+    }
+    const diffMs = cumpleEsteAnio.getTime() - new Date(aHoy, mHoy, dHoy).getTime();
+    const diasParaCumple = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const esCumplePronto = diasParaCumple >= 0 && diasParaCumple <= 30;
+    const cumpleEnEsteMes = (p.mes === mHoy);
+
+    let textoEdad = "";
+    if (anios === 0) {
+        textoEdad = `${meses} ${meses === 1 ? 'mes' : 'meses'}`;
+    } else if (meses === 0) {
+        textoEdad = `${anios} ${anios === 1 ? 'año' : 'años'}`;
+    } else {
+        textoEdad = `${anios} ${anios === 1 ? 'año' : 'años'}, ${meses} ${meses === 1 ? 'mes' : 'meses'}`;
+    }
+
+    return {
+        anios,
+        meses,
+        textoEdad,
+        mesesPara15,
+        diasParaCumple,
+        esCumplePronto,
+        cumpleEnEsteMes,
+    };
+}
+
+function calcularEdadLead(fechaNacStr) {
+    const det = calcularEdadDetallada(fechaNacStr);
+    return det ? det.anios : null;
 }
 
 function calcularDiasHastaCumple(fechaNacStr) {
-    if (!fechaNacStr) return null;
-    const partes = String(fechaNacStr).trim().split("-");
-    if (partes.length !== 3) return null;
-    const mes = parseInt(partes[1], 10) - 1;
-    const dia = parseInt(partes[2], 10);
-    if (isNaN(mes) || isNaN(dia)) return null;
-
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-
-    let cumpleEsteAnio = new Date(hoy.getFullYear(), mes, dia);
-    if (cumpleEsteAnio < hoy) {
-        cumpleEsteAnio = new Date(hoy.getFullYear() + 1, mes, dia);
-    }
-
-    const diffTiempo = cumpleEsteAnio.getTime() - hoy.getTime();
-    return Math.ceil(diffTiempo / (1000 * 60 * 60 * 24));
+    const det = calcularEdadDetallada(fechaNacStr);
+    return det ? det.diasParaCumple : null;
 }
 
 function obtenerRangoEdadLead(edad) {
@@ -2806,8 +2943,17 @@ function renderizarTablaLeads(listaLeads) {
     const conversion = Math.min(100, Math.round((totalLeads / totalInvitados) * 100));
     if (crmMetricTasaEl) crmMetricTasaEl.textContent = `${conversion}%`;
 
+    // 4to indicador KPI: Prospectos 15 Años (13 a 14 años)
+    const quinceanerasTotal = cacheLeads.filter((l) => {
+        const d = calcularEdadDetallada(l.fecha_nacimiento);
+        return d && (d.anios === 13 || d.anios === 14);
+    }).length;
+    if (crmMetricQuinceanerasEl) {
+        crmMetricQuinceanerasEl.textContent = String(quinceanerasTotal);
+    }
+
     if (conteoFiltradoLeadsEl) {
-        const hayFiltro = Boolean(filtroActivoGrafico || (inputBuscarLeadsEl?.value || "").trim());
+        const hayFiltro = Boolean(filtroActivoGrafico || filtroRapidoCrmActivo !== "todos" || (inputBuscarLeadsEl?.value || "").trim());
         conteoFiltradoLeadsEl.textContent = hayFiltro
             ? `Mostrando ${leads.length} de ${totalLeads} interesados`
             : `${totalLeads} interesados`;
@@ -2816,8 +2962,8 @@ function renderizarTablaLeads(listaLeads) {
     if (leads.length === 0) {
         tbodyLeadsAdminEl.innerHTML = `
             <tr>
-                <td colspan="8" class="crm-empty-state">
-                    ${(inputBuscarLeadsEl?.value || "").trim() || filtroActivoGrafico
+                <td colspan="9" class="crm-empty-state">
+                    ${(inputBuscarLeadsEl?.value || "").trim() || filtroActivoGrafico || filtroRapidoCrmActivo !== "todos"
                         ? "No se encontraron prospectos que coincidan con los filtros aplicados."
                         : "Aún no hay leads capturados en este evento. Los invitados podrán solicitarlos tocando '🎁 Pase VIP & Descuento'."}
                 </td>
@@ -2830,7 +2976,7 @@ function renderizarTablaLeads(listaLeads) {
         tbodyLeadsAdminEl.innerHTML = leads.map((l) => {
             const nombre = escaparHtml(l.nombre || "Interesado VIP");
             const tel = escaparHtml(l.telefono || "");
-            const nac = escaparHtml(l.fecha_nacimiento || "—");
+            const nacFmt = escaparHtml(formatearFechaDMY(l.fecha_nacimiento));
             const generoStr = escaparHtml(l.genero || "No especificado");
             const generoLower = generoStr.toLowerCase();
             const generoClase = generoLower === "femenino" ? "gender-femenino" : (generoLower === "masculino" ? "gender-masculino" : (generoLower === "otro" ? "gender-otro" : ""));
@@ -2841,21 +2987,39 @@ function renderizarTablaLeads(listaLeads) {
             const telSoloDigitos = (l.telefono || "").replace(/\D/g, "");
             const urlWa = telSoloDigitos ? `https://wa.me/51${telSoloDigitos}?text=${encodeURIComponent(`¡Hola ${l.nombre || ''}! Te saludamos de Eventos Segalú. Vemos que solicitaste tu Pase VIP (${l.codigo_promocional || ''}) y nos encantaría brindarte información de nuestros paquetes.`)}` : "#";
 
-            const diasHastaCumple = calcularDiasHastaCumple(l.fecha_nacimiento);
-            const esCumplePronto = diasHastaCumple !== null && diasHastaCumple <= 30;
-            const badgeCumple = esCumplePronto ? `<div class="crm-badge-bday-soon" title="¡Cumpleaños en los próximos 30 días!">🎂 ¡En ${diasHastaCumple}d!</div>` : "";
-            const rowClass = esCumplePronto ? "lead-row-bday-highlight" : "";
+            const infoEdad = calcularEdadDetallada(l.fecha_nacimiento);
+            let edadHtml = '<span style="color:var(--text-warm-gray);">—</span>';
+            if (infoEdad) {
+                let badgeProspecto = "";
+                if (infoEdad.anios >= 13 && infoEdad.anios <= 14) {
+                    const mesesFaltan = infoEdad.mesesPara15 || (15 * 12 - (infoEdad.anios * 12 + infoEdad.meses));
+                    badgeProspecto = `<span class="crm-badge-prospect-15">👑 Rumbo a 15 Años (Faltan ${mesesFaltan}m)</span>`;
+                } else if (infoEdad.anios === 17) {
+                    badgeProspecto = `<span class="crm-badge-prospect-18">🥂 Rumbo a 18 Años</span>`;
+                }
+                const badgeBday = infoEdad.esCumplePronto
+                    ? `<span class="crm-badge-bday-soon">🎂 Cumple pronto (${infoEdad.diasParaCumple}d)</span>`
+                    : "";
+
+                edadHtml = `
+                    <span class="crm-age-text">${escaparHtml(infoEdad.textoEdad)}</span>
+                    ${badgeProspecto}
+                    ${badgeBday}
+                `;
+            }
+
+            const rowClass = infoEdad?.esCumplePronto ? "lead-row-bday-highlight" : "";
 
             return `
                 <tr class="${rowClass}">
                     <td>
                         <strong>${nombre}</strong>
-                        ${badgeCumple}
                     </td>
                     <td>
                         ${tel ? `<a href="${urlWa}" target="_blank" rel="noopener noreferrer" class="crm-wa-link" title="Abrir chat en WhatsApp">📲 ${tel}</a>` : "—"}
                     </td>
-                    <td><span>${nac}</span></td>
+                    <td><span>${nacFmt}</span></td>
+                    <td>${edadHtml}</td>
                     <td><span class="crm-badge-gender ${generoClase}">${generoStr}</span></td>
                     <td><span style="color:var(--text-warm-gray);">${correo}</span></td>
                     <td><span class="crm-lead-code-pill">${codigo}</span></td>
@@ -2879,7 +3043,25 @@ function filtrarLeadsGeneral() {
 
     let filtrados = cacheLeads;
 
-    // 1. Filtrar por gráfico interactivo si está activo
+    // 1. Filtrar por botones rápidos de CRM
+    if (filtroRapidoCrmActivo === "15_anos") {
+        filtrados = filtrados.filter((l) => {
+            const det = calcularEdadDetallada(l.fecha_nacimiento);
+            return det && (det.anios === 13 || det.anios === 14);
+        });
+    } else if (filtroRapidoCrmActivo === "hitos_18") {
+        filtrados = filtrados.filter((l) => {
+            const det = calcularEdadDetallada(l.fecha_nacimiento);
+            return det && [17, 27, 29, 39, 49].includes(det.anios);
+        });
+    } else if (filtroRapidoCrmActivo === "cumple_mes") {
+        filtrados = filtrados.filter((l) => {
+            const det = calcularEdadDetallada(l.fecha_nacimiento);
+            return det && (det.cumpleEnEsteMes || det.esCumplePronto);
+        });
+    }
+
+    // 2. Filtrar por gráfico interactivo si está activo
     if (filtroActivoGrafico) {
         if (filtroActivoGrafico.tipo === "edad") {
             filtrados = filtrados.filter((l) => {
@@ -2894,7 +3076,7 @@ function filtrarLeadsGeneral() {
         }
     }
 
-    // 2. Filtrar por término de búsqueda en texto
+    // 3. Filtrar por término de búsqueda en texto
     if (query) {
         filtrados = filtrados.filter((l) => {
             const n = (l.nombre || "").toLowerCase();
@@ -2907,6 +3089,26 @@ function filtrarLeadsGeneral() {
     }
 
     renderizarTablaLeads(filtrados);
+}
+
+// Botones de filtro rápido CRM
+document.querySelectorAll(".crm-filter-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        document.querySelectorAll(".crm-filter-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        filtroRapidoCrmActivo = btn.dataset.filtroRapido || "todos";
+        filtrarLeadsGeneral();
+    });
+});
+
+const cardQuinceanerasEl = document.getElementById("crm-metric-quinceaneras")?.closest(".crm-metric-card");
+if (cardQuinceanerasEl) {
+    cardQuinceanerasEl.style.cursor = "pointer";
+    cardQuinceanerasEl.title = "Clic para filtrar prospectos de 13 y 14 años";
+    cardQuinceanerasEl.addEventListener("click", () => {
+        const btn15 = document.querySelector('.crm-filter-btn[data-filtro-rapido="15_anos"]');
+        if (btn15) btn15.click();
+    });
 }
 
 if (inputBuscarLeadsEl) {
@@ -2950,6 +3152,10 @@ if (btnVaciarLeadsAdminEl) {
 
             cacheLeads = [];
             filtroActivoGrafico = null;
+            filtroRapidoCrmActivo = "todos";
+            document.querySelectorAll(".crm-filter-btn").forEach((b) => {
+                b.classList.toggle("active", b.dataset.filtroRapido === "todos");
+            });
             if (inputBuscarLeadsEl) inputBuscarLeadsEl.value = "";
             if (btnLimpiarBusquedaLeadsEl) btnLimpiarBusquedaLeadsEl.classList.add("hidden");
             const bannerCrm = document.getElementById("crm-active-filter-banner");
