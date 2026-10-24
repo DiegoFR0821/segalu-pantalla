@@ -18,7 +18,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,700;0,800;1,700&display=swap" rel="stylesheet">
 
     <!-- Hoja de estilos Modo Claro: Gala Marfil, Blanco Puro y Bronce Dorado -->
-    <link rel="stylesheet" href="styles.css?v=20261022i" />
+    <link rel="stylesheet" href="styles.css?v=20261024a" />
 </head>
 <body>
 
@@ -198,7 +198,20 @@
                 </div>
             </div>
 
-            <!-- 2. TARJETA PROMINENTE: RECLAMA TU DESCUENTO ESPECIAL (PASE VIP CRM) -->
+            <!-- 2. TARJETA HORIZONTAL DE TRIVIA EN VIVO (ESTILO JUEGO / KAHOOT) -->
+            <button type="button" id="btn-ir-trivia" class="trivia-game-card" aria-label="Jugar Ronda de Trivia en Vivo">
+                <div class="trivia-game-icon-box">
+                    <span class="trivia-icon-trophy">🏆</span>
+                </div>
+                <div class="trivia-game-text">
+                    <span class="trivia-game-tag" id="etiqueta-estado-trivia-lobby">RONDA DE PREGUNTAS &amp; PODIO</span>
+                    <strong class="trivia-game-title">¡Juega la Trivia en Vivo!</strong>
+                    <span class="trivia-game-sub">Compite desde tu mesa y sube al podio de la pantalla gigante</span>
+                </div>
+                <div class="trivia-game-arrow">→</div>
+            </button>
+
+            <!-- 3. TARJETA PROMINENTE: RECLAMA TU DESCUENTO ESPECIAL (PASE VIP CRM) -->
             <button type="button" id="btn-abrir-modal-lead" class="vip-discount-card" aria-label="Reclamar Pase VIP y Descuento Especial">
                 <div class="vip-discount-icon-box">
                     <span class="lead-icon-gift">🎁</span>
@@ -901,32 +914,18 @@
         </div>
     </div>
 
-    <!-- 3 BOTONES FLOTANTES INDEPENDIENTES (Sin contenedor visual, botones cuadrados redondeados y WhatsApp) -->
+    <!-- 2 BOTONES FLOTANTES INDEPENDIENTES (Cámara central destacada y WhatsApp oficial) -->
     <nav id="dock-flotante-invitado" class="bottom-floating-dock hidden" aria-label="Acciones rápidas">
-        <!-- 1. Costado Izquierdo: Trivia (Cuadrado redondeado 52x52 en degradado violeta/azul eléctrico con trofeo y texto "Trivia") -->
-        <button type="button" id="btn-ir-trivia" class="btn-float-independent btn-float-trivia" aria-label="Jugar Ronda de Trivia" title="Jugar Trivia">
-            <svg class="svg-float-icon svg-float-trivia" viewBox="0 0 24 24" aria-hidden="true" fill="none">
-                <path d="M7 4h10v5a5 5 0 0 1-10 0V4z" fill="#FDE047" stroke="#FFFFFF" stroke-width="1.4" stroke-linejoin="round"/>
-                <path d="M5 6H3a2 2 0 0 0 2 3h2" stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round"/>
-                <path d="M17 6h2a2 2 0 0 1-2 3h-2" stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round"/>
-                <path d="M12 14v4m-3 0h6" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>
-                <path d="M10 20h4" stroke="#FDE047" stroke-width="2" stroke-linecap="round"/>
-                <circle cx="12" cy="8.5" r="1.5" fill="#4F46E5"/>
-            </svg>
-            <span class="float-btn-label float-btn-label-trivia">Trivia</span>
-        </button>
-
-        <!-- 2. Centro Exacto: Subir Foto (Cuadrado redondeado 56x56 en degradado dorado luminoso con cámara, destello y texto "Foto") -->
+        <!-- 1. Centro Exacto: Subir Foto (Cuadrado redondeado 56x56 en degradado dorado luminoso con icono grande de 30px) -->
         <button type="button" id="btn-ir-fotos" class="btn-float-independent btn-float-camera-featured" aria-label="Subir Foto a la Pantalla" title="Subir Foto a la Pantalla">
-            <svg class="svg-float-icon svg-float-camera" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#0B0F17" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="svg-float-icon svg-float-camera" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#0B0F17" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M14.5 4.5h-5L7.2 7.2H4.5a2 2 0 0 0-2 2v8.5a2 2 0 0 0 2 2h15a2 2 0 0 0 2-2V9.2a2 2 0 0 0-2-2h-2.7l-2.3-2.7z" />
                 <circle cx="12" cy="13.5" r="3.2" stroke-width="2.2" />
                 <path d="M18.8 4.2v2.2m-1.1-1.1h2.2" stroke="#0B0F17" stroke-width="1.8" />
             </svg>
-            <span class="float-btn-label float-btn-label-foto">Foto</span>
         </button>
 
-        <!-- 3. Esquina Derecha: WhatsApp Oficial (Circular Verde) -->
+        <!-- 2. Esquina Derecha: WhatsApp Oficial (Circular Verde) -->
         <a
             href="https://wa.me/51922574048"
             id="btn-whatsapp-flotante"
@@ -943,6 +942,6 @@
     </nav>
 
     <!-- Script con arquitectura modular de paquetes temáticos y conexión a FastAPI -->
-    <script src="app.js?v=20261022i"></script>
+    <script src="app.js?v=20261024a"></script>
 </body>
 </html>

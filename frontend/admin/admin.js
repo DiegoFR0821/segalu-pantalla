@@ -895,10 +895,29 @@ function pintarResumenEventoActual() {
     };
     const tematicaLabel = etiquetasTematica[ev.tematica_accesorios || "todos"] || "✨ Todos los Paquetes";
 
+    const autoLimpieza = ev.estado_autolimpieza || {};
+    let esPurgado = Boolean(autoLimpieza.purgado);
+    let diasRest = typeof autoLimpieza.dias_restantes === "number" ? autoLimpieza.dias_restantes : null;
+    if (diasRest === null) {
+        const fechaRef = new Date(ev.fecha_evento || ev.created_at || Date.now());
+        const diasTrans = Math.max(0, (Date.now() - fechaRef.getTime()) / (1000 * 60 * 60 * 24));
+        diasRest = Math.max(0, Math.floor(30 - diasTrans));
+        if (diasTrans >= 30) esPurgado = true;
+    }
+    const badgeTexto = autoLimpieza.badge_texto || (esPurgado ? "🧹 Multimedia purgada (CRM activo)" : `⏳ Autolimpieza multimedia: ${diasRest} día${diasRest !== 1 ? 's' : ''} restante${diasRest !== 1 ? 's' : ''}`);
+    const badgeColor = esPurgado ? "#A0AEC0" : (diasRest <= 5 ? "#F6AD55" : "#68D391");
+    const badgeBg = esPurgado ? "rgba(160, 174, 192, 0.12)" : (diasRest <= 5 ? "rgba(246, 173, 85, 0.12)" : "rgba(104, 211, 145, 0.12)");
+    const badgeBorder = esPurgado ? "rgba(160, 174, 192, 0.3)" : (diasRest <= 5 ? "rgba(246, 173, 85, 0.3)" : "rgba(104, 211, 145, 0.3)");
+
     infoEventoSeleccionadoEl.innerHTML = `
         <div style="margin-bottom: 4px;"><strong>Sede:</strong> ${ev.locales?.nombre || "Segalú"}</div>
         <div style="margin-bottom: 4px;"><strong>Código QR:</strong> <code style="color: #D4AF37; font-weight: 800; background: rgba(212,175,55,0.12); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(212,175,55,0.3);">${ev.codigo_acceso}</code></div>
-        <div><strong>Temática:</strong> ${tematicaLabel}</div>
+        <div style="margin-bottom: 6px;"><strong>Temática:</strong> ${tematicaLabel}</div>
+        <div style="margin-top: 8px;">
+            <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: ${badgeColor}; background: ${badgeBg}; border: 1px solid ${badgeBorder}; border-radius: 9999px; padding: 4px 10px; line-height: 1.3;">
+                ${badgeTexto}
+            </span>
+        </div>
     `;
 
     // Actualizar el enlace al proyector en la lista operativa del sidebar
@@ -1151,11 +1170,12 @@ if (btnEliminarEventoCompletoEl) {
 
         const confirmar = window.confirm(
             `⚠️ ¿ELIMINAR POR COMPLETO el evento "${nombreEv}"?\n\n` +
-                `Esta acción borrará en cascada:\n` +
+                `Esta acción borrará en cascada definitiva:\n` +
                 `1. Todas las fotos del Bucket de Supabase Storage y tabla multimedia.\n` +
                 `2. Todas las preguntas y respuestas de la trivia.\n` +
                 `3. Todos los invitados conectados.\n` +
-                `4. El registro del evento.`
+                `4. TODOS los prospectos y cupones CRM generados para este evento.\n` +
+                `5. El registro del evento en la base de datos.`
         );
         if (!confirmar) return;
 

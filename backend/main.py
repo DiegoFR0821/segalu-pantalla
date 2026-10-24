@@ -2338,9 +2338,17 @@ def obtener_resumen_admin(
             .execute()
         )
         eventos = eventos_res.data or []
+
+        # Verificación periódica de autolimpieza de 30 días (máximo cada 6 horas)
+        try:
+            verificar_y_ejecutar_autolimpieza_30_dias(eventos)
+        except Exception as err_auto:
+            print(f"Aviso al verificar autolimpieza 30d en resumen admin: {err_auto}")
+
         for ev in eventos:
             st_ev = obtener_estado_evento(ev["id"])
             ev["tematica_accesorios"] = ev.get("tematica_accesorios") or st_ev.get("tematica_accesorios") or "todos"
+            ev["estado_autolimpieza"] = calcular_estado_30d_evento(ev)
 
         # Filtrado por Sede según el rol del operador autenticado
         locales_visibles = list(_CACHE_LOCALES or [])
@@ -2539,7 +2547,9 @@ def actualizar_tematica_evento_admin(
 
     estado_ev = obtener_estado_evento(eid)
     estado_ev["tematica_accesorios"] = tematica_nueva
+    _guardar_estado_eventos_disco()
     invalidar_cache_evento(eid)
+    gc.collect()
     return {
         "ok": True,
         "mensaje": f"Temática de accesorios del evento actualizada a '{tematica_nueva}'.",
@@ -2880,6 +2890,228 @@ def _purgar_archivos_storage_de_evento(evento_id: str) -> tuple[int, int]:
     return len(registros), len(rutas_storage)
 
 
+def _parsear_fecha_evento_o_creacion(ev: dict) -> datetime | None:
+    """
+    Parsea de forma robusta la fecha de celebración o de creación del evento.
+    Prioriza `fecha_evento` (la fecha real de la fiesta) con fallback a `created_at`.
+    """
+    for campo in ("fecha_evento", "created_at"):
+        val = ev.get(campo)
+        if not val:
+            continue
+        val_str = str(val).strip()
+        try:
+            if "T" in val_str or "+" in val_str or "Z" in val_str:
+                dt = datetime.fromisoformat(val_str.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt
+            # Formato simple de fecha YYYY-MM-DD
+            d = date.fromisoformat(val_str[:10])
+            return datetime.combine(d, datetime.min.time(), tzinfo=timezone.utc)
+        except Exception:
+            continue
+    return None
+
+
+def calcular_estado_30d_evento(ev: dict) -> dict:
+    """
+    Calcula si un evento ha superado los 30 días de antigüedad o si ya fue purgado.
+    Devuelve los días restantes y la información de la píldora informativa para el Admin.
+    """
+    eid = str(ev.get("id") or "").strip()
+    st = _ESTADO_EVENTOS.get(eid) or {}
+    ya_autolimpiado = bool(st.get("autolimpiado_30d"))
+
+    fecha_base = _parsear_fecha_evento_o_creacion(ev)
+    ahora = datetime.now(timezone.utc)
+
+    if not fecha_base:
+        return {
+            "purgado": ya_autolimpiado,
+            "dias_restantes": 0 if ya_autolimpiado else 30,
+            "badge_texto": "🧹 Multimedia purgada (CRM activo)" if ya_autolimpiado else "⏳ Autolimpieza multimedia: 30 días restantes",
+            "badge_tipo": "purgado" if ya_autolimpiado else "activo",
+        }
+
+    dias_transcurridos = (ahora - fecha_base).total_seconds() / 86400.0
+    dias_restantes = max(0, int(30 - dias_transcurridos))
+
+    if ya_autolimpiado or dias_transcurridos >= 30.0:
+        return {
+            "purgado": True,
+            "dias_restantes": 0,
+            "dias_antiguedad": int(dias_transcurridos),
+            "badge_texto": "🧹 Multimedia purgada (CRM activo)",
+            "badge_tipo": "purgado",
+        }
+    else:
+        return {
+            "purgado": False,
+            "dias_restantes": dias_restantes,
+            "dias_antiguedad": int(dias_transcurridos),
+            "badge_texto": f"⏳ Autolimpieza multimedia: {dias_restantes} día{'s' if dias_restantes != 1 else ''} restante{'s' if dias_restantes != 1 else ''}",
+            "badge_tipo": "advertencia" if dias_restantes <= 5 else "activo",
+        }
+
+
+def ejecutar_autolimpieza_30_dias_evento(evento_id: str) -> dict:
+    """
+    Ejecuta la purga periódica a los 30 días para un evento:
+    1. Purga fotos del Storage y tabla `multimedia`.
+    2. Purga preguntas y respuestas de la trivia.
+    3. Purga invitados registrados en el evento.
+    4. Purga paquetes de accesorios temporales vinculados exclusivamente a este evento (scope == 'evento').
+    5. CRÍTICO: CONSERVA INTACTA la fila del evento en la tabla `eventos` y CONSERVA INTACTOS todos los prospectos en `crm_leads`.
+    6. Marca el evento como autolimpiado en memoria y lo persiste a disco.
+    """
+    eid = evento_id.strip()
+
+    # 1. Purgar fotos del Bucket de Supabase Storage y tabla multimedia
+    fotos_borradas, archivos_borrados = _purgar_archivos_storage_de_evento(eid)
+
+    # 2. Borrar respuestas_trivia y preguntas del evento
+    try:
+        preguntas_ev = listar_preguntas_evento(eid)
+        for p in preguntas_ev:
+            pid = p.get("id")
+            if pid:
+                try:
+                    ejecutar_consulta_segura(
+                        lambda db, _pid=pid: db.table("respuestas_trivia").delete().eq("pregunta_id", _pid).execute()
+                    )
+                except Exception:
+                    pass
+        ejecutar_consulta_segura(
+            lambda db: db.table("preguntas").delete().eq("evento_id", eid).execute()
+        )
+    except Exception as err_preg:
+        print(f"Aviso al purgar preguntas en autolimpieza 30d ({eid}): {err_preg}")
+
+    # 3. Borrar invitados del evento
+    try:
+        ejecutar_consulta_segura(
+            lambda db: db.table("invitados").delete().eq("evento_id", eid).execute()
+        )
+    except Exception as err_inv:
+        print(f"Aviso al purgar invitados en autolimpieza 30d ({eid}): {err_inv}")
+
+    # 4. Purgar paquetes de accesorios temporales vinculados exclusivamente a este evento (scope == 'evento')
+    try:
+        catalogo_actual = obtener_catalogo_paquetes_completo()
+        paquetes_a_borrar = [
+            pid for pid, pkg in catalogo_actual.items()
+            if pkg.get("scope") == "evento" and str(pkg.get("evento_id") or "").strip() == eid
+        ]
+        if paquetes_a_borrar:
+            db_sb = verificar_conexion_supabase()
+            for pid in paquetes_a_borrar:
+                pkg = catalogo_actual[pid]
+                rutas_storage = [f"accesorios/{pid}/{acc['archivo']}" for acc in pkg.get("accesorios", []) if acc.get("archivo")]
+                if rutas_storage:
+                    try:
+                        db_sb.storage.from_(SUPABASE_BUCKET).remove(rutas_storage)
+                    except Exception:
+                        pass
+                dir_loc = Path(__file__).parent.parent / "frontend" / "static" / "accessories" / pid
+                if dir_loc.exists() and dir_loc.is_dir():
+                    import shutil
+                    shutil.rmtree(dir_loc, ignore_errors=True)
+                del catalogo_actual[pid]
+            guardar_catalogo_paquetes(catalogo_actual)
+    except Exception as err_pkg:
+        print(f"Aviso al purgar paquetes temporales en autolimpieza 30d ({eid}): {err_pkg}")
+
+    # 5. Marcar estado autolimpiado conservando el evento y sus datos CRM
+    st = obtener_estado_evento(eid)
+    st["autolimpiado_30d"] = True
+    st["fecha_autolimpieza_30d"] = datetime.now(timezone.utc).isoformat()
+    _guardar_estado_eventos_disco()
+    invalidar_cache_evento(eid)
+    gc.collect()
+
+    return {
+        "ok": True,
+        "evento_id": eid,
+        "fotos_eliminadas": fotos_borradas,
+        "archivos_storage_purgados": archivos_borrados,
+        "crm_conservado": True,
+        "evento_conservado": True,
+        "mensaje": f"🧹 Autolimpieza de 30 días completada para el evento {eid}. Se purgaron {fotos_borradas} fotos y datos operativos, conservando intactos el evento y su base CRM.",
+    }
+
+
+_ULTIMA_VERIFICACION_AUTOLIMPIEZA: float = 0.0
+INTERVALO_VERIFICACION_AUTOLIMPIEZA_SEG: float = 6 * 3600.0  # Máximo una vez cada 6 horas
+
+
+def verificar_y_ejecutar_autolimpieza_30_dias(
+    eventos: list[dict] | None = None,
+    forzar: bool = False,
+) -> list[str]:
+    """
+    Verifica periódicamente si existen eventos con más de 30 días de antigüedad
+    (tomando fecha_evento o created_at) y ejecuta la autolimpieza conservando el CRM.
+    Se limita a un chequeo máximo cada 6 horas para evitar sobrecarga en la base de datos.
+    """
+    global _ULTIMA_VERIFICACION_AUTOLIMPIEZA
+    ahora_ts = time.time()
+    if not forzar and (ahora_ts - _ULTIMA_VERIFICACION_AUTOLIMPIEZA) < INTERVALO_VERIFICACION_AUTOLIMPIEZA_SEG:
+        return []
+
+    _ULTIMA_VERIFICACION_AUTOLIMPIEZA = ahora_ts
+
+    if eventos is None:
+        try:
+            res = ejecutar_consulta_segura(
+                lambda db: db.table("eventos").select("id, nombre, fecha_evento, created_at").execute()
+            )
+            eventos = res.data or []
+        except Exception as err:
+            print(f"Aviso al consultar eventos para chequeo 30d: {err}")
+            return []
+
+    ahora_dt = datetime.now(timezone.utc)
+    eventos_purgados: list[str] = []
+
+    for ev in eventos:
+        eid = str(ev.get("id") or "").strip()
+        if not eid:
+            continue
+        st = _ESTADO_EVENTOS.get(eid) or {}
+        if st.get("autolimpiado_30d"):
+            continue
+
+        fecha_ref = _parsear_fecha_evento_o_creacion(ev)
+        if not fecha_ref:
+            continue
+
+        dias = (ahora_dt - fecha_ref).total_seconds() / 86400.0
+        if dias >= 30.0:
+            try:
+                print(f"[AUTOLIMPIEZA 30D] Purgando automáticamente evento '{ev.get('nombre')}' ({eid}), antigüedad: {dias:.1f} días...")
+                ejecutar_autolimpieza_30_dias_evento(eid)
+                eventos_purgados.append(eid)
+            except Exception as e_purge:
+                print(f"[AUTOLIMPIEZA 30D] Error al purgar evento {eid}: {e_purge}")
+
+    return eventos_purgados
+
+
+@app.post("/api/admin/eventos/{evento_id}/autolimpieza-30d")
+def forzar_autolimpieza_30d_evento(
+    evento_id: str,
+    x_admin_password: str | None = Header(default=None),
+):
+    """
+    Fuerza manualmente la autolimpieza de 30 días para un evento:
+    Purga fotos y datos operativos pero CONSERVA el registro del evento y todos los leads de crm_leads.
+    """
+    verificar_admin_password(x_admin_password)
+    eid = evento_id.strip()
+    return ejecutar_autolimpieza_30_dias_evento(eid)
+
+
 @app.delete("/api/admin/eventos/{evento_id}/purgar-fotos")
 def purgar_fotos_storage_evento(
     evento_id: str,
@@ -2973,6 +3205,24 @@ def eliminar_evento_completo_en_cascada(
         except Exception:
             pass
 
+        # 3.5. Borrar leads CRM generados en este evento
+        try:
+            eid_uuid = eid
+            if not re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", eid, re.I):
+                ev_check = ejecutar_consulta_segura(
+                    lambda db: db.table("eventos").select("id").eq("codigo_acceso", eid).limit(1).execute()
+                )
+                if ev_check and ev_check.data:
+                    eid_uuid = ev_check.data[0]["id"]
+            ejecutar_consulta_segura(
+                lambda db: db.table("crm_leads").delete().eq("evento_id", eid_uuid).execute()
+            )
+            for clave in [eid, eid_uuid]:
+                if clave in _ESTADO_EVENTOS and isinstance(_ESTADO_EVENTOS[clave], dict):
+                    _ESTADO_EVENTOS[clave]["crm_leads"] = []
+        except Exception as crm_err:
+            print(f"Aviso al purgar crm_leads en eliminación total ({eid}): {crm_err}")
+
         # 4. Borrar el evento en la tabla eventos
         ejecutar_consulta_segura(
             lambda db: db.table("eventos").delete().eq("id", eid).execute()
@@ -3011,13 +3261,14 @@ def eliminar_evento_completo_en_cascada(
         _guardar_estado_eventos_disco()
         invalidar_cache_evento(eid)
         _CACHE_META_EVENTOS_PROYECTOR.clear()
+        gc.collect()
 
         return {
             "ok": True,
             "evento_eliminado_id": eid,
             "fotos_eliminadas": fotos_borradas,
             "archivos_storage_purgados": archivos_borrados,
-            "mensaje": f"🗑️ El evento '{nombre_ev}' fue eliminado por completo junto con sus fotos, invitados, preguntas y respuestas.",
+            "mensaje": f"🗑️ El evento '{nombre_ev}' fue eliminado por completo junto con sus fotos, invitados, preguntas, respuestas y prospectos CRM.",
         }
     except HTTPException:
         raise
