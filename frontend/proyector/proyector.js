@@ -352,6 +352,72 @@ function activarVistaModo(modo) {
 // ------------------------------------------------------------------------------
 // 3. MODO GALERIA FULLSCREEN: CARRUSEL 1x1 + VISTA MOSAICO DE 6 A 8 FOTOS
 // ------------------------------------------------------------------------------
+function resolverMedidaCssAPx(valorCss, basePx) {
+    const limpio = String(valorCss || "").trim().toLowerCase();
+    const num = parseFloat(limpio);
+    if (!Number.isFinite(num) || num <= 0) return basePx * 0.9;
+    if (limpio.endsWith("vw")) return (num / 100) * (window.innerWidth || 1920);
+    if (limpio.endsWith("vh")) return (num / 100) * (window.innerHeight || 1080);
+    if (limpio.endsWith("%")) return (num / 100) * basePx;
+    return num;
+}
+
+/* === [EDITAR TAMAÑO DE FOTOS HORIZONTALES Y VERTICALES AQUÍ] === */
+// Ajusta exactamente el contenedor (.galeria-marco-corporativo-wrapper) y la imagen (.galeria-img-nitida)
+// a la proporción real de cada foto usando las variables de :root en proyector.css.
+// Así el marco dorado (border-radius: 18px) abraza los 4 bordes reales de la foto y el logo
+// de marca de agua queda siempre superpuesto en la esquina superior izquierda de la imagen.
+function ajustarMarcoFotoIndividualProyector() {
+    if (
+        !galeriaImgNitidaEl ||
+        !galeriaImgNitidaEl.naturalWidth ||
+        !galeriaImgNitidaEl.naturalHeight
+    ) {
+        return;
+    }
+
+    const natW = galeriaImgNitidaEl.naturalWidth;
+    const natH = galeriaImgNitidaEl.naturalHeight;
+    const esHorizontal = natW > natH;
+
+    galeriaImgNitidaEl.classList.toggle("foto-proyector-horizontal", esHorizontal);
+    galeriaImgNitidaEl.classList.toggle("foto-proyector-vertical", !esHorizontal);
+    if (galeriaMarcoWrapperEl) {
+        galeriaMarcoWrapperEl.classList.toggle("foto-proyector-horizontal", esHorizontal);
+        galeriaMarcoWrapperEl.classList.toggle("foto-proyector-vertical", !esHorizontal);
+    }
+
+    const estilosRoot = getComputedStyle(document.documentElement);
+    const vw = window.innerWidth || 1920;
+    const vh = window.innerHeight || 1080;
+
+    const maxAnchoPx = esHorizontal
+        ? resolverMedidaCssAPx(estilosRoot.getPropertyValue("--foto-horiz-ancho") || "92vw", vw)
+        : resolverMedidaCssAPx(estilosRoot.getPropertyValue("--foto-vert-ancho-max") || "84vw", vw);
+    const maxAltoPx = esHorizontal
+        ? resolverMedidaCssAPx(estilosRoot.getPropertyValue("--foto-horiz-alto-max") || "92vh", vh)
+        : resolverMedidaCssAPx(estilosRoot.getPropertyValue("--foto-vert-alto") || "92vh", vh);
+
+    const ratio = natW / natH;
+    let anchoFinal = maxAnchoPx;
+    let altoFinal = anchoFinal / ratio;
+    if (altoFinal > maxAltoPx) {
+        altoFinal = maxAltoPx;
+        anchoFinal = altoFinal * ratio;
+    }
+
+    const wPx = `${Math.max(120, Math.round(anchoFinal))}px`;
+    const hPx = `${Math.max(120, Math.round(altoFinal))}px`;
+    galeriaImgNitidaEl.style.width = wPx;
+    galeriaImgNitidaEl.style.height = hPx;
+    if (galeriaMarcoWrapperEl) {
+        galeriaMarcoWrapperEl.style.width = wPx;
+        galeriaMarcoWrapperEl.style.height = hPx;
+    }
+}
+
+window.addEventListener("resize", ajustarMarcoFotoIndividualProyector);
+
 function mostrarFotoIndividualEnPantalla(indice) {
     // Filtrar cualquier foto cuya URL haya fallado previamente para jamás mostrar ícono roto
     fotosAprobadasCache = fotosAprobadasCache.filter((f) => {
@@ -408,17 +474,10 @@ function mostrarFotoIndividualEnPantalla(indice) {
     setTimeout(() => {
         /* === [EDITAR TAMAÑO DE FOTOS HORIZONTALES Y VERTICALES AQUÍ] === */
         // Al cargar cada foto proyectada (img.onload), detecta automáticamente si es
-        // horizontal (naturalWidth > naturalHeight) o vertical, y aplica la clase CSS
-        // .foto-proyector-horizontal o .foto-proyector-vertical cuyas dimensiones están en proyector.css (:root).
+        // horizontal (naturalWidth > naturalHeight) o vertical, y ajusta exactamente
+        // la tarjeta Dark Luxury y la foto a las dimensiones de proyector.css (:root).
         galeriaImgNitidaEl.onload = () => {
-            const esHorizontal =
-                galeriaImgNitidaEl.naturalWidth > galeriaImgNitidaEl.naturalHeight;
-            galeriaImgNitidaEl.classList.toggle("foto-proyector-horizontal", esHorizontal);
-            galeriaImgNitidaEl.classList.toggle("foto-proyector-vertical", !esHorizontal);
-            if (galeriaMarcoWrapperEl) {
-                galeriaMarcoWrapperEl.classList.toggle("foto-proyector-horizontal", esHorizontal);
-                galeriaMarcoWrapperEl.classList.toggle("foto-proyector-vertical", !esHorizontal);
-            }
+            ajustarMarcoFotoIndividualProyector();
             targetAnimacion.classList.remove("transicion-foto");
         };
 
