@@ -5,14 +5,18 @@
 # Imagen base ligera con Python 3.11 (idéntica a la versión de producción en Render)
 FROM python:3.11-slim
 
-# Variables de entorno para optimizar la ejecución de Python en contenedores:
+# Variables de entorno críticas para optimizar memoria RAM en contenedores de 512 MB:
 # - PYTHONUNBUFFERED=1: Flujo continuo de logs sin retención en búfer
-# - PYTHONDONTWRITEBYTECODE=1: Evita generar archivos .pyc innecesarios
+# - PYTHONDONTWRITEBYTECODE=1: Evita generar archivos .pyc en memoria/disco
+# - PYTHONMALLOC=malloc: Delega las asignaciones de CPython directamente a glibc para permitir malloc_trim(0)
+# - MALLOC_TRIM_THRESHOLD_=65536: Retorna bloques liberados (>=64 KB) al kernel de Linux inmediatamente
+# - MALLOC_ARENA_MAX=2: Limita las arenas de memoria de glibc por hilo para evitar fragmentación de RSS
 # - PORT=8000: Puerto estándar de la aplicación
-# - MALLOC_TRIM_THRESHOLD_=65536: Retorna memoria liberada de Pillow/Python al SO (Render) de inmediato
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONMALLOC=malloc \
     MALLOC_TRIM_THRESHOLD_=65536 \
+    MALLOC_ARENA_MAX=2 \
     PORT=8000
 
 # Directorio de trabajo dentro del contenedor
@@ -46,4 +50,4 @@ EXPOSE 8000
 # de 512 MB de RAM del Plan Starter de Render y evitar el OOM (Out Of Memory) Killer,
 # además de mantener sincronizado el estado en memoria RAM sin necesidad de Redis.
 # ${PORT:-8000} permite enlace dinámico al puerto asignado por Render (ej. 10000) o 8000 local.
-CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --no-access-log --limit-concurrency 100"]

@@ -1445,15 +1445,20 @@ const HTML_BTN_ENVIAR_FOTO_ORIGINAL = `
 
 /**
  * Compresión de imagen directa en el cliente (Navegador)
- * Reduce el peso a ~200-300 KB antes de transmitir para lograr subidas en <1 segundo.
+ * Redimensiona a un máximo de 1200px en su lado más largo y exporta como Blob image/jpeg
+ * con calidad 0.82 (~150 KB a 220 KB) antes de transmitir al servidor.
  */
-function comprimirImagenEnNavegador(elementoImg, calidad = 0.82) {
+function comprimirImagenEnNavegador(elementoImg, calidad = 0.82, maxDim = 1200) {
     return new Promise((resolve) => {
         try {
             const canvas = document.createElement("canvas");
             let ancho = elementoImg.naturalWidth || elementoImg.width;
             let alto = elementoImg.naturalHeight || elementoImg.height;
-            const maxDim = 1280;
+
+            if (!ancho || !alto) {
+                resolve(null);
+                return;
+            }
 
             if (ancho > maxDim || alto > maxDim) {
                 if (ancho > alto) {
@@ -1472,6 +1477,8 @@ function comprimirImagenEnNavegador(elementoImg, calidad = 0.82) {
 
             canvas.toBlob(
                 (blob) => {
+                    canvas.width = 0;
+                    canvas.height = 0;
                     resolve(blob || null);
                 },
                 "image/jpeg",
@@ -1480,6 +1487,37 @@ function comprimirImagenEnNavegador(elementoImg, calidad = 0.82) {
         } catch (e) {
             resolve(null);
         }
+    });
+}
+
+/**
+ * Procesa directamente un objeto File/Blob a través de un <canvas> HTML5,
+ * garantizando que se redimensione a máximo 1200px en su lado más largo
+ * y se exporte como JPEG con calidad 0.82 antes del fetch POST.
+ */
+function comprimirArchivoFotoEnCanvas(archivo, maxDim = 1200, calidad = 0.82) {
+    return new Promise((resolve) => {
+        if (!archivo) {
+            resolve(null);
+            return;
+        }
+        const urlTemp = URL.createObjectURL(archivo);
+        const imgTemp = new Image();
+        imgTemp.onload = async () => {
+            try {
+                const blob = await comprimirImagenEnNavegador(imgTemp, calidad, maxDim);
+                URL.revokeObjectURL(urlTemp);
+                resolve(blob);
+            } catch (_) {
+                URL.revokeObjectURL(urlTemp);
+                resolve(null);
+            }
+        };
+        imgTemp.onerror = () => {
+            URL.revokeObjectURL(urlTemp);
+            resolve(null);
+        };
+        imgTemp.src = urlTemp;
     });
 }
 
@@ -1539,15 +1577,25 @@ function calcularPuntajeIaEnCanvas(elementoImagen) {
             puntaje = Math.max(15, Math.round(70 - (indiceRiesgo - 0.42) * 140));
         }
 
+        canvas.width = 0;
+        canvas.height = 0;
         return Math.max(5, Math.min(99, puntaje));
     } catch (e) {
         return 94;
     }
 }
 
+let urlPreviewActiva = null;
+
 function reiniciarModalFoto() {
     archivoFotoSeleccionado = null;
     blobFotoComprimidaCliente = null;
+    if (urlPreviewActiva) {
+        try {
+            URL.revokeObjectURL(urlPreviewActiva);
+        } catch (_) {}
+        urlPreviewActiva = null;
+    }
     inputArchivoFotoEl.value = "";
     imgPreviewFotoEl.src = "";
     const bgBlurEl = document.getElementById("bg-blur-preview-foto");
@@ -1568,6 +1616,7 @@ btnIrFotosEl.addEventListener("click", () => {
 });
 
 btnCerrarModalFotoEl.addEventListener("click", () => {
+    reiniciarModalFoto();
     modalSubirFotoEl.classList.add("hidden");
     const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
     if (dockFlotanteEl) dockFlotanteEl.classList.remove("hidden");
@@ -1583,39 +1632,41 @@ inputArchivoFotoEl.addEventListener("change", (eventoChange) => {
     }
 
     archivoFotoSeleccionado = archivo;
-    const lector = new FileReader();
+    blobFotoComprimidaCliente = null;
 
-    lector.onload = (e) => {
-        const dataUrl = e.target.result;
-        const bgBlurEl = document.getElementById("bg-blur-preview-foto");
-        if (bgBlurEl) {
-            bgBlurEl.style.backgroundImage = `url("${dataUrl}")`;
+    if (urlPreviewActiva) {
+        try {
+            URL.revokeObjectURL(urlPreviewActiva);
+        } catch (_) {}
+    }
+    urlPreviewActiva = URL.createObjectURL(archivo);
+
+    const bgBlurEl = document.getElementById("bg-blur-preview-foto");
+    if (bgBlurEl) {
+        bgBlurEl.style.backgroundImage = `url("${urlPreviewActiva}")`;
+    }
+
+    imgPreviewFotoEl.onload = async () => {
+        // Ejecutamos el Pre-Filtro de IA local y comprimimos la foto en el cliente (máx 1200px, JPEG 0.82)
+        puntajeIaCalculadoCliente = calcularPuntajeIaEnCanvas(imgPreviewFotoEl);
+        blobFotoComprimidaCliente = await comprimirImagenEnNavegador(imgPreviewFotoEl, 0.82, 1200);
+
+        barraEstadoIaEl.classList.remove("hidden");
+        if (puntajeIaCalculadoCliente >= 70) {
+            barraEstadoIaEl.classList.remove("ia-warning");
+            iaPuntajeTextoEl.textContent = `Pre-Filtro IA: ${puntajeIaCalculadoCliente}% Segura (Aprobada)`;
+            iaDetalleTextoEl.textContent = "Tu foto se mostrará con el marco oficial de Segalú en la pantalla.";
+        } else {
+            barraEstadoIaEl.classList.add("ia-warning");
+            iaPuntajeTextoEl.textContent = `Pre-Filtro IA: ${puntajeIaCalculadoCliente}% (Revisión Especial)`;
+            iaDetalleTextoEl.textContent = "El Administrador revisará manualmente esta fotografía.";
         }
-
-        imgPreviewFotoEl.onload = async () => {
-            // Ejecutamos el Pre-Filtro de IA local y comprimimos la foto en el cliente
-            puntajeIaCalculadoCliente = calcularPuntajeIaEnCanvas(imgPreviewFotoEl);
-            blobFotoComprimidaCliente = await comprimirImagenEnNavegador(imgPreviewFotoEl, 0.82);
-
-            barraEstadoIaEl.classList.remove("hidden");
-            if (puntajeIaCalculadoCliente >= 70) {
-                barraEstadoIaEl.classList.remove("ia-warning");
-                iaPuntajeTextoEl.textContent = `Pre-Filtro IA: ${puntajeIaCalculadoCliente}% Segura (Aprobada)`;
-                iaDetalleTextoEl.textContent = "Tu foto se mostrará con el marco oficial de Segalú en la pantalla.";
-            } else {
-                barraEstadoIaEl.classList.add("ia-warning");
-                iaPuntajeTextoEl.textContent = `Pre-Filtro IA: ${puntajeIaCalculadoCliente}% (Revisión Especial)`;
-                iaDetalleTextoEl.textContent = "El Administrador revisará manualmente esta fotografía.";
-            }
-            btnEnviarFotoEl.disabled = false;
-        };
-
-        imgPreviewFotoEl.src = dataUrl;
-        placeholderSubidaEl.classList.add("hidden");
-        contenedorPreviewFotoEl.classList.remove("hidden");
+        btnEnviarFotoEl.disabled = false;
     };
 
-    lector.readAsDataURL(archivo);
+    imgPreviewFotoEl.src = urlPreviewActiva;
+    placeholderSubidaEl.classList.add("hidden");
+    contenedorPreviewFotoEl.classList.remove("hidden");
 });
 
 btnEnviarFotoEl.addEventListener("click", async () => {
@@ -1628,12 +1679,18 @@ btnEnviarFotoEl.addEventListener("click", async () => {
     btnEnviarFotoEl.innerHTML = `<span>Enviando foto a la pantalla...</span>`;
 
     try {
+        // Garantizar compresión por <canvas> HTML5 a máximo 1200px y calidad 0.82 antes del fetch POST
+        let blobParaSubir = blobFotoComprimidaCliente;
+        if (!blobParaSubir) {
+            blobParaSubir = await comprimirArchivoFotoEnCanvas(archivoFotoSeleccionado, 1200, 0.82);
+        }
+
         const datosFormulario = new FormData();
         datosFormulario.append("evento_id", eventoActual.id);
         datosFormulario.append("invitado_id", sesionInvitado.invitado.id);
         datosFormulario.append("puntaje_ia_cliente", String(puntajeIaCalculadoCliente));
 
-        const archivoParaSubir = blobFotoComprimidaCliente || archivoFotoSeleccionado;
+        const archivoParaSubir = blobParaSubir || archivoFotoSeleccionado;
         datosFormulario.append("archivo", archivoParaSubir, "foto.jpg");
 
         const respuestaHttp = await fetch("/api/multimedia/subir", {
@@ -1646,7 +1703,10 @@ btnEnviarFotoEl.addEventListener("click", async () => {
             throw new Error(resultado.detail || "No se pudo subir la foto.");
         }
 
+        reiniciarModalFoto();
         modalSubirFotoEl.classList.add("hidden");
+        const dockFlotanteEl = document.getElementById("dock-flotante-invitado");
+        if (dockFlotanteEl) dockFlotanteEl.classList.remove("hidden");
         mostrarAlerta(
             `${resultado.mensaje} (${resultado.analisis_ia?.peso_kb || 200} KB)`,
             "exito"

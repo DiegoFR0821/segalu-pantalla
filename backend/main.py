@@ -15,8 +15,8 @@
 
 from __future__ import annotations
 
-import concurrent.futures
 import copy
+import ctypes
 import gc
 import hashlib
 import hmac
@@ -28,8 +28,6 @@ import re
 import time
 import urllib.request
 import uuid
-import zipfile
-import zlib
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -43,19 +41,18 @@ from PIL import Image, ImageOps
 from pydantic import BaseModel, Field, field_validator
 from supabase import create_client, Client
 
-# Importación de pypdf y google-generativeai (Fase 4.5)
-try:
-    import pypdf
-except ImportError:
-    pypdf = None
 
-try:
-    import warnings
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=FutureWarning)
-        import google.generativeai as genai
-except ImportError:
-    genai = None
+def liberar_memoria_os():
+    """
+    Fuerza la recolección de basura en Python y ejecuta malloc_trim(0) en glibc (Linux)
+    para devolver inmediatamente las páginas de memoria (RSS) al sistema operativo del contenedor.
+    """
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:
+        pass
+
 
 # ------------------------------------------------------------------------------
 # 1. CARGA SEGURA DE VARIABLES DE ENTORNO (PILAR DE CONFIDENCIALIDAD)
@@ -117,7 +114,7 @@ else:
 
 # ==============================================================================
 # SISTEMA DE CACHÉ INTELIGENTE EN MEMORIA RAM CON INVALIDACIÓN INSTANTÁNEA
-# (TTL: 2.0s por Evento para Reducción Drástica de Egress & Log Ingestion)
+# (TTL: 2.0s por Evento | Tope estricto: máximo 30 llaves y cero bytes de imagen)
 # ==============================================================================
 _CACHE_LOCALES: list | None = None
 _CACHE_DASHBOARD_POR_EVENTO: dict[str, dict] = {}
@@ -125,46 +122,67 @@ _CACHE_RAM_SISTEMA: dict[str, dict] = {}
 _EVENTO_A_CLAVES_CACHE: dict[str, set[str]] = {}
 _CACHE_META_EVENTOS_PROYECTOR: dict[str, dict] = {}
 _CACHE_TTL_SEGUNDOS = 2.0
-_MAX_CACHE_RAM_ENTRADAS = 350
+_MAX_CACHE_RAM_ENTRADAS = 30
 _CONTADOR_INSERCIONES_CACHE = 0
+
+
+def _limitar_y_purgar_diccionario_cache(diccionario: dict[str, dict], ttl_seg: float, max_llaves: int = 30):
+    """Purga entradas vencidas y aplica tope estricto de máximo 30 llaves (FIFO/LRU)."""
+    ahora = time.time()
+    expiradas = [
+        k for k, v in list(diccionario.items())
+        if not isinstance(v, dict) or (ahora - float(v.get("ts", 0))) > ttl_seg
+    ]
+    for k in expiradas:
+        diccionario.pop(k, None)
+
+    if len(diccionario) > max_llaves:
+        ordenadas = sorted(diccionario.items(), key=lambda it: float(it[1].get("ts", 0) if isinstance(it[1], dict) else 0))
+        exceso = len(diccionario) - max_llaves
+        for k, _ in ordenadas[:exceso]:
+            diccionario.pop(k, None)
 
 
 def purgar_cache_ram_expirada():
     """
-    Control estricto de memoria RAM para Render:
-    1. Purga automáticamente las entradas que excedieron el TTL.
-    2. Si el diccionario supera los 350 registros, elimina las entradas más antiguas (FIFO/LRU).
+    Control estricto de memoria RAM para Render (Plan 512 MB):
+    1. Purga automáticamente las entradas que excedieron el TTL en todos los diccionarios de caché.
+    2. Garantiza que ningún diccionario de caché supere jamás las 30 llaves.
     """
-    ahora = time.time()
-    claves_expiradas = [
-        k for k, v in list(_CACHE_RAM_SISTEMA.items())
-        if (ahora - v.get("ts", 0)) > (_CACHE_TTL_SEGUNDOS * 3)
-    ]
-    for k in claves_expiradas:
-        _CACHE_RAM_SISTEMA.pop(k, None)
+    _limitar_y_purgar_diccionario_cache(_CACHE_RAM_SISTEMA, _CACHE_TTL_SEGUNDOS, _MAX_CACHE_RAM_ENTRADAS)
+    _limitar_y_purgar_diccionario_cache(_CACHE_DASHBOARD_POR_EVENTO, _CACHE_TTL_SEGUNDOS, _MAX_CACHE_RAM_ENTRADAS)
+    _limitar_y_purgar_diccionario_cache(_CACHE_META_EVENTOS_PROYECTOR, 4.0, _MAX_CACHE_RAM_ENTRADAS)
 
-    if len(_CACHE_RAM_SISTEMA) > _MAX_CACHE_RAM_ENTRADAS:
-        ordenadas = sorted(_CACHE_RAM_SISTEMA.items(), key=lambda it: it[1].get("ts", 0))
-        exceso = len(_CACHE_RAM_SISTEMA) - _MAX_CACHE_RAM_ENTRADAS
-        for k, _ in ordenadas[:exceso]:
-            _CACHE_RAM_SISTEMA.pop(k, None)
+    if len(_EVENTO_A_CLAVES_CACHE) > _MAX_CACHE_RAM_ENTRADAS:
+        for k in list(_EVENTO_A_CLAVES_CACHE.keys())[:-_MAX_CACHE_RAM_ENTRADAS]:
+            _EVENTO_A_CLAVES_CACHE.pop(k, None)
 
 
 def obtener_cache_ram(clave: str) -> Any | None:
     """
-    Lógica de Lectura (GET): Si no han pasado 2 segundos ni ha habido cambios,
-    responde en <1ms directamente desde memoria RAM interna sin consultas a Supabase.
+    Lógica de Lectura (GET): Purga llaves vencidas automáticamente en cada lectura.
+    Si la llave está vigente (<= 2.0s), responde en <1ms desde RAM.
     """
+    purgar_cache_ram_expirada()
     ahora = time.time()
     entrada = _CACHE_RAM_SISTEMA.get(clave)
     if entrada and (ahora - entrada["ts"]) <= _CACHE_TTL_SEGUNDOS:
         return entrada["datos"]
+    _CACHE_RAM_SISTEMA.pop(clave, None)
     return None
 
 
 def guardar_cache_ram(clave: str, datos: Any, evento_id: str | None = None):
-    """Guarda un resultado en memoria RAM indexado por evento para invalidación instantánea."""
+    """
+    Guarda un resultado JSON ligero en memoria RAM indexado por evento.
+    Prohibido almacenar bytes de imágenes y tope estricto de 30 llaves.
+    """
+    if isinstance(datos, (bytes, bytearray, memoryview)):
+        return
+
     global _CONTADOR_INSERCIONES_CACHE
+    purgar_cache_ram_expirada()
+
     _CACHE_RAM_SISTEMA[clave] = {
         "ts": time.time(),
         "datos": datos,
@@ -177,7 +195,7 @@ def guardar_cache_ram(clave: str, datos: Any, evento_id: str | None = None):
         _EVENTO_A_CLAVES_CACHE[eid_clean].add(clave)
 
     _CONTADOR_INSERCIONES_CACHE += 1
-    if _CONTADOR_INSERCIONES_CACHE >= 30 or len(_CACHE_RAM_SISTEMA) > _MAX_CACHE_RAM_ENTRADAS:
+    if len(_CACHE_RAM_SISTEMA) > _MAX_CACHE_RAM_ENTRADAS or _CONTADOR_INSERCIONES_CACHE >= 10:
         _CONTADOR_INSERCIONES_CACHE = 0
         purgar_cache_ram_expirada()
 
@@ -185,11 +203,7 @@ def guardar_cache_ram(clave: str, datos: Any, evento_id: str | None = None):
 def invalidar_cache_evento(evento_id: str | None = None):
     """
     LÓGICA DE ESCRITURA E INVALIDACIÓN INSTANTÁNEA (0 ms):
-    En el milisegundo exacto en que ocurra CUALQUIER modificación en el servidor
-    (registro, edición de avatar/nombre, respuesta de trivia, subida o moderación
-    de foto, lanzamiento de pregunta o cambio de estado de trivia), la operación
-    se ejecuta en Supabase y de inmediato se borran las entradas de caché de ese evento
-    en la RAM. El siguiente GET traerá el dato nuevo al instante sin esperar los 2s.
+    Borra las entradas de caché del evento modificado y libera páginas de memoria al SO.
     """
     if evento_id:
         eid_clean = str(evento_id).strip()
@@ -211,6 +225,7 @@ def invalidar_cache_evento(evento_id: str | None = None):
 
     _CACHE_RAM_SISTEMA.pop("catalogo_accesorios", None)
     _CACHE_META_EVENTOS_PROYECTOR.clear()
+    purgar_cache_ram_expirada()
 
 
 # ------------------------------------------------------------------------------
@@ -688,40 +703,57 @@ def actualizar_flags_preguntas_evento(
 # ------------------------------------------------------------------------------
 def extraer_texto_de_pdf(pdf_bytes: bytes) -> str:
     """
-    DIDÁCTICA (Fase 4.5 - Lector de PDF con pypdf):
-    Lee todas las páginas del archivo PDF subido por el Administrador y extrae
-    su texto limpio para enviarlo al generador de preguntas.
+    DIDÁCTICA (Fase 4.5 - Lector de PDF con Lazy Import de pypdf):
+    Importa 'pypdf' de forma diferida solo cuando el Administrador sube un PDF,
+    lee las páginas, cierra el buffer en memoria y libera páginas al SO Linux.
     """
     texto_paginas = []
-
-    if pypdf is not None:
-        try:
-            lector = pypdf.PdfReader(io.BytesIO(pdf_bytes))
-            for pagina in lector.pages:
-                txt = pagina.extract_text() or ""
-                if txt.strip():
-                    texto_paginas.append(txt.strip())
-        except Exception as err:
-            print(f"Aviso pypdf: {err}")
-
-    texto_unido = "\n".join(texto_paginas).strip()
-    if texto_unido:
-        return texto_unido
-
-    # Respaldo de emergencia en caso de PDF con streams comprimidos simples
+    bio = None
+    lector = None
     try:
-        fragmentos = []
-        for match in re.finditer(rb"stream[\r\n]+(.*?)[\r\n]+endstream", pdf_bytes, re.DOTALL):
-            bloque = match.group(1)
+        try:
+            import pypdf as _pypdf
+        except ImportError:
+            _pypdf = None
+
+        if _pypdf is not None:
             try:
-                descomprimido = zlib.decompress(bloque).decode("latin-1", errors="ignore")
+                bio = io.BytesIO(pdf_bytes)
+                lector = _pypdf.PdfReader(bio)
+                for pagina in lector.pages:
+                    txt = pagina.extract_text() or ""
+                    if txt.strip():
+                        texto_paginas.append(txt.strip())
+            except Exception as err:
+                print(f"Aviso pypdf: {err}")
+
+        texto_unido = "\n".join(texto_paginas).strip()
+        if texto_unido:
+            return texto_unido
+
+        # Respaldo de emergencia en caso de PDF con streams comprimidos simples
+        try:
+            import zlib
+            fragmentos = []
+            for match in re.finditer(rb"stream[\r\n]+(.*?)[\r\n]+endstream", pdf_bytes, re.DOTALL):
+                bloque = match.group(1)
+                try:
+                    descomprimido = zlib.decompress(bloque).decode("latin-1", errors="ignore")
+                except Exception:
+                    descomprimido = bloque.decode("latin-1", errors="ignore")
+                for texto_parentesis in re.findall(r"\(([^()]{2,200})\)", descomprimido):
+                    fragmentos.append(texto_parentesis)
+            return "\n".join(fragmentos).strip()
+        except Exception:
+            return ""
+    finally:
+        if bio is not None:
+            try:
+                bio.close()
             except Exception:
-                descomprimido = bloque.decode("latin-1", errors="ignore")
-            for texto_parentesis in re.findall(r"\(([^()]{2,200})\)", descomprimido):
-                fragmentos.append(texto_parentesis)
-        return "\n".join(fragmentos).strip()
-    except Exception:
-        return ""
+                pass
+        del lector
+        liberar_memoria_os()
 
 
 BANCOS_DISTRACTORES_CERCANOS = {
@@ -937,13 +969,19 @@ def armar_pregunta_4_opciones(enunciado: str, respuesta_correcta_texto: str, dis
 
 def generar_preguntas_con_gemini_ia(texto_pdf: str, max_preguntas: int = 10) -> list[dict] | None:
     """
-    DIDÁCTICA (Conexión con Google Gemini IA - gemini-3.5-flash-lite):
-    Lee el nombre del modelo desde la variable de entorno GEMINI_MODEL
-    (por defecto 'gemini-3.5-flash-lite') e invoca generate_content con
-    generation_config={"response_mime_type": "application/json"} para garantizar
-    que devuelva el arreglo JSON limpio de las 10 preguntas.
+    DIDÁCTICA (Conexión con Google Gemini IA con Lazy Import):
+    Importa 'google.generativeai' de forma diferida solo cuando se invoca la generación
+    de trivia desde PDF y libera la memoria al finalizar.
     """
-    if not GEMINI_API_KEY or "tu-api-key" in GEMINI_API_KEY.lower() or genai is None:
+    if not GEMINI_API_KEY or "tu-api-key" in GEMINI_API_KEY.lower():
+        return None
+
+    try:
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=FutureWarning)
+            import google.generativeai as genai
+    except ImportError:
         return None
 
     prompt_sistema = f"""
@@ -973,6 +1011,8 @@ TEXTO DEL PDF:
 \"\"\"
 """
 
+    modelo = None
+    respuesta = None
     try:
         genai.configure(api_key=GEMINI_API_KEY)
         nombre_modelo = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip() or GEMINI_MODEL
@@ -1028,6 +1068,10 @@ TEXTO DEL PDF:
             return preguntas_validas
     except Exception as err:
         print(f"Aviso Gemini API ({GEMINI_MODEL}): {err}")
+    finally:
+        del modelo
+        del respuesta
+        liberar_memoria_os()
 
     return None
 
@@ -1116,17 +1160,22 @@ def extraer_preguntas_pdf_modo_local(texto_pdf: str, max_preguntas: int = 10) ->
 # ------------------------------------------------------------------------------
 def analizar_seguridad_imagen_ia(imagen_rgb: Image.Image) -> dict:
     miniatura = None
-    pixeles = None
+    raw_ycbcr = None
     try:
         miniatura = imagen_rgb.resize((160, 160), Image.Resampling.BILINEAR).convert("YCbCr")
-        pixeles = list(miniatura.getdata())
-        total_pixeles = len(pixeles)
+        raw_ycbcr = miniatura.tobytes()
+        total_pixeles = 160 * 160
 
         conteo_piel_total = 0
         conteo_piel_centro = 0
         total_centro = 0
 
-        for idx, (y_val, cb, cr) in enumerate(pixeles):
+        for idx in range(total_pixeles):
+            offset = idx * 3
+            y_val = raw_ycbcr[offset]
+            cb = raw_ycbcr[offset + 1]
+            cr = raw_ycbcr[offset + 2]
+
             fila = idx // 160
             col = idx % 160
             en_centro = (40 <= fila <= 120) and (40 <= col <= 120)
@@ -1160,7 +1209,7 @@ def analizar_seguridad_imagen_ia(imagen_rgb: Image.Image) -> dict:
                 miniatura.close()
             except Exception:
                 pass
-        del pixeles
+        del raw_ycbcr
 
 
 def procesar_ia_background(
@@ -1172,8 +1221,8 @@ def procesar_ia_background(
 ):
     """
     Tarea en segundo plano (FastAPI BackgroundTasks):
-    Ejecuta el filtrado IA local sobre los píxeles de la foto sin bloquear la respuesta
-    inmediata al celular del invitado. Libera explícitamente buffers y recolecta memoria al terminar.
+    Ejecuta el filtrado IA local sobre una miniatura de 160x160 sin descomprimir bitmaps gigantes,
+    cierra los descriptores y ejecuta liberar_memoria_os() (gc.collect + malloc_trim) al terminar.
     """
     bio = None
     img = None
@@ -1181,8 +1230,17 @@ def procesar_ia_background(
     try:
         bio = io.BytesIO(contenido_bytes)
         img = Image.open(bio)
-        img = ImageOps.exif_transpose(img)
-        img_rgb = img.convert("RGB")
+        try:
+            img.draft("RGB", (160, 160))
+        except Exception:
+            pass
+        img_small = img.resize((160, 160), Image.Resampling.BILINEAR)
+        img_rgb = img_small.convert("RGB")
+        if img_small is not img_rgb:
+            try:
+                img_small.close()
+            except Exception:
+                pass
         resultado_ia = analizar_seguridad_imagen_ia(img_rgb)
         puntaje_ia = resultado_ia.get("puntaje_ia_seguridad", 95)
         puntaje_final = min(max(0, min(100, int(puntaje_ia_cliente))), puntaje_ia)
@@ -1218,8 +1276,7 @@ def procesar_ia_background(
             except Exception:
                 pass
         del contenido_bytes
-        import gc
-        gc.collect()
+        liberar_memoria_os()
 
 
 def extraer_puntaje_ia_de_url(url_original: str | None, filtro_aprobado: bool) -> int:
@@ -1655,40 +1712,40 @@ def subir_foto_invitado(
     nombre_archivo = f"{uid_hex}.jpg"
     ruta_storage = f"multimedia/{nombre_archivo}"
 
-    # Guardado local único para respaldo
-    dir_local = LOCAL_UPLOADS_DIR / "multimedia"
-    dir_local.mkdir(parents=True, exist_ok=True)
-    (dir_local / nombre_archivo).write_bytes(contenido_bytes)
-
     url_publica = f"/static/uploads/multimedia/{nombre_archivo}"
     origen_almacenamiento = "local_fallback"
+    ruta_temp_multimedia = LOCAL_UPLOADS_DIR / "multimedia" / nombre_archivo
+    ruta_temp_originales = LOCAL_UPLOADS_DIR / "originales" / nombre_archivo
 
     try:
-        db = verificar_conexion_supabase()
-        db.storage.from_(SUPABASE_BUCKET).upload(
-            path=ruta_storage,
-            file=contenido_bytes,
-            file_options={
-                "content-type": "image/jpeg",
-                "upsert": "true",
-                "cache-control": "86400",
-                "cacheControl": "86400",
-            },
-        )
-        url_sb = db.storage.from_(SUPABASE_BUCKET).get_public_url(ruta_storage)
-        if url_sb:
-            url_publica = url_sb
-        origen_almacenamiento = "supabase_storage"
-    except Exception as storage_err:
-        print(f"Aviso Supabase Storage ({SUPABASE_BUCKET}): {storage_err}")
+        try:
+            db = verificar_conexion_supabase()
+            db.storage.from_(SUPABASE_BUCKET).upload(
+                path=ruta_storage,
+                file=contenido_bytes,
+                file_options={
+                    "content-type": "image/jpeg",
+                    "upsert": "true",
+                    "cache-control": "86400",
+                    "cacheControl": "86400",
+                },
+            )
+            url_sb = db.storage.from_(SUPABASE_BUCKET).get_public_url(ruta_storage)
+            if url_sb:
+                url_publica = url_sb
+            origen_almacenamiento = "supabase_storage"
+        except Exception as storage_err:
+            print(f"Aviso Supabase Storage ({SUPABASE_BUCKET}): {storage_err}")
+            # Solo respaldar en disco local si Supabase Storage no estuvo disponible
+            ruta_temp_multimedia.parent.mkdir(parents=True, exist_ok=True)
+            ruta_temp_multimedia.write_bytes(contenido_bytes)
 
-    estado_ev = obtener_estado_evento(evento_id.strip())
-    auto_aprobar_activo = bool(estado_ev.get("auto_aprobar_fotos", False))
-    puntaje_cliente_int = max(0, min(100, int(puntaje_ia_cliente)))
-    aprobado_cliente = puntaje_cliente_int >= 70
-    estado_inicial = "aprobado" if (auto_aprobar_activo and aprobado_cliente) else "pendiente"
+        estado_ev = obtener_estado_evento(evento_id.strip())
+        auto_aprobar_activo = bool(estado_ev.get("auto_aprobar_fotos", False))
+        puntaje_cliente_int = max(0, min(100, int(puntaje_ia_cliente)))
+        aprobado_cliente = puntaje_cliente_int >= 70
+        estado_inicial = "aprobado" if (auto_aprobar_activo and aprobado_cliente) else "pendiente"
 
-    try:
         nueva_multimedia = {
             "evento_id": evento_id.strip(),
             "invitado_id": invitado_id.strip(),
@@ -1747,6 +1804,16 @@ def subir_foto_invitado(
             status_code=500,
             detail=f"Error al guardar la foto en la tabla multimedia de Supabase: {str(db_err)}",
         )
+    finally:
+        # Cero copias locales en contenedor cuando Supabase está activo
+        if origen_almacenamiento == "supabase_storage":
+            for ruta_tmp in (ruta_temp_multimedia, ruta_temp_originales):
+                if ruta_tmp.exists():
+                    try:
+                        os.remove(ruta_tmp)
+                    except Exception:
+                        pass
+        liberar_memoria_os()
 
 
 @app.get("/api/eventos/{evento_id}/fotos")
@@ -2090,6 +2157,8 @@ def responder_pregunta_trivia(datos: ResponderTriviaInput):
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
     )
+    if len(estado_ev["respuestas_fallback"]) > 30:
+        estado_ev["respuestas_fallback"] = estado_ev["respuestas_fallback"][-30:]
     _guardar_estado_eventos_disco()
 
     # 4. Actualizar puntaje_total acumulado del invitado en Supabase
@@ -2135,65 +2204,56 @@ def responder_pregunta_trivia(datos: ResponderTriviaInput):
 # ------------------------------------------------------------------------------
 def construir_dashboard_evento_rapido(evento_id: str, usar_cache: bool = True) -> dict:
     """
-    DIDÁCTICA (Fase 4.5 - Requerimiento B: Velocidad Instantánea <200ms):
-    1. Si el evento fue consultado hace menos de 2 segundos y no hubo cambios,
-       responde en <5ms desde la caché en RAM.
-    2. Si toca refrescar desde Supabase, lanza las consultas de 'multimedia',
-       'invitados' y 'preguntas' EN PARALELO usando ThreadPoolExecutor, y cuenta
-       todas las respuestas en un solo lote (sin bucle N+1).
+    DIDÁCTICA (Fase 4.5 - Requerimiento B: Velocidad Instantánea <200ms y Cero Fugas de RAM):
+    1. Purga automáticamente llaves vencidas y responde desde caché RAM si está vigente (<= 2.0s).
+    2. Reutiliza el único cliente persistente de Supabase (keep-alive socket) sin crear instancias
+       adicionales de create_client() ni hilos de ThreadPoolExecutor que fragmenten arenas de glibc.
     """
     eid = evento_id.strip()
+    purgar_cache_ram_expirada()
     ahora = time.time()
 
     if usar_cache and eid in _CACHE_DASHBOARD_POR_EVENTO:
         entrada = _CACHE_DASHBOARD_POR_EVENTO[eid]
         if (ahora - entrada["ts"]) <= _CACHE_TTL_SEGUNDOS:
             return entrada["datos"]
+        _CACHE_DASHBOARD_POR_EVENTO.pop(eid, None)
 
     estado_ev = obtener_estado_evento(eid)
     auto_aprobar_fotos = bool(estado_ev.get("auto_aprobar_fotos", False))
 
-    def _query_multimedia():
-        # Creamos cliente ligero por hilo para evitar contención de sockets en httpx
-        cli = create_client(SUPABASE_URL, SUPABASE_KEY) if (SUPABASE_URL and SUPABASE_KEY) else verificar_conexion_supabase()
-        res = (
-            cli.table("multimedia")
+    multimedia_lista = []
+    try:
+        res_multi = ejecutar_consulta_segura(
+            lambda db: db.table("multimedia")
             .select("*, invitados(id, nombre, avatar)")
             .eq("evento_id", eid)
             .order("created_at", desc=True)
             .execute()
         )
-        lista = []
-        for item in res.data or []:
+        for item in res_multi.data or []:
             item["puntaje_ia_seguridad"] = extraer_puntaje_ia_de_url(
                 item.get("url_original"), item.get("filtro_ia_aprobado", True)
             )
-            lista.append(item)
-        return lista
+            multimedia_lista.append(item)
+    except Exception as err_m:
+        print(f"Aviso en consulta multimedia dashboard: {err_m}")
 
-    def _query_invitados():
-        cli = create_client(SUPABASE_URL, SUPABASE_KEY) if (SUPABASE_URL and SUPABASE_KEY) else verificar_conexion_supabase()
-        res = (
-            cli.table("invitados")
+    invitados_lista = []
+    try:
+        res_inv = ejecutar_consulta_segura(
+            lambda db: db.table("invitados")
             .select("*")
             .eq("evento_id", eid)
             .order("puntaje_total", desc=True)
             .order("created_at", desc=True)
             .execute()
         )
-        return res.data or []
+        invitados_lista = res_inv.data or []
+    except Exception as err_i:
+        print(f"Aviso en consulta invitados dashboard: {err_i}")
 
-    def _query_preguntas():
-        return listar_preguntas_evento(eid)
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        fut_multi = executor.submit(_query_multimedia)
-        fut_inv = executor.submit(_query_invitados)
-        fut_preg = executor.submit(_query_preguntas)
-
-        multimedia_lista = fut_multi.result()
-        invitados_lista = fut_inv.result()
-        preguntas_raw = fut_preg.result()
+    preguntas_raw = listar_preguntas_evento(eid)
 
     # Contamos respuestas en 1 sola consulta por lote (0 consultas N+1)
     ids_preguntas = [p["id"] for p in preguntas_raw if p.get("id")]
@@ -2549,7 +2609,7 @@ def actualizar_tematica_evento_admin(
     estado_ev["tematica_accesorios"] = tematica_nueva
     _guardar_estado_eventos_disco()
     invalidar_cache_evento(eid)
-    gc.collect()
+    liberar_memoria_os()
     return {
         "ok": True,
         "mensaje": f"Temática de accesorios del evento actualizada a '{tematica_nueva}'.",
@@ -2653,6 +2713,7 @@ def eliminar_multimedia_definitivamente(
             nombre_archivo = u.split("#")[0].split("?")[0].split("/")[-1]
             for posible_ruta in (
                 LOCAL_UPLOADS_DIR / "multimedia" / nombre_archivo,
+                LOCAL_UPLOADS_DIR / "originales" / nombre_archivo,
                 LOCAL_UPLOADS_DIR / nombre_archivo,
             ):
                 if nombre_archivo and posible_ruta.exists():
@@ -2667,6 +2728,7 @@ def eliminar_multimedia_definitivamente(
         )
 
         invalidar_cache_evento(evento_id)
+        liberar_memoria_os()
 
         return {
             "ok": True,
@@ -2785,6 +2847,8 @@ def descargar_fotos_evento_zip(
                 detail="Este evento aún no tiene fotografías subidas para empaquetar en ZIP.",
             )
 
+        import zipfile
+
         buffer_zip = io.BytesIO()
         archivos_agregados = 0
 
@@ -2805,9 +2869,12 @@ def descargar_fotos_evento_zip(
                 nombre_en_zip = f"{idx:03d}_{autor_slug}_{estado_slug}_ORIGINAL.jpg"
 
                 zf.writestr(nombre_en_zip, img_bytes)
+                del img_bytes
                 archivos_agregados += 1
 
         if archivos_agregados == 0:
+            buffer_zip.close()
+            liberar_memoria_os()
             raise HTTPException(
                 status_code=404,
                 detail="No se pudieron recuperar archivos físicos de imagen para este evento.",
@@ -2821,7 +2888,7 @@ def descargar_fotos_evento_zip(
                 buf.close()
             except Exception:
                 pass
-            gc.collect()
+            liberar_memoria_os()
 
         return StreamingResponse(
             buffer_zip,
@@ -2867,6 +2934,7 @@ def _purgar_archivos_storage_de_evento(evento_id: str) -> tuple[int, int]:
             if nombre_local:
                 for archivo_local in (
                     LOCAL_UPLOADS_DIR / "multimedia" / nombre_local,
+                    LOCAL_UPLOADS_DIR / "originales" / nombre_local,
                     LOCAL_UPLOADS_DIR / nombre_local,
                 ):
                     if archivo_local.exists():
@@ -3028,7 +3096,7 @@ def ejecutar_autolimpieza_30_dias_evento(evento_id: str) -> dict:
     st["fecha_autolimpieza_30d"] = datetime.now(timezone.utc).isoformat()
     _guardar_estado_eventos_disco()
     invalidar_cache_evento(eid)
-    gc.collect()
+    liberar_memoria_os()
 
     return {
         "ok": True,
@@ -3128,6 +3196,7 @@ def purgar_fotos_storage_evento(
     try:
         total_filas, total_archivos = _purgar_archivos_storage_de_evento(eid)
         invalidar_cache_evento(eid)
+        liberar_memoria_os()
         return {
             "ok": True,
             "fotos_eliminadas": total_filas,
@@ -3261,7 +3330,7 @@ def eliminar_evento_completo_en_cascada(
         _guardar_estado_eventos_disco()
         invalidar_cache_evento(eid)
         _CACHE_META_EVENTOS_PROYECTOR.clear()
-        gc.collect()
+        liberar_memoria_os()
 
         return {
             "ok": True,
@@ -3561,7 +3630,7 @@ def subir_foto_sede_admin(
             except Exception:
                 pass
         del raw_bytes
-        gc.collect()
+        liberar_memoria_os()
 
 
 @app.patch("/api/admin/sedes/galeria/titulo")
@@ -3732,59 +3801,75 @@ def generar_preguntas_desde_pdf_admin(
             detail="Por favor selecciona un archivo con extensión .PDF válido.",
         )
 
-    pdf_bytes = archivo_pdf.file.read()
-    if not pdf_bytes:
-        raise HTTPException(status_code=400, detail="El archivo PDF está vacío.")
+    pdf_bytes = None
+    texto_extraido = None
+    try:
+        pdf_bytes = archivo_pdf.file.read()
+        if not pdf_bytes:
+            raise HTTPException(status_code=400, detail="El archivo PDF está vacío.")
 
-    texto_extraido = extraer_texto_de_pdf(pdf_bytes)
-    if not texto_extraido or len(texto_extraido.strip()) < 10:
-        raise HTTPException(
-            status_code=400,
-            detail="No se encontró texto legible dentro del PDF (verifica que no sea una imagen escaneada sin texto).",
-        )
+        texto_extraido = extraer_texto_de_pdf(pdf_bytes)
+        del pdf_bytes
+        pdf_bytes = None
+        if not texto_extraido or len(texto_extraido.strip()) < 10:
+            raise HTTPException(
+                status_code=400,
+                detail="No se encontró texto legible dentro del PDF (verifica que no sea una imagen escaneada sin texto).",
+            )
 
-    modelo_configurado = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip() or GEMINI_MODEL
-    motor_utilizado = f"Google Gemini IA ({modelo_configurado})"
-    preguntas_generadas = generar_preguntas_con_gemini_ia(texto_extraido, max_preguntas=10)
+        modelo_configurado = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip() or GEMINI_MODEL
+        motor_utilizado = f"Google Gemini IA ({modelo_configurado})"
+        preguntas_generadas = generar_preguntas_con_gemini_ia(texto_extraido, max_preguntas=10)
 
-    if not preguntas_generadas:
-        motor_utilizado = "Extractor Inteligente Local (Semántico)"
-        preguntas_generadas = extraer_preguntas_pdf_modo_local(texto_extraido, max_preguntas=10)
+        if not preguntas_generadas:
+            motor_utilizado = "Extractor Inteligente Local (Semántico)"
+            preguntas_generadas = extraer_preguntas_pdf_modo_local(texto_extraido, max_preguntas=10)
 
-    if not preguntas_generadas:
-        raise HTTPException(
-            status_code=400,
-            detail="No se pudieron estructurar preguntas desde el PDF proporcionado.",
-        )
+        del texto_extraido
+        texto_extraido = None
 
-    existentes = listar_preguntas_evento(eid)
-    base_orden = len(existentes)
-    creadas = []
+        if not preguntas_generadas:
+            raise HTTPException(
+                status_code=400,
+                detail="No se pudieron estructurar preguntas desde el PDF proporcionado.",
+            )
 
-    for idx, q in enumerate(preguntas_generadas[:10]):
-        nueva_q = {
-            "evento_id": eid,
-            "enunciado": q["enunciado"],
-            "opcion_a": q["opcion_a"],
-            "opcion_b": q["opcion_b"],
-            "opcion_c": q["opcion_c"],
-            "opcion_d": q["opcion_d"],
-            "respuesta_correcta": q["respuesta_correcta"],
-            "tiempo_limite_segundos": int(tiempo_limite_segundos or q.get("tiempo_limite_segundos") or 20),
-            "orden": base_orden + idx + 1,
-            "activa": False,
-            "revelar_respuesta": False,
+        existentes = listar_preguntas_evento(eid)
+        base_orden = len(existentes)
+        creadas = []
+
+        for idx, q in enumerate(preguntas_generadas[:10]):
+            nueva_q = {
+                "evento_id": eid,
+                "enunciado": q["enunciado"],
+                "opcion_a": q["opcion_a"],
+                "opcion_b": q["opcion_b"],
+                "opcion_c": q["opcion_c"],
+                "opcion_d": q["opcion_d"],
+                "respuesta_correcta": q["respuesta_correcta"],
+                "tiempo_limite_segundos": int(tiempo_limite_segundos or q.get("tiempo_limite_segundos") or 20),
+                "orden": base_orden + idx + 1,
+                "activa": False,
+                "revelar_respuesta": False,
+            }
+            creadas.append(insertar_pregunta_evento(nueva_q))
+
+        invalidar_cache_evento(eid)
+        return {
+            "ok": True,
+            "motor_ia": motor_utilizado,
+            "cantidad_generadas": len(creadas),
+            "preguntas": creadas,
+            "mensaje": f"¡Se generaron {len(creadas)} pregunta(s) desde tu PDF usando {motor_utilizado}!",
         }
-        creadas.append(insertar_pregunta_evento(nueva_q))
-
-    invalidar_cache_evento(eid)
-    return {
-        "ok": True,
-        "motor_ia": motor_utilizado,
-        "cantidad_generadas": len(creadas),
-        "preguntas": creadas,
-        "mensaje": f"¡Se generaron {len(creadas)} pregunta(s) desde tu PDF usando {motor_utilizado}!",
-    }
+    finally:
+        try:
+            archivo_pdf.file.close()
+        except Exception:
+            pass
+        pdf_bytes = None
+        texto_extraido = None
+        liberar_memoria_os()
 
 
 @app.post("/api/admin/eventos/{evento_id}/preguntas-ejemplo")
@@ -3901,7 +3986,9 @@ def editar_pregunta_admin(
         # Sincronizar en la memoria local
         evento_id_afectado = None
         with ESTADOS_EVENTOS_LOCK:
-            for eid, estado_ev in ESTADOS_EVENTOS.items():
+            for eid, estado_ev in _ESTADO_EVENTOS.items():
+                if not isinstance(estado_ev, dict):
+                    continue
                 for q in estado_ev.get("preguntas_fallback", []):
                     if q.get("id") == pid:
                         q.update(campos_update)
@@ -3947,7 +4034,9 @@ def renombrar_invitado_admin(
             print(f"Aviso actualizando nombre de invitado en Supabase: {err}")
 
         with ESTADOS_EVENTOS_LOCK:
-            for eid, estado_ev in ESTADOS_EVENTOS.items():
+            for eid, estado_ev in _ESTADO_EVENTOS.items():
+                if not isinstance(estado_ev, dict):
+                    continue
                 for inv in estado_ev.get("invitados_fallback", []):
                     if inv.get("id") == iid:
                         inv["nombre"] = nuevo_nombre
@@ -4427,7 +4516,7 @@ async def subir_paquete_accesorios_admin(
 
     # 6. Guardar catálogo actualizado en Storage y disco local
     guardar_catalogo_paquetes(catalogo)
-    gc.collect()
+    liberar_memoria_os()
 
     return {
         "ok": True,
@@ -4535,6 +4624,7 @@ def eliminar_paquete_accesorios_admin(
         del catalogo[pkg_id]
 
     guardar_catalogo_paquetes(catalogo)
+    liberar_memoria_os()
 
     return {
         "ok": True,
@@ -4592,6 +4682,7 @@ def eliminar_accesorio_individual_admin(
 
     pkg["accesorios"] = nuevos_accesorios
     guardar_catalogo_paquetes(catalogo)
+    liberar_memoria_os()
 
     return {
         "ok": True,
@@ -4644,6 +4735,7 @@ def vaciar_preguntas_evento_admin(
     estado_ev["respuestas_fallback"] = []
     _guardar_estado_eventos_disco()
     invalidar_cache_evento(eid)
+    liberar_memoria_os()
 
     return {
         "ok": True,
@@ -4871,6 +4963,7 @@ def resolver_evento_proyector(
     4. Fallback global al último evento activo seleccionado en /admin.
     """
     ahora = time.time()
+    _limitar_y_purgar_diccionario_cache(_CACHE_META_EVENTOS_PROYECTOR, ahora, ttl_max=4.0)
     lid_busqueda = local_id.strip() if local_id and local_id.strip() else ""
     if not lid_busqueda and sede:
         s_clean = sede.strip().lower()
@@ -4970,6 +5063,7 @@ def resolver_evento_proyector(
         if ev:
             _CACHE_META_EVENTOS_PROYECTOR[clave_busqueda] = {"ts": ahora, "evento": ev}
             _CACHE_META_EVENTOS_PROYECTOR[f"id:{ev['id']}"] = {"ts": ahora, "evento": ev}
+            _limitar_y_purgar_diccionario_cache(_CACHE_META_EVENTOS_PROYECTOR, ahora, ttl_max=4.0)
         return ev
     except Exception as err:
         print(f"Aviso al resolver evento del proyector: {err}")
