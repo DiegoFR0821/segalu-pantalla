@@ -63,6 +63,7 @@ const podioMencionesBarraEl = document.getElementById("podio-menciones-barra");
 // Estado en memoria del Proyector
 let modoProyectorActual = "";
 let fotosAprobadasCache = [];
+const urlsFotosInvalidas = new Set();
 let indiceCarruselActual = 0;
 let mostrandoMosaicoEnCiclo = false;
 let offsetMosaicoActual = 0;
@@ -352,6 +353,12 @@ function activarVistaModo(modo) {
 // 3. MODO GALERIA FULLSCREEN: CARRUSEL 1x1 + VISTA MOSAICO DE 6 A 8 FOTOS
 // ------------------------------------------------------------------------------
 function mostrarFotoIndividualEnPantalla(indice) {
+    // Filtrar cualquier foto cuya URL haya fallado previamente para jamás mostrar ícono roto
+    fotosAprobadasCache = fotosAprobadasCache.filter((f) => {
+        const u = (f.url_con_marca || f.url_original || "").trim();
+        return Boolean(u) && !urlsFotosInvalidas.has(u);
+    });
+
     if (!fotosAprobadasCache.length) {
         galeriaContenedorFotoActivaEl.classList.add("hidden");
         galeriaContenedorMosaicoEl.classList.add("hidden");
@@ -374,7 +381,7 @@ function mostrarFotoIndividualEnPantalla(indice) {
     indiceCarruselActual = idxSeguro;
 
     const foto = fotosAprobadasCache[idxSeguro];
-    const urlFoto = foto.url_con_marca || foto.url_original || "";
+    const urlFoto = (foto.url_con_marca || foto.url_original || "").trim();
     const invitado = foto.invitados || {};
     const nombreInvitado = invitado.nombre || "Invitado";
     const avatarInvitado = invitado.avatar || "pug_real|corona_imperial";
@@ -395,15 +402,40 @@ function mostrarFotoIndividualEnPantalla(indice) {
     // CAPA 1: Fondo Desenfocado (Ambient Blur 100vw x 100vh)
     galeriaCapaBlurFondoEl.style.backgroundImage = `url("${urlFoto}")`;
 
-    // CAPA 2: Transición fluida (opacity + transform: scale) de la foto central y su marco
+    // CAPA 2: Transición fluida (opacity + transform: scale) y detección de orientación Horizontal/Vertical
     const targetAnimacion = galeriaMarcoWrapperEl || galeriaImgNitidaEl;
     targetAnimacion.classList.add("transicion-foto");
     setTimeout(() => {
-        galeriaImgNitidaEl.src = urlFoto;
+        /* === [EDITAR TAMAÑO DE FOTOS HORIZONTALES Y VERTICALES AQUÍ] === */
+        // Al cargar cada foto proyectada (img.onload), detecta automáticamente si es
+        // horizontal (naturalWidth > naturalHeight) o vertical, y aplica la clase CSS
+        // .foto-proyector-horizontal o .foto-proyector-vertical cuyas dimensiones están en proyector.css (:root).
         galeriaImgNitidaEl.onload = () => {
+            const esHorizontal =
+                galeriaImgNitidaEl.naturalWidth > galeriaImgNitidaEl.naturalHeight;
+            galeriaImgNitidaEl.classList.toggle("foto-proyector-horizontal", esHorizontal);
+            galeriaImgNitidaEl.classList.toggle("foto-proyector-vertical", !esHorizontal);
+            if (galeriaMarcoWrapperEl) {
+                galeriaMarcoWrapperEl.classList.toggle("foto-proyector-horizontal", esHorizontal);
+                galeriaMarcoWrapperEl.classList.toggle("foto-proyector-vertical", !esHorizontal);
+            }
             targetAnimacion.classList.remove("transicion-foto");
         };
-        setTimeout(() => targetAnimacion.classList.remove("transicion-foto"), 140);
+
+        // Si alguna URL antigua falla (onerror), la descarta limpiamente y pasa a la siguiente foto válida
+        galeriaImgNitidaEl.onerror = () => {
+            if (urlFoto) {
+                urlsFotosInvalidas.add(urlFoto);
+            }
+            idFotoMostradaActual = "";
+            fotosAprobadasCache = fotosAprobadasCache.filter(
+                (f) => f.id !== foto.id && !urlsFotosInvalidas.has((f.url_con_marca || f.url_original || "").trim())
+            );
+            mostrarFotoIndividualEnPantalla(indiceCarruselActual);
+        };
+
+        galeriaImgNitidaEl.src = urlFoto;
+        setTimeout(() => targetAnimacion.classList.remove("transicion-foto"), 180);
     }, 220);
 }
 
@@ -450,10 +482,11 @@ function mostrarVistaMosaico6a8() {
             const url = foto.url_con_marca || foto.url_original || "";
             const autor = foto.invitados?.nombre || "Invitado";
             const delayMs = idx * 65;
+            /* === [EDITAR MARCA DE AGUA LOGO SEGALÚ AQUÍ] === */
             return `
                 <div class="mosaico-item-card" style="animation-delay: ${delayMs}ms;">
                     <div class="mosaico-item-blur" style="background-image: url('${url}');"></div>
-                    <img class="mosaico-item-img" src="${url}" alt="Foto de ${escaparHtml(autor)}" />
+                    <img class="mosaico-item-img" src="${url}" alt="" onerror="const c = this.closest('.mosaico-item-card'); if(c) c.style.display='none';" />
                     <div class="mosaico-item-overlay-marca" aria-hidden="true">
                         <img src="/static/img/logo_segalu.png" alt="Segalú" class="mosaico-logo-mini" onerror="this.style.display='none'" />
                     </div>
@@ -552,9 +585,11 @@ function sincronizarModoGaleria(fotosServidor, configServidor) {
         reiniciarTemporizadorGaleria();
     }
 
-    const soloAprobadas = (fotosServidor || []).filter(
-        (f) => String(f.estado_moderacion || "").toLowerCase() === "aprobado"
-    );
+    const soloAprobadas = (fotosServidor || []).filter((f) => {
+        if (String(f.estado_moderacion || "").toLowerCase() !== "aprobado") return false;
+        const u = (f.url_con_marca || f.url_original || "").trim();
+        return Boolean(u) && !urlsFotosInvalidas.has(u);
+    });
 
     const idsPrevios = fotosAprobadasCache.map((f) => f.id).join(",");
     const idsNuevos = soloAprobadas.map((f) => f.id).join(",");
@@ -567,6 +602,7 @@ function sincronizarModoGaleria(fotosServidor, configServidor) {
 
     if (idsPrevios !== idsNuevos) {
         // Si acaba de aprobarse una foto nueva, mostrarla al instante
+        idFotoMostradaActual = "";
         indiceCarruselActual = 0;
         if (modoGaleriaConfig === "mosaico") {
             offsetMosaicoActual = 0;

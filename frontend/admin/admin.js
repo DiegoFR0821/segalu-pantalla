@@ -3511,7 +3511,10 @@ function renderizarTablaLeads(listaLeads) {
             const fechaIso = l.creado_en || "";
             const fechaFmt = fechaIso ? new Date(fechaIso).toLocaleDateString("es-PE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
             const telSoloDigitos = (l.telefono || "").replace(/\D/g, "");
-            const urlWa = telSoloDigitos ? `https://wa.me/51${telSoloDigitos}?text=${encodeURIComponent(`¡Hola ${l.nombre || ''}! Te saludamos de Eventos Segalú. Vemos que solicitaste tu Pase VIP (${l.codigo_promocional || ''}) y nos encantaría brindarte información de nuestros paquetes.`)}` : "#";
+            /* === [EDITAR WHATSAPP 3: MENSAJE AUTOMÁTICO CRM ADMIN AQUÍ] === */
+            // Edita la variable 'mensajeCrmWa' para personalizar el mensaje automático al contactar a un prospecto desde la tabla CRM & Leads:
+            const mensajeCrmWa = `¡Hola ${l.nombre || ""}! Te saludamos de Eventos Segalú. Vemos que solicitaste tu Pase VIP (${l.codigo_promocional || ""}) y nos encantaría brindarte información de nuestros paquetes.`;
+            const urlWa = telSoloDigitos ? `https://wa.me/51${telSoloDigitos}?text=${encodeURIComponent(mensajeCrmWa)}` : "#";
 
             const infoEdad = calcularEdadDetallada(l.fecha_nacimiento);
             let edadHtml = '<span style="color:var(--text-warm-gray);">—</span>';

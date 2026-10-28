@@ -126,12 +126,31 @@ _MAX_CACHE_RAM_ENTRADAS = 30
 _CONTADOR_INSERCIONES_CACHE = 0
 
 
-def _limitar_y_purgar_diccionario_cache(diccionario: dict[str, dict], ttl_seg: float, max_llaves: int = 30):
-    """Purga entradas vencidas y aplica tope estricto de máximo 30 llaves (FIFO/LRU)."""
+def _limitar_y_purgar_diccionario_cache(
+    diccionario: dict[str, dict],
+    ttl_seg: float | None = None,
+    max_llaves: int = 30,
+    ttl: float | None = None,
+    ttl_max: float | None = None,
+    **kwargs,
+):
+    """
+    Purga entradas vencidas y aplica tope estricto de máximo 30 llaves (FIFO/LRU).
+    Soporta invocaciones con ttl_seg, ttl, ttl_max o timestamp posicional sin lanzar TypeError.
+    """
     ahora = time.time()
+    ttl_efectivo = _CACHE_TTL_SEGUNDOS
+    if ttl_max is not None:
+        ttl_efectivo = float(ttl_max)
+    elif ttl is not None:
+        ttl_efectivo = float(ttl)
+    elif ttl_seg is not None:
+        # Si se pasó un timestamp Unix (> 1_000_000_000) como 2do argumento posicional, usar TTL por defecto (4.0s)
+        ttl_efectivo = 4.0 if float(ttl_seg) > 1_000_000_000 else float(ttl_seg)
+
     expiradas = [
         k for k, v in list(diccionario.items())
-        if not isinstance(v, dict) or (ahora - float(v.get("ts", 0))) > ttl_seg
+        if not isinstance(v, dict) or (ahora - float(v.get("ts", 0))) > ttl_efectivo
     ]
     for k in expiradas:
         diccionario.pop(k, None)
@@ -1317,6 +1336,40 @@ def extraer_ruta_storage_de_url(url_multimedia: str | None, evento_id: str = "")
     return None
 
 
+def normalizar_url_multimedia_publica(url_raw: str | None) -> str:
+    """
+    Garantiza que toda foto aprobada tenga una URL pública válida y accesible para el proyector y el muro:
+    1. Si ya es una URL absoluta (https://... de Supabase Storage), la retorna limpia.
+    2. Si es una ruta relativa (/static/uploads/...) y el archivo existe localmente en el contenedor, la conserva.
+    3. Si es una ruta relativa pero el archivo local no existe en el contenedor, construye automáticamente
+       la URL pública oficial del Bucket de Supabase Storage para evitar íconos de imagen rota.
+    """
+    if not url_raw:
+        return ""
+    url_limpia = str(url_raw).split("#")[0].strip()
+    if not url_limpia:
+        return ""
+
+    if url_limpia.startswith("http://") or url_limpia.startswith("https://"):
+        return url_limpia
+
+    nombre_archivo = url_limpia.split("?")[0].split("/")[-1].strip()
+    if nombre_archivo:
+        for posible_local in (
+            LOCAL_UPLOADS_DIR / "multimedia" / nombre_archivo,
+            LOCAL_UPLOADS_DIR / "originales" / nombre_archivo,
+            LOCAL_UPLOADS_DIR / nombre_archivo,
+        ):
+            if posible_local.exists():
+                return url_limpia
+
+        if SUPABASE_URL:
+            base_sb = SUPABASE_URL.rstrip("/")
+            return f"{base_sb}/storage/v1/object/public/{SUPABASE_BUCKET}/multimedia/{nombre_archivo}"
+
+    return url_limpia
+
+
 
 # ------------------------------------------------------------------------------
 # 9. ENDPOINTS PÚBLICOS DEL INVITADO (REGISTRO, FOTOS Y TRIVIA KAHOOT)
@@ -1863,9 +1916,14 @@ def listar_fotos_aprobadas_evento(evento_id: str):
         nombre_autor = inv.get("nombre") if isinstance(inv, dict) else "Invitado"
         mid = f["id"]
         likes_count = int(likes_map.get(mid, 0))
+        url_resuelta = normalizar_url_multimedia_publica(
+            f.get("url_con_marca") or f.get("url_original")
+        )
+        if not url_resuelta:
+            continue
         fotos_formateadas.append({
             "id": mid,
-            "url": f.get("url_con_marca") or f.get("url_original"),
+            "url": url_resuelta,
             "autor": nombre_autor or "Invitado",
             "autor_avatar": inv.get("avatar") if isinstance(inv, dict) else None,
             "created_at": f.get("created_at"),
@@ -2235,6 +2293,12 @@ def construir_dashboard_evento_rapido(evento_id: str, usar_cache: bool = True) -
             item["puntaje_ia_seguridad"] = extraer_puntaje_ia_de_url(
                 item.get("url_original"), item.get("filtro_ia_aprobado", True)
             )
+            url_norm = normalizar_url_multimedia_publica(
+                item.get("url_con_marca") or item.get("url_original")
+            )
+            if url_norm:
+                item["url_con_marca"] = url_norm
+                item["url_original"] = normalizar_url_multimedia_publica(item.get("url_original")) or url_norm
             multimedia_lista.append(item)
     except Exception as err_m:
         print(f"Aviso en consulta multimedia dashboard: {err_m}")
@@ -4963,7 +5027,7 @@ def resolver_evento_proyector(
     4. Fallback global al último evento activo seleccionado en /admin.
     """
     ahora = time.time()
-    _limitar_y_purgar_diccionario_cache(_CACHE_META_EVENTOS_PROYECTOR, ahora, ttl_max=4.0)
+    _limitar_y_purgar_diccionario_cache(_CACHE_META_EVENTOS_PROYECTOR, ttl_seg=4.0, max_llaves=_MAX_CACHE_RAM_ENTRADAS, ttl_max=4.0)
     lid_busqueda = local_id.strip() if local_id and local_id.strip() else ""
     if not lid_busqueda and sede:
         s_clean = sede.strip().lower()
@@ -5063,7 +5127,7 @@ def resolver_evento_proyector(
         if ev:
             _CACHE_META_EVENTOS_PROYECTOR[clave_busqueda] = {"ts": ahora, "evento": ev}
             _CACHE_META_EVENTOS_PROYECTOR[f"id:{ev['id']}"] = {"ts": ahora, "evento": ev}
-            _limitar_y_purgar_diccionario_cache(_CACHE_META_EVENTOS_PROYECTOR, ahora, ttl_max=4.0)
+            _limitar_y_purgar_diccionario_cache(_CACHE_META_EVENTOS_PROYECTOR, ttl_seg=4.0, max_llaves=_MAX_CACHE_RAM_ENTRADAS, ttl_max=4.0)
         return ev
     except Exception as err:
         print(f"Aviso al resolver evento del proyector: {err}")
@@ -5113,12 +5177,20 @@ def obtener_estado_proyector_en_vivo(
     estado_ev = obtener_estado_evento(eid)
     fase = estado_ev.get("fase_trivia", "inactiva")
 
-    # 1. Filtrar ESTRICTAMENTE las fotos con estado_moderacion == 'aprobado'
-    fotos_aprobadas = [
-        m
-        for m in (datos_dash.get("multimedia") or [])
-        if str(m.get("estado_moderacion") or "").lower() == "aprobado"
-    ]
+    # 1. Filtrar ESTRICTAMENTE las fotos con estado_moderacion == 'aprobado' y URL pública válida
+    fotos_aprobadas = []
+    for m in (datos_dash.get("multimedia") or []):
+        if str(m.get("estado_moderacion") or "").lower() != "aprobado":
+            continue
+        url_valida = normalizar_url_multimedia_publica(
+            m.get("url_con_marca") or m.get("url_original")
+        )
+        if not url_valida:
+            continue
+        item_foto = dict(m)
+        item_foto["url_con_marca"] = url_valida
+        item_foto["url_original"] = normalizar_url_multimedia_publica(m.get("url_original")) or url_valida
+        fotos_aprobadas.append(item_foto)
 
     # 2. Lista de invitados generales, Top del Podio y filtro exclusivo de "Invitados en la Pista"
     invitados = datos_dash.get("invitados") or []

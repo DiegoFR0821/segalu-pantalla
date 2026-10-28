@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/proyector/proyector.css?v=20261018c" />
+    <link rel="stylesheet" href="/proyector/proyector.css?v=20261028b" />
 </head>
 <body>
     <!-- Lienzo de Fuegos Artificiales a 60 FPS para el Podio -->
@@ -30,18 +30,20 @@
                 <div id="galeria-capa-blur-fondo" class="galeria-capa-blur-fondo"></div>
                 <div class="galeria-capa-velo-suave"></div>
 
-                <!-- CAPA 2A: Vista de Foto Individual Nítida (max-height: 92vh, max-width: 90vw) -->
-                <div id="galeria-contenedor-foto-activa" class="galeria-contenedor-foto-activa">
+                <!-- CAPA 2A: Vista de Foto Individual Nítida (Horizontal y Vertical parametrizadas) -->
+                <div id="galeria-contenedor-foto-activa" class="galeria-contenedor-foto-activa hidden">
                     <div class="galeria-marco-corporativo-wrapper" id="galeria-marco-wrapper">
                         <img
                             id="galeria-img-nitida"
                             class="galeria-img-nitida"
-                            src=""
-                            alt="Fotografía aprobada del evento"
+                            src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+                            alt=""
                         />
-                        <!-- Capa flotante superpuesta mediante CSS del Marco y Logo de Segalú -->
+                        <!-- /* === [EDITAR MARCA DE AGUA LOGO SEGALÚ AQUÍ] === */ -->
+                        <!-- El tamaño, opacidad, posición y sombra de este logo se controlan en proyector.css (:root) -->
                         <div class="galeria-overlay-marca-flotante" aria-hidden="true">
                             <img
+                                id="galeria-logo-marca-overlay"
                                 src="/static/img/logo_segalu.png"
                                 alt="Sello Segalú"
                                 class="galeria-logo-marca-overlay"
@@ -57,7 +59,7 @@
                 </div>
 
                 <!-- REQUERIMIENTO 5: Cápsula pequeña, translúcida y fija en la esquina inferior izquierda -->
-                <div id="galeria-autor-capsula" class="galeria-autor-capsula">
+                <div id="galeria-autor-capsula" class="galeria-autor-capsula hidden">
                     <div id="galeria-autor-avatar" class="galeria-autor-avatar-mini"></div>
                     <span class="galeria-autor-texto-compacto">
                         En vivo por <strong id="galeria-autor-nombre">Invitado</strong>
@@ -65,7 +67,7 @@
                 </div>
 
                 <!-- Estado elegante cuando aún no hay fotos aprobadas -->
-                <div id="galeria-estado-vacio" class="galeria-estado-vacio hidden">
+                <div id="galeria-estado-vacio" class="galeria-estado-vacio">
                     <img src="/static/img/logo_segalu.png" alt="Logo Segalú" class="galeria-vacio-logo" />
                     <h2 class="galeria-vacio-titulo">¡Comparte tus mejores momentos en la Pantalla Gigante!</h2>
                     <p class="galeria-vacio-subtitulo">
@@ -352,6 +354,6 @@
 
     <!-- Librería ligera canvas-confetti + motor propio de fuegos artificiales a 60 FPS -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
-    <script src="/proyector/proyector.js?v=20261018c"></script>
+    <script src="/proyector/proyector.js?v=20261028b"></script>
 </body>
 </html>

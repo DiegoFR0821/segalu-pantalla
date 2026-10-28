@@ -7,6 +7,9 @@
 
 const STORAGE_KEY_SESION = "segalu_sesion_invitado";
 const STORAGE_KEY_EN_TRIVIA = "segalu_invitado_en_trivia";
+
+/* === [EDITAR WHATSAPP 2: BOTÓN FLOTANTE INVITADO AQUÍ] === */
+// Número de teléfono oficial (con código de país 51 sin signo +) usado por el botón flotante de WhatsApp y el cupón VIP:
 const TELEFONO_WHATSAPP_SEGALU = "51907512340"; // Número oficial de Segalú (Carabayllo)
 
 // ==============================================================================
@@ -725,7 +728,8 @@ function actualizarCabeceraYWhatsApp(evento) {
     tituloEventoEl.innerHTML = `¡Bienvenido a <em class="gold-italic">${nombreEvento}</em>!`;
     subtituloLocalEl.textContent = nombreLocal.toUpperCase();
 
-    // Mensaje de gancho comercial dinámico en UTF-8 para identificar clientes desde la aplicación
+    /* === [EDITAR WHATSAPP 2: BOTÓN FLOTANTE INVITADO AQUÍ] === */
+    // Edita la variable 'mensajeRastreo' para cambiar el mensaje predeterminado del botón flotante verde (esquina inferior derecha):
     const mensajeRastreo = `¡Hola Eventos Segalú! 🎉 Estoy participando en vivo en el evento ${nombreEvento} desde la app interactiva y me encantaría cotizar una fecha con mi beneficio especial de invitado.`;
     const urlWaOficial = `https://wa.me/${TELEFONO_WHATSAPP_SEGALU}?text=${encodeURIComponent(mensajeRastreo)}`;
 
@@ -2528,6 +2532,8 @@ function mostrarTarjetaCuponGenerado(leadData) {
     }
 
     if (btnCompartirCuponWaEl) {
+        /* === [EDITAR WHATSAPP 1: CUPÓN VALIDAR POR WHATSAPP AQUÍ] === */
+        // Edita la variable 'msgWa' para personalizar el mensaje que se envía cuando el invitado reclama su Cupón / Descuento Especial:
         const nombreEvento = eventoActual?.nombre || "Gala Segalú";
         const msgWa = `¡Hola Eventos Segalú! 🎁 Tengo mi Pase VIP con código promocional "${codigoPromo}" generado en el evento "${nombreEvento}" y deseo cotizar mi fecha con mi beneficio exclusivo.`;
         btnCompartirCuponWaEl.href = `https://wa.me/${TELEFONO_WHATSAPP_SEGALU}?text=${encodeURIComponent(msgWa)}`;
