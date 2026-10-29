@@ -8,35 +8,13 @@
 
 :root {
     /* ====================================================================== */
-    /* /* === [EDITAR TAMAÑO DE FOTOS HORIZONTALES Y VERTICALES AQUÍ] === */  */
-    /* Ajusta estos valores en vw (ancho de pantalla) y vh (alto de pantalla) */
-    /* para agrandar o achicar las fotos proyectadas y eliminar bordes vacíos */
+    /* 1. VARIABLES GENERALES DE GALERÍA Y BORDES DEL PROYECTOR               */
     /* ====================================================================== */
-    --foto-horiz-ancho: 92vw;         /* Ancho objetivo de fotos HORIZONTALES (ej. 88vw, 92vw, 96vw) */
-    --foto-horiz-alto-max: 92vh;      /* Alto máximo permitido en fotos HORIZONTALES (ej. 90vh, 94vh) */
-    --foto-vert-alto: 92vh;           /* Alto objetivo de fotos VERTICALES (ej. 88vh, 92vh, 95vh)    */
-    --foto-vert-ancho-max: 84vw;      /* Ancho máximo permitido en fotos VERTICALES (ej. 78vw, 85vw) */
-    --foto-ajuste-modo: contain;      /* Modo de encuadre: 'contain' (completa) o 'cover' (llenar)   */
-
-    --foto-max-height: 92vh;          /* Respaldo general de alto máximo de la foto nítida central   */
-    --foto-max-width: 92vw;           /* Respaldo general de ancho máximo de la foto nítida central  */
-    --foto-border-radius: 18px;       /* Redondeo de esquinas de las fotos (Dark Luxury)             */
-    --blur-intensidad: 38px;          /* Intensidad del desenfoque de fondo (Ambient Blur)           */
-    --transicion-duracion: 0.8s;      /* Duración de la transición suave entre fotos                 */
-
-    /* ====================================================================== */
-    /* /* === [EDITAR MARCA DE AGUA LOGO SEGALÚ] === */                       */
-    /* /* === [EDITAR MARCA DE AGUA LOGO SEGALÚ AQUÍ] === */                  */
-    /* Cambia aquí el ancho (en px o vw), opacidad y posición del logo        */
-    /* que se superpone en la esquina superior izquierda de cada tarjeta      */
-    /* ====================================================================== */
-    --logo-marca-agua-ancho: 130px;   /* Ancho del logo en la esquina superior izquierda */
-    --logo-marca-agua-tamano: 130px;  /* Alias compatible para tamaño del logo */
-    --logo-marca-agua-opacidad: 0.90; /* Nivel de visibilidad */
-    --logo-marca-agua-top: 24px;      /* Margen superior dentro de la tarjeta */
-    --logo-marca-agua-left: 24px;     /* Margen izquierdo dentro de la tarjeta */
-    --logo-marca-agua-sombra: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.85)); /* Sombra para resaltar sobre fotos claras */
-    --logo-marca-agua-mosaico-tamano: 56px; /* Ancho del logo dentro de las tarjetas del mosaico (6-8 fotos) */
+    --foto-max-height: 92vh;          /* Alto máximo general de la foto central */
+    --foto-max-width: 90vw;           /* Ancho máximo general de la foto central */
+    --foto-border-radius: 22px;       /* Redondeo de esquinas de fotos y mosaicos */
+    --blur-intensidad: 38px;          /* Intensidad del desenfoque de fondo (Ambient Blur) */
+    --transicion-duracion: 0.8s;      /* Duración de la transición suave entre fotos */
 
     /* ====================================================================== */
     /* 2. VARIABLES DE ATMÓSFERA DE JUEGO KAHOOT (FONDO NEGRO Y DIVS PLOMO)   */
@@ -189,19 +167,22 @@ body {
     padding: 0;
 }
 
-/* /* === [EDITAR TAMAÑO DE FOTOS HORIZONTALES Y VERTICALES AQUÍ] === */ */
-/* Contenedor responsivo Dark Luxury que abraza exactamente a la foto y envuelve la marca de agua */
+/* Contenedor responsivo con borde dorado que abraza la foto exacta y envuelve el logo */
 .galeria-marco-corporativo-wrapper {
     position: relative;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     max-height: var(--foto-max-height);
     max-width: var(--foto-max-width);
-    border-radius: 18px;
-    border: 2px solid rgba(212, 175, 55, 0.6);
+    border-radius: var(--foto-border-radius);
+    border: 2px solid rgba(212, 175, 55, 0.75);
     background-color: #0F141F;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(212, 175, 55, 0.25);
     overflow: hidden;
-    line-height: 0;
+    box-shadow:
+        0 28px 72px rgba(0, 0, 0, 0.65),
+        0 0 24px rgba(212, 175, 55, 0.28),
+        0 0 0 1px rgba(245, 215, 127, 0.35);
     opacity: 1;
     transform: scale(1);
     transition:
@@ -215,58 +196,56 @@ body {
     transform: scale(0.965);
 }
 
+/* === [EDITAR TAMAÑO DE LA FOTO EN PROYECTOR AQUÍ] === */
 .galeria-img-nitida {
+    max-height: 92vh;               /* Alto máximo base de la foto (ej. 85vh, 90vh, 92vh) */
+    max-width: 90vw;                /* Ancho máximo base de la foto (ej. 85vw, 90vw, 94vw) */
+    width: auto;                    /* Mantiene proporción natural sin deformar */
+    height: auto;                   /* Mantiene proporción natural sin deformar */
+    border-radius: 20px;            /* Suaviza las esquinas internas junto al borde dorado */
+    object-fit: contain;
     display: block;
-    max-height: var(--foto-max-height);
-    max-width: var(--foto-max-width);
-    width: 100%;
-    height: 100%;
-    border-radius: 16px;
-    object-fit: var(--foto-ajuste-modo, contain);
 }
 
-/* Reglas dedicadas para FOTOS HORIZONTALES (aprovechan el ancho/alto sin deformar ni dejar bordes) */
-.galeria-marco-corporativo-wrapper.foto-proyector-horizontal {
-    max-width: var(--foto-horiz-ancho);
-    max-height: var(--foto-horiz-alto-max);
-}
-
+/* Tamaño cuando la foto es HORIZONTAL (ej. 4:3 o 16:9) */
 .galeria-img-nitida.foto-proyector-horizontal {
-    max-width: var(--foto-horiz-ancho);
-    max-height: var(--foto-horiz-alto-max);
-    object-fit: var(--foto-ajuste-modo, contain);
+    height: 88vh;                   /* Cambia este valor para agrandar o achicar fotos horizontales (ej. 82vh, 88vh, 92vh) */
+    width: auto;                    /* Ajusta el ancho automáticamente al borde exacto de la foto */
+    max-width: 90vw;                /* Límite de ancho en pantalla (ej. 86vw, 90vw, 94vw) */
 }
 
-/* Reglas dedicadas para FOTOS VERTICALES (aprovechan la altura completa de la pantalla gigante) */
-.galeria-marco-corporativo-wrapper.foto-proyector-vertical {
-    max-height: var(--foto-vert-alto);
-    max-width: var(--foto-vert-ancho-max);
+/* Tamaño cuando la foto es PANORÁMICA MUY ANCHA */
+.galeria-img-nitida.foto-proyector-panoramica {
+    width: 90vw;                    /* Cambia este valor para ajustar el ancho de fotos panorámicas (ej. 85vw, 90vw, 94vw) */
+    height: auto;                   /* Ajusta el alto automáticamente al borde exacto de la foto */
+    max-height: 88vh;               /* Límite de alto en pantalla */
 }
 
+/* Tamaño cuando la foto es VERTICAL (tomada con celular en vertical) */
 .galeria-img-nitida.foto-proyector-vertical {
-    max-height: var(--foto-vert-alto);
-    max-width: var(--foto-vert-ancho-max);
-    object-fit: var(--foto-ajuste-modo, contain);
+    height: 90vh;                   /* Cambia este valor para agrandar o achicar fotos verticales (ej. 84vh, 90vh, 94vh) */
+    width: auto;                    /* Ajusta el ancho automáticamente al borde exacto de la foto */
+    max-width: 85vw;                /* Límite de ancho en pantalla */
 }
 
-/* /* === [EDITAR MARCA DE AGUA LOGO SEGALÚ] === */ */
-/* /* === [EDITAR MARCA DE AGUA LOGO SEGALÚ AQUÍ] === */ */
-/* Capa flotante superpuesta estrictamente en la esquina superior izquierda dentro de la tarjeta */
+/* === [EDITAR TAMAÑO Y POSICIÓN DEL LOGO SUPERPUESTO AQUÍ] === */
+/* (Vista Individual 1x1: Logo de Segalú flotando en la esquina superior izquierda SOBRE la foto) */
 .galeria-overlay-marca-flotante {
     position: absolute;
-    top: var(--logo-marca-agua-top, 24px);
-    left: var(--logo-marca-agua-left, 24px);
-    z-index: 10;
+    top: 20px;                      /* Distancia desde el borde superior de la foto (en px) */
+    left: 24px;                     /* Distancia desde el borde izquierdo de la foto (en px) */
+    z-index: 10;                    /* Mantiene el logo superpuesto encima de la fotografía */
     pointer-events: none;
-    display: block;
-    filter: var(--logo-marca-agua-sombra, drop-shadow(0 4px 12px rgba(0, 0, 0, 0.85)));
+    display: flex;
+    align-items: center;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.78));
 }
 
 .galeria-logo-marca-overlay {
-    width: var(--logo-marca-agua-ancho, var(--logo-marca-agua-tamano, 130px));
-    height: auto;
+    width: 78px;                    /* Ancho del logo en vista 1x1 en píxeles (ej. 65px, 78px, 95px, 120px) */
+    height: auto;                   /* Calcula el alto proporcionalmente para no deformar el logo */
     object-fit: contain;
-    opacity: var(--logo-marca-agua-opacidad, 0.90);
+    opacity: 0.94;                  /* Opacidad del logo (de 0.10 transparente a 1.00 sólido) */
     display: block;
 }
 
@@ -312,11 +291,13 @@ body {
     position: relative;
     width: 100%;
     height: 100%;
-    border-radius: 18px;
+    border-radius: var(--foto-border-radius);
     overflow: hidden;
-    background-color: #0F141F;
-    border: 2px solid rgba(212, 175, 55, 0.6);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(212, 175, 55, 0.25);
+    background: rgba(20, 20, 28, 0.55);
+    border: 2px solid rgba(212, 175, 55, 0.75);
+    box-shadow:
+        0 18px 42px rgba(0, 0, 0, 0.55),
+        0 0 18px rgba(212, 175, 55, 0.22);
     opacity: 0;
     transform: translateY(14px) scale(0.96);
     animation: aparicionTarjetaMosaico 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -343,27 +324,28 @@ body {
     z-index: 2;
     width: 100%;
     height: 100%;
-    border-radius: 16px;
     object-fit: contain;
     display: block;
 }
 
-/* /* === [EDITAR MARCA DE AGUA LOGO SEGALÚ AQUÍ] === */ (Versión Mosaico 6-8 fotos) */
+/* === [EDITAR TAMAÑO Y POSICIÓN DEL LOGO SUPERPUESTO AQUÍ] === */
+/* (Vista Mosaico 6-8 fotos: Logo de Segalú superpuesto en la esquina superior izquierda de cada tarjeta) */
 .mosaico-item-overlay-marca {
     position: absolute;
-    top: 16px;
-    left: 16px;
-    z-index: 10;
+    top: 12px;                      /* Distancia desde el borde superior de cada tarjeta del mosaico (en px) */
+    left: 14px;                     /* Distancia desde el borde izquierdo de cada tarjeta del mosaico (en px) */
+    z-index: 10;                    /* Mantiene el logo superpuesto encima de cada foto del mosaico */
     pointer-events: none;
-    display: block;
-    filter: var(--logo-marca-agua-sombra, drop-shadow(0 4px 12px rgba(0, 0, 0, 0.85)));
+    display: flex;
+    align-items: center;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.78));
 }
 
 .mosaico-logo-mini {
-    width: var(--logo-marca-agua-mosaico-tamano, 56px);
-    height: auto;
+    width: 42px;                    /* Ancho del logo en el mosaico en píxeles (ej. 30px, 42px, 56px) */
+    height: auto;                   /* Calcula el alto proporcionalmente para no deformar el logo */
     object-fit: contain;
-    opacity: var(--logo-marca-agua-opacidad, 0.90);
+    opacity: 0.92;                  /* Opacidad del logo en el mosaico (de 0.10 a 1.00) */
     display: block;
 }
 
